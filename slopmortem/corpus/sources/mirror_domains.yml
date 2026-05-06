@@ -1,0 +1,12 @@
+# Aggregator / syndicated-content rehosts. Suffix match: a host matches when
+# it equals the listed domain or ends with `.<domain>`. Match is host-only
+# and case-insensitive (canonicalisation lowercases hosts upstream).
+#
+# Seed list intentionally small. Easy to grow if filler reappears at scores
+# above min_score.
+- bundle.app          # observed mirroring TechCrunch in 2026-05-06 probe
+- flipboard.com
+- feedly.com
+- smartnews.com
+- inoreader.com
+- news.google.com

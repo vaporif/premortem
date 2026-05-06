@@ -1,0 +1,18 @@
+queries:
+  - "startup shuts down"
+  - "startup ceases operations"
+  - "startup files for bankruptcy"
+  - "company winds down"
+  - "startup files chapter 11"
+  - "startup lays off all staff"
+  - "tech startup closes operations"
+  - "startup runs out of cash"
+  - "startup fails to raise funding"
+  - "company shutters operations"
+year_range:
+  start: 2024  # Tavily news index empirically empty for these queries before 2024
+  # `end` intentionally omitted: source defaults to datetime.now(UTC).year.
+  # Set explicitly only for one-off historical sweeps via YAML or CLI.
+max_emit: 200
+min_score: 0.3
+search_depth: basic     # basic = 1 credit/call, advanced = 2 credits/call
