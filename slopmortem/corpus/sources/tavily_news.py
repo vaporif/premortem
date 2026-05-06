@@ -3,9 +3,9 @@
 Pipeline:
   1. Materialise (query, year, quarter) triples from YAML defaults
      overridden by constructor kwargs.
-  2. Fan out one POST /search per triple under
-     anyio.CapacityLimiter(5), routed through gather_resilient so a
-     bad call doesn't take down siblings.
+  2. Fan out one POST /search per triple under the configured
+     CapacityLimiter, routed through gather_resilient so a bad
+     call doesn't take down siblings.
   3. Flatten + filter (min_score, missing url/raw_content/score).
   4. Canonicalise URLs (strip utm_*, fbclid, gclid, ref, ref_src,
      feature, _ga; lowercase host; drop fragment; trailing slash).
@@ -18,8 +18,8 @@ Pipeline:
 
 Why collect-then-rank instead of streaming: parallel gather_resilient
 completion order is non-deterministic. Score-best-wins matters more
-than first-yield latency, and the ~24 MB peak memory across 120 calls
-is trivial.
+than first-yield latency, and the peak memory across the
+queries x years x 4 fan-out is trivial.
 """
 
 from __future__ import annotations
@@ -403,12 +403,21 @@ class TavilyNewsSource:
         )
 
         # ``_one_call`` swallows ``httpx.HTTPError`` / ``ValueError`` and returns
-        # ``None``; ``gather_resilient`` only surfaces unexpected ``Exception``s.
-        # Both paths count as a failed call so the operator log matches reality.
+        # ``None``; anything else (SSRFBlockedError, TimeoutError, KeyError, ...)
+        # surfaces here via ``gather_resilient`` and gets logged with its type so
+        # an operator can tell a real outage from an API-shape miss.
         flat: list[dict[str, object]] = []
         failures = 0
         for r in results:
-            if isinstance(r, Exception) or r is None:
+            if isinstance(r, Exception):
+                logger.warning(
+                    "tavily_news: unexpected error: %s: %s",
+                    type(r).__name__,
+                    r,
+                )
+                failures += 1
+                continue
+            if r is None:
                 failures += 1
                 continue
             flat.extend(r)
