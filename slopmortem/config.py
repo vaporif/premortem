@@ -49,6 +49,7 @@ class Config(BaseSettings):
     model_synthesize: str = "anthropic/claude-sonnet-4.6"
     model_consolidate: str = "anthropic/claude-sonnet-4.6"
     model_pitch_filler: str = "anthropic/claude-haiku-4.5"
+    model_title_pre_filter: str = "anthropic/claude-haiku-4.5"
 
     # Per-stage output caps. OpenRouter holds upfront credit for the model's
     # max output, so leaving these unset reserves the full 64K Anthropic
@@ -62,6 +63,7 @@ class Config(BaseSettings):
     max_tokens_slop_judge: int = Field(default=64, ge=1)
     max_tokens_tiebreaker: int = Field(default=256, ge=1)
     max_tokens_pitch_filler: int = Field(default=1500, ge=1)
+    max_tokens_title_pre_filter: int = Field(default=16, ge=1)
 
     embedding_provider: Literal["fastembed", "openai"] = "fastembed"
     embed_model_id: str = "nomic-ai/nomic-embed-text-v1.5"
@@ -74,6 +76,7 @@ class Config(BaseSettings):
 
     enable_tavily_synthesis: bool = False
     enable_pitch_filler: bool = False
+    enable_title_pre_filter: bool = False
     pitch_filler_max_chars_per_result: int = Field(default=2500, ge=1)
     enable_tracing: bool = False
     strict_deaths: bool = False

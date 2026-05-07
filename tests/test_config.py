@@ -179,3 +179,10 @@ def test_fastembed_provider_does_not_require_openai_key(tmp_path, monkeypatch):
     cfg = Config()
     assert cfg.embedding_provider == "fastembed"
     assert cfg.openai_api_key.get_secret_value() == ""
+
+
+def test_title_pre_filter_config_defaults() -> None:
+    c = Config()
+    assert c.enable_title_pre_filter is False
+    assert c.model_title_pre_filter == "anthropic/claude-haiku-4.5"
+    assert c.max_tokens_title_pre_filter == 16
