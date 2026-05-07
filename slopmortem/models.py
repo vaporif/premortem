@@ -338,6 +338,11 @@ class RawEntry(BaseModel):
     # (no primary HTML body backing it). Threads through to
     # ``CandidatePayload.provenance="synthesized"`` at payload assembly.
     synthesized: bool = False
+    # Set by HaikuTitlePreFilter when the HN title fails the cheap "is this a
+    # death narrative?" gate. Downstream enrichers (pitch filler) and the
+    # ingest classify loop short-circuit on this flag so rejected entries
+    # never trigger a Tavily call or a slop classifier call.
+    title_pre_filter_rejected: bool = False
 
 
 class AliasEdge(BaseModel):
