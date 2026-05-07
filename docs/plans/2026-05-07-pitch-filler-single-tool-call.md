@@ -485,7 +485,7 @@ Expected: clean.
 Run: `just lint`
 Expected: clean. If ruff complains about the unused-variable rename (`_turn` → `turn`), it's because it interpreted the underscore prefix as "intentionally unused"; the rename is correct.
 
-- [ ] **Step 2.10: Commit**
+- [x] **Step 2.10: Commit**
 
 Run:
 
