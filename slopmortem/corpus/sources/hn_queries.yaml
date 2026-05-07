@@ -1,0 +1,25 @@
+# HN Algolia phrase-driven discovery config. Phrases are matched against
+# story titles + bodies via /search_by_date (chronological, not relevance-
+# ranked). Each (phrase, calendar-year) window paginates up to
+# ``pages_per_window`` × ``hits_per_page`` hits. Year-window slicing is
+# what makes the long tail reachable — flat pagination from "most recent"
+# only covers ~2.5 years before exhausting a 20-page budget.
+# Dedup is by HN ``objectID`` across phrases and windows.
+#
+# To add a phrase: append a string to ``phrases``. Re-record the HN cassette
+# (see ``docs/cassettes.md``) before committing.
+defaults:
+  date_from: "2015-01-01"
+  date_to: ""                # empty = open-ended (today)
+  pages_per_window: 3        # max pages per (phrase, year) window — 3 × 30 = 90 hits/window
+  hits_per_page: 30
+
+phrases:
+  - "shutting down"
+  - "winding down"
+  - "winds down"
+  - "wound down"
+  - "is closing"
+  - "we're closing"
+  - "post-mortem"
+  - "sunsetting"
