@@ -191,7 +191,7 @@ Expected: 16-char SHA prints, then `{'system': '...', 'user': 'HN title: Lytro i
 - Modify: `slopmortem/config.py:46-77`
 - Test: `tests/test_config.py` (append)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/test_config.py`:
 
@@ -204,12 +204,12 @@ def test_title_pre_filter_config_defaults() -> None:
     assert c.max_tokens_title_pre_filter == 16
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_config.py::test_title_pre_filter_config_defaults -v`
 Expected: FAIL — `'Config' object has no attribute 'enable_title_pre_filter'` (or pydantic validation error).
 
-- [ ] **Step 3: Add the config keys**
+- [x] **Step 3: Add the config keys**
 
 In `slopmortem/config.py`, add these lines near the existing `model_pitch_filler` (~line 51), `max_tokens_pitch_filler` (~line 64), and `enable_pitch_filler` (~line 76):
 
@@ -219,17 +219,17 @@ In `slopmortem/config.py`, add these lines near the existing `model_pitch_filler
     enable_title_pre_filter: bool = False
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_config.py::test_title_pre_filter_config_defaults -v`
 Expected: PASS.
 
-- [ ] **Step 5: Lint + typecheck**
+- [x] **Step 5: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 `git add slopmortem/config.py tests/test_config.py && git commit -m "config: title pre-filter keys"`
 
