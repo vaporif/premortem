@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 ENDPOINT: Final = "https://hn.algolia.com/api/v1/search_by_date"
 DEFAULT_PAGES_PER_WINDOW: Final = 3
 DEFAULT_HITS_PER_PAGE: Final = 30
-DEFAULT_LOOKBACK_YEARS: Final = 11  # if date_from is unset, look back this many years
+DEFAULT_LOOKBACK_YEARS: Final = 11  # fallback lookback when date_from is unset
 
 
 def _epoch(date_str: str) -> int | None:
@@ -53,8 +53,8 @@ def _epoch(date_str: str) -> int | None:
 
 
 def _coerce_int(name: str, raw: object, default: int) -> int:
-    # bool is an int subclass in Python; reject it explicitly so
-    # ``pages_per_window: true`` doesn't silently become ``1``.
+    # ``bool`` is a subclass of ``int``, so check it first — otherwise
+    # ``pages_per_window: true`` silently becomes ``1``.
     if isinstance(raw, bool):
         msg = f"hn_queries.yaml: 'defaults.{name}' must be an integer, got bool"
         raise TypeError(msg)
@@ -158,14 +158,10 @@ class HNAlgoliaSource:
         )
 
     def _build_url(self, phrase: str, page: int, win_start: int, win_end: int) -> str:
-        # Wrap the phrase in literal double-quotes so HN Algolia treats it as
-        # a phrase match instead of AND-ing the tokens. Without quoting,
-        # ``shutting down`` matches anything containing both words anywhere
-        # (titles, comments, body) — e.g. an Ask-HN about "shoot...down" — and
-        # our cost / signal estimates assume phrase semantics.
+        # Literal double-quotes turn this into a phrase match. Bare tokens
+        # AND-search across title/comments/body and explode recall.
         quoted_phrase = f'"{phrase}"'
-        # Inclusive lower bound (``>=``) preserves the old source's edge
-        # behaviour for stories landing exactly on a year boundary.
+        # ``>=`` keeps stories posted exactly at the year boundary.
         numeric = f"created_at_i>={win_start},created_at_i<{win_end}"
         return (
             f"{ENDPOINT}?query={quote_plus(quoted_phrase)}&tags=story"
@@ -184,9 +180,8 @@ class HNAlgoliaSource:
         if not isinstance(object_id, str) or not object_id:
             return None
         if not isinstance(url, str) or not url:
-            # Ask-HN / Show-HN self-posts have no URL and would have nothing
-            # for the Tavily enricher to fetch. See "Drop URL-less hits" in
-            # the plan rationale.
+            # Ask-HN / Show-HN self-posts have no external URL; the Tavily
+            # enricher would have nothing to fetch.
             return None
         title_str = title if isinstance(title, str) else str(title)
         markdown = (
@@ -209,8 +204,7 @@ class HNAlgoliaSource:
         self, phrase: str, page: int, win_start: int, win_end: int
     ) -> list[dict[str, object]] | None:
         url = self._build_url(phrase, page, win_start, win_end)
-        # Robots is host-cached and checked once at the top of fetch();
-        # skip per-call recheck.
+        # ``fetch`` already cleared robots once per host; skip the recheck.
         await throttle_for(url, rps=self.rps)
         resp = await safe_get(url)
         if resp.status_code >= HTTP_BAD_REQUEST:
@@ -234,10 +228,9 @@ class HNAlgoliaSource:
         return [cast("dict[str, object]", h) for h in hits_list if isinstance(h, dict)]
 
     async def fetch(self) -> AsyncIterator[RawEntry]:
-        # Robots check is per-host, not per-URL: hit it once up front so a
-        # blocked endpoint short-circuits the entire run instead of being
-        # re-checked across every (phrase, year, page) iteration. ``ENDPOINT``
-        # is a valid URL on hn.algolia.com — respect_robots only inspects host.
+        # Robots is checked per-host. One check up front skips ~288 redundant
+        # rechecks across every (phrase, year, page) and makes a blocked
+        # endpoint short-circuit the whole run.
         if not await respect_robots(ENDPOINT, user_agent=self.user_agent):
             logger.info("hn_algolia: robots blocked %s; skipping source", ENDPOINT)
             return
@@ -247,9 +240,8 @@ class HNAlgoliaSource:
                 for page in range(self.pages_per_window):
                     hits = await self._fetch_page(phrase, page, win_start, win_end)
                     if hits is None or not hits:
-                        # None = HTTP error or response shape mismatch (logged
-                        # in _fetch_page); empty = window exhausted. Either
-                        # way, stop paginating this window and move on.
+                        # None: HTTP error or bad shape (logged upstream).
+                        # Empty: window exhausted. Either way, next window.
                         break
                     for hit in hits:
                         entry = self._hit_to_entry(hit)
