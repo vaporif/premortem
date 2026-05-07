@@ -773,7 +773,7 @@ git commit -m "feat: hn yaml phrase-driven discovery"
 - Modify: `slopmortem/cli/_ingest_cmd.py` (constructor call + helper for default YAML path)
 - Re-record: any HN-touching cassettes under `tests/.../cassettes/`
 
-- [ ] **Step 2.1: Add the default-YAML helper**
+- [x] **Step 2.1: Add the default-YAML helper**
 
 In `slopmortem/cli/_ingest_cmd.py`, immediately below the existing `_default_curated_yaml()` helper, add a mirror — same `Path(__file__).parent.parent` traversal (no `.resolve()`) so the two helpers stay parallel:
 
@@ -782,7 +782,7 @@ def _default_hn_queries_yaml() -> Path:
     return Path(__file__).parent.parent / "corpus" / "sources" / "hn_queries.yaml"
 ```
 
-- [ ] **Step 2.2: Update the source-list construction**
+- [x] **Step 2.2: Update the source-list construction**
 
 In `_run_ingest` (the `sources: list[Source] = [...]` block, currently around line 317), replace the existing line:
 
@@ -796,7 +796,7 @@ with:
 HNAlgoliaSource(queries_yaml_path=_default_hn_queries_yaml(), rps=5.0),
 ```
 
-- [ ] **Step 2.3: Smoke-test the CLI**
+- [x] **Step 2.3: Smoke-test the CLI**
 
 Scope the smoke test to HN only — running every source pulls Crunchbase + curated state into the picture and slows the loop. `--dry-run` still constructs the OpenRouter client, so `OPENROUTER_API_KEY` must be set in `.env`/env (a stub value works; no LLM calls fire under `FakeSlopClassifier`).
 
@@ -812,7 +812,7 @@ Expected:
 
 If the run errors with a stale-cassette message, proceed to Step 2.4.
 
-- [ ] **Step 2.3a: Source-level smoke (per-entry visibility)**
+- [x] **Step 2.3a: Source-level smoke (per-entry visibility)**
 
 `--dry-run` only prints aggregated counts via Rich; the per-entry stream
 is invisible because the CLI doesn't configure stdlib logging
@@ -858,7 +858,7 @@ signals:
   empty (check `date_from` / `date_to` parsing) or `respect_robots`
   short-circuited (check the `ENDPOINT` host).
 
-- [ ] **Step 2.4: Identify and re-record stale cassettes**
+- [x] **Step 2.4: Identify and re-record stale cassettes**
 
 Stale cassette indicators are `NoCannedResponseError` from the test suite or `vcr` mismatch errors during `just test`. Find them:
 
@@ -874,7 +874,7 @@ RECORD=1 uv run pytest <stale_test_id> -v
 
 Inspect the resulting YAML before commit; if it captured a transient 5xx, re-record. The project's `docs/cassettes.md` covers cassette hygiene if anything is unclear.
 
-- [ ] **Step 2.5: Verify Mattermark surfaces in a tight live run**
+- [x] **Step 2.5: Verify Mattermark surfaces in a tight live run**
 
 Optional but high-value sanity check that proves end-to-end:
 
@@ -886,12 +886,12 @@ Expected: PASS (the assertion `any("Mattermark" in (e.markdown_text or "") for e
 
 If it fails, the live HN Algolia response shape has changed since the validation in this plan. Stop and update the response parser before committing.
 
-- [ ] **Step 2.6: Lint + typecheck + full test suite**
+- [x] **Step 2.6: Lint + typecheck + full test suite**
 
 Run: `just lint && just typecheck && just test`
 Expected: all clean.
 
-- [ ] **Step 2.7: Commit**
+- [x] **Step 2.7: Commit**
 
 ```
 git add slopmortem/cli/_ingest_cmd.py tests/sources/cassettes/
