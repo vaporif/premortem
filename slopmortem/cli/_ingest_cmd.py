@@ -99,7 +99,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
         bool,
         typer.Option(
             "--enrich-wayback",
-            help="Enable the Wayback enricher. Auto-enabled when hn_algolia is in the source list.",
+            help="Enable the Wayback enricher (cheap fetch path; opt-in).",
         ),
     ] = False,
     tavily_enrich: Annotated[
@@ -107,8 +107,19 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
         typer.Option(
             "--tavily-enrich",
             help=(
-                "Enable the Tavily enricher. Auto-enabled when hn_algolia or "
-                "defillama is in the source list."
+                "Enable the Tavily /extract enricher (cheap fetch path; opt-in). "
+                "Auto-enabled when defillama is in the source list."
+            ),
+        ),
+    ] = False,
+    enable_pitch_filler: Annotated[
+        bool,
+        typer.Option(
+            "--enable-pitch-filler/--no-pitch-filler",
+            help=(
+                "Enable the LLM-driven pitch filler that synthesizes bodies for "
+                "URL-only stubs via tavily_search. Auto-enabled when hn_algolia is "
+                "in the source list."
             ),
         ),
     ] = False,
@@ -254,6 +265,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             crunchbase_csv=crunchbase_csv,
             enrich_wayback=enrich_wayback,
             tavily_enrich=tavily_enrich,
+            enable_pitch_filler=enable_pitch_filler,
             enable_defillama=enable_defillama,
             defillama_rps=defillama_rps,
             defillama_concurrency=defillama_concurrency,
@@ -325,6 +337,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     crunchbase_csv: Path | None,
     enrich_wayback: bool,
     tavily_enrich: bool,
+    enable_pitch_filler: bool,
     enable_defillama: bool,
     defillama_rps: float | None,
     defillama_concurrency: int | None,
@@ -447,25 +460,42 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             raise typer.BadParameter(msg)
 
     # HN Algolia emits URL-only stubs (sources/hn_algolia.py:_hit_to_entry).
-    # Without enrichers their bodies stay empty and the entry is skipped at
-    # classify, so force both on whenever the source is in the resolved set.
+    # The cheap fetch chain (Tavily-extract, Wayback) recovers ~50% of dead
+    # blogs but pads bodies with chrome and can't tell primary post-mortems
+    # from competitor commentary. The LLM pitch filler researches each URL
+    # via a single tavily_search and synthesizes a clean pitch instead.
     if any(isinstance(s, HNAlgoliaSource) for s in sources):
         if not os.environ.get("TAVILY_API_KEY"):
             msg = (
                 "hn_algolia source requires TAVILY_API_KEY: HN entries are URL-only "
-                "stubs whose bodies must be extracted by the Tavily enricher. Set "
-                "TAVILY_API_KEY in .env, or use --only-source on a source whose "
-                "entries already carry their body (e.g. crunchbase_csv)."
+                "stubs whose pitches are synthesized by the LLM-driven pitch filler "
+                "using tavily_search. Set TAVILY_API_KEY in .env, or use "
+                "--only-source on a source whose entries already carry their body "
+                "(e.g. crunchbase_csv)."
             )
             raise typer.BadParameter(msg)
-        enrich_wayback = True
-        tavily_enrich = True
+        enable_pitch_filler = True
 
     enrichers: list[Enricher] = []
     if enrich_wayback:
         enrichers.append(WaybackEnricher(rps=5.0))
     if tavily_enrich:
         enrichers.append(TavilyEnricher())
+    if enable_pitch_filler:
+        # Append last so cheap fetchers (Wayback, Tavily-extract) get a chance
+        # first when also enabled — the filler's skip-guards short-circuit on
+        # any pre-filled body.
+        from slopmortem.ingest import HaikuPitchFiller  # noqa: PLC0415
+
+        enrichers.append(
+            HaikuPitchFiller(
+                llm=llm,
+                model=config.model_pitch_filler,
+                budget=budget,
+                max_tokens=config.max_tokens_pitch_filler,
+                max_chars_per_result=config.pitch_filler_max_chars_per_result,
+            )
+        )
 
     # TTY-gated: attach Rich progress only when stderr is a real terminal.
     # Piped invocations (CI, ``> file``) get a quiet run.

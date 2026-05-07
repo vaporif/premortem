@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import date
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 from slopmortem.corpus import extract_clean
 from slopmortem.corpus.sources._names import (
@@ -161,9 +161,16 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
     text_id: str,
     name: str,
     provenance: str,
+    synthesized: bool = False,
 ) -> CandidatePayload:
     founding_year = facets.founding_year
     failure_year = facets.failure_year
+    if synthesized:
+        provenance_value: Literal["curated_real", "scraped", "synthesized"] = "synthesized"
+    elif provenance == SOURCE_CURATED:
+        provenance_value = "curated_real"
+    else:
+        provenance_value = "scraped"
     return CandidatePayload(
         name=name,
         summary=summary,
@@ -173,7 +180,7 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
         failure_date=None if failure_year is None else date(failure_year, 1, 1),
         founding_date_unknown=founding_year is None,
         failure_date_unknown=failure_year is None,
-        provenance="curated_real" if provenance == SOURCE_CURATED else "scraped",
+        provenance=provenance_value,
         slop_score=slop_score,
         sources=sources_seen,
         provenance_id=provenance_id,

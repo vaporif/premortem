@@ -197,6 +197,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         text_id=text_id,
         name=name,
         provenance=entry.source,
+        synthesized=entry.synthesized,
     )
     chunks_written = await _embed_and_upsert(
         canonical_id=canonical_id,

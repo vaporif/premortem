@@ -223,7 +223,7 @@ The HN Algolia source is changed to populate a new `RawEntry.title: str | None` 
 
 ### Steps
 
-- [ ] **Step 5.1:** In `slopmortem/cli/_ingest_cmd.py`, **remove** the auto-enable block:
+- [x] **Step 5.1:** In `slopmortem/cli/_ingest_cmd.py`, **remove** the auto-enable block:
   ```python
   if any(isinstance(s, HNAlgoliaSource) for s in sources):
       if not os.environ.get("TAVILY_API_KEY"):
@@ -231,7 +231,7 @@ The HN Algolia source is changed to populate a new `RawEntry.title: str | None` 
       enrich_wayback = True
       tavily_enrich = True
   ```
-- [ ] **Step 5.2:** **Add** a new auto-enable block in the same location (after the `--only-source` filter resolves the source list):
+- [x] **Step 5.2:** **Add** a new auto-enable block in the same location (after the `--only-source` filter resolves the source list):
   ```python
   if any(isinstance(s, HNAlgoliaSource) for s in sources):
       if not os.environ.get("TAVILY_API_KEY"):
@@ -244,11 +244,11 @@ The HN Algolia source is changed to populate a new `RawEntry.title: str | None` 
           raise typer.BadParameter(msg)
       enable_pitch_filler = True
   ```
-- [ ] **Step 5.3:** Update help text on `--enrich-wayback` and `--tavily-enrich` to drop the "Auto-enabled when hn_algolia is in the source list" claim.
-- [ ] **Step 5.4:** Add `--enable-pitch-filler` / `--no-pitch-filler` typer flag (default `False`, but the auto-enable block flips it to `True` for `hn_algolia`).
-- [ ] **Step 5.5:** When `enable_pitch_filler=True`, instantiate `HaikuPitchFiller(llm=llm, model=config.model_pitch_filler, budget=budget, max_tokens=config.max_tokens_pitch_filler, max_chars_per_result=config.pitch_filler_max_chars_per_result)` and append it to the `enrichers` list **after** any other enrichers (so dumb fetchers run first if also enabled).
-- [ ] **Step 5.6:** Update `_helpers.py` `_build_payload` (or its caller) so when `entry.synthesized is True`, `provenance="synthesized"`. Else preserve existing logic.
-- [ ] **Step 5.7:** Run `just lint` and `just typecheck` — clean.
+- [x] **Step 5.3:** Update help text on `--enrich-wayback` and `--tavily-enrich` to drop the "Auto-enabled when hn_algolia is in the source list" claim.
+- [x] **Step 5.4:** Add `--enable-pitch-filler` / `--no-pitch-filler` typer flag (default `False`, but the auto-enable block flips it to `True` for `hn_algolia`).
+- [x] **Step 5.5:** When `enable_pitch_filler=True`, instantiate `HaikuPitchFiller(llm=llm, model=config.model_pitch_filler, budget=budget, max_tokens=config.max_tokens_pitch_filler, max_chars_per_result=config.pitch_filler_max_chars_per_result)` and append it to the `enrichers` list **after** any other enrichers (so dumb fetchers run first if also enabled).
+- [x] **Step 5.6:** Update `_helpers.py` `_build_payload` (or its caller) so when `entry.synthesized is True`, `provenance="synthesized"`. Else preserve existing logic.
+- [x] **Step 5.7:** Run `just lint` and `just typecheck` — clean.
 
 **Done when:** CLI wires the filler; auto-enable swap is in place; help text updated.
 
