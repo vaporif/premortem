@@ -814,12 +814,12 @@ Add to `__all__` (alphabetical placement):
 "DefiLlamaSource",
 ```
 
-- [ ] **Step 2.2: Verify the import wiring**
+- [x] **Step 2.2: Verify the import wiring**
 
 Run: `uv run python -c "from slopmortem.corpus.sources import DefiLlamaSource; print('ok')"`
 Expected: `ok`.
 
-- [ ] **Step 2.3: Extend `_RELIABILITY_RANK`**
+- [x] **Step 2.3: Extend `_RELIABILITY_RANK`**
 
 Edit `slopmortem/ingest/_helpers.py`. Add `SOURCE_DEFILLAMA` to the existing `_names` import block (alphabetical placement keeps the diff small) so it reads:
 
@@ -845,7 +845,7 @@ _RELIABILITY_RANK: Final[dict[str, int]] = {
 }
 ```
 
-- [ ] **Step 2.4: Extend the regression test**
+- [x] **Step 2.4: Extend the regression test**
 
 `tests/ingest/test_reliability_rank.py` already exists and already imports
 `SOURCE_TAVILY_NEWS` plus parametrizes it at rank 4. Extend it:
@@ -862,14 +862,14 @@ _RELIABILITY_RANK: Final[dict[str, int]] = {
 The existing `test_unknown_source_lands_at_dead_letter_rank` already covers
 the default-fallback case — do not duplicate it.
 
-- [ ] **Step 2.5: Run reliability test**
+- [x] **Step 2.5: Run reliability test**
 
 Run: `uv run pytest tests/ingest/test_reliability_rank.py -v`
 Expected: 6 PASS (5 parametrized cases including the existing
 `SOURCE_TAVILY_NEWS` row + the existing
 `test_unknown_source_lands_at_dead_letter_rank`).
 
-- [ ] **Step 2.6: Add CLI flag + wiring (with Tavily implication and key assertion)**
+- [x] **Step 2.6: Add CLI flag + wiring (with Tavily implication and key assertion)**
 
 The flag touches seven landmarks in `slopmortem/cli/_ingest_cmd.py`. Skipping
 any leaves the flag silently ignored, raising `NameError`, or — worst case —
@@ -1015,12 +1015,12 @@ def test_enable_defillama_without_tavily_key_fails(monkeypatch: pytest.MonkeyPat
     assert "TAVILY_API_KEY" in combined
 ```
 
-- [ ] **Step 2.7: Smoke-test the CLI flag**
+- [x] **Step 2.7: Smoke-test the CLI flag**
 
 Run: `uv run slopmortem ingest --help | grep enable-defillama`
 Expected: one line describing the flag.
 
-- [ ] **Step 2.8: Dry-run with the flag on**
+- [x] **Step 2.8: Dry-run with the flag on**
 
 `_gather_entries` runs sources sequentially in list order
 (`Curated, HN, Crunchbase?, DefiLlama?, TavilyNews?`) and breaks the moment
@@ -1052,12 +1052,12 @@ Expected: at least one matching line. If the line shows `HTTP 4xx/5xx`, the
 endpoint changed — capture the failure URL and either fix the endpoint or
 flag it before continuing.
 
-- [ ] **Step 2.9: Lint + typecheck + full test suite**
+- [x] **Step 2.9: Lint + typecheck + full test suite**
 
 Run: `just lint && just typecheck && just test`
 Expected: all clean.
 
-- [ ] **Step 2.10: Commit**
+- [x] **Step 2.10: Commit**
 
 ```
 git add slopmortem/corpus/sources/__init__.py slopmortem/cli/_ingest_cmd.py slopmortem/ingest/_helpers.py tests/ingest/test_reliability_rank.py tests/test_cli_ingest.py

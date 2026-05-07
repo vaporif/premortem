@@ -38,6 +38,7 @@ from slopmortem.corpus import (
 from slopmortem.corpus.sources import (
     CrunchbaseCsvSource,
     CuratedSource,
+    DefiLlamaSource,
     HNAlgoliaSource,
     TavilyEnricher,
     TavilyNewsSource,
@@ -100,6 +101,16 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
     tavily_enrich: Annotated[
         bool, typer.Option("--tavily-enrich", help="Enable the Tavily enricher.")
     ] = False,
+    enable_defillama: Annotated[
+        bool,
+        typer.Option(
+            "--enable-defillama",
+            help=(
+                "Enable the DefiLlama dead-protocol source. "
+                "Implies --tavily-enrich; requires TAVILY_API_KEY."
+            ),
+        ),
+    ] = False,
     enable_tavily_news: Annotated[
         bool,
         typer.Option(
@@ -148,7 +159,8 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             "--only-source",
             help=(
                 "Run only the named source, auto-enabling its --enable-* flag if any. "
-                "Accepts source identifiers (curated, hn_algolia, crunchbase_csv, tavily_news)."
+                "Accepts source identifiers (curated, hn_algolia, crunchbase_csv, "
+                "defillama, tavily_news)."
             ),
         ),
     ] = None,
@@ -165,8 +177,8 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             "--limit",
             help=(
                 "Process only the first N entries after gathering from all sources. "
-                "Source order is curated -> HN -> Crunchbase. Useful for cheap live "
-                "smoke tests; cost scales with N."
+                "Source order is curated -> HN -> Crunchbase -> DefiLlama -> TavilyNews. "
+                "Useful for cheap live smoke tests; cost scales with N."
             ),
         ),
     ] = None,
@@ -183,6 +195,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             crunchbase_csv=crunchbase_csv,
             enrich_wayback=enrich_wayback,
             tavily_enrich=tavily_enrich,
+            enable_defillama=enable_defillama,
             enable_tavily_news=enable_tavily_news,
             tavily_news_start_year=tavily_news_start_year,
             tavily_news_end_year=tavily_news_end_year,
@@ -248,6 +261,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     crunchbase_csv: Path | None,
     enrich_wayback: bool,
     tavily_enrich: bool,
+    enable_defillama: bool,
     enable_tavily_news: bool,
     tavily_news_start_year: int | None,
     tavily_news_end_year: int | None,
@@ -292,6 +306,8 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         # ``locals()`` tricks. Add one when introducing a new opt-in source.
         if spec.source_class is TavilyNewsSource:
             enable_tavily_news = True
+        if spec.source_class is DefiLlamaSource:
+            enable_defillama = True
         # crunchbase_csv is gated by a path argument, not a boolean — require it explicitly.
         if spec.source_class is CrunchbaseCsvSource and crunchbase_csv is None:
             msg = "--only-source crunchbase_csv requires --crunchbase-csv PATH."
@@ -304,6 +320,18 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             "Set TAVILY_API_KEY in .env or unset --enable-tavily-news."
         )
         raise typer.BadParameter(msg)
+
+    if enable_defillama:
+        if not os.environ.get("TAVILY_API_KEY"):
+            msg = (
+                "--enable-defillama requires TAVILY_API_KEY: the DefiLlama source "
+                "anchors entries to Wayback snapshots whose bodies are extracted "
+                "by the Tavily enricher. Set TAVILY_API_KEY in .env or unset "
+                "--enable-defillama."
+            )
+            raise typer.BadParameter(msg)
+        # Implication: TavilyEnricher must run for DefiLlama entries to have a body.
+        tavily_enrich = True
 
     llm, embedder, corpus, budget, journal, classifier = await _build_ingest_deps(
         config, post_mortems_root, dry_run=dry_run
@@ -318,6 +346,8 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     ]
     if crunchbase_csv is not None:
         sources.append(CrunchbaseCsvSource(csv_path=crunchbase_csv))
+    if enable_defillama:
+        sources.append(DefiLlamaSource())
     if enable_tavily_news:
         sources.append(
             TavilyNewsSource(
@@ -396,6 +426,7 @@ _SOURCE_REGISTRY: dict[str, _SourceSpec] = {
     "curated": _SourceSpec(source_class=CuratedSource),
     "hn_algolia": _SourceSpec(source_class=HNAlgoliaSource),
     "crunchbase_csv": _SourceSpec(source_class=CrunchbaseCsvSource),
+    "defillama": _SourceSpec(source_class=DefiLlamaSource),
     "tavily_news": _SourceSpec(source_class=TavilyNewsSource),
 }
 

@@ -129,6 +129,16 @@ def test_enable_tavily_news_without_api_key_fails(monkeypatch: pytest.MonkeyPatc
     assert "TAVILY_API_KEY" in combined
 
 
+def test_enable_defillama_without_tavily_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
+    runner = CliRunner()
+    result = runner.invoke(app, ["ingest", "--enable-defillama", "--dry-run"])
+    assert result.exit_code != 0, result.output
+    combined = result.output + (result.stderr or "")
+    assert "TAVILY_API_KEY" in combined
+
+
 def test_only_source_tavily_news_runs_in_isolation(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
