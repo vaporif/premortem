@@ -9,8 +9,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import anyio
 from lmnr import Laminar, observe
 
+from slopmortem.concurrency import gather_resilient
 from slopmortem.ingest._fan_out import (
     _facet_summarize_fanout,
     _FanoutResult,
@@ -124,56 +126,83 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
 
     Per-entry failures log and continue; only the run-level orchestrator can
     short-circuit. Mutates ``result`` counters and ``result.span_events``.
+
+    Each entry's enrich + slop call runs concurrently up to
+    ``config.ingest_concurrency``. Counter mutations and ``keepers`` writes
+    are coroutine-safe under anyio (single-threaded event loop).
+    ``gather_resilient`` preserves input order, so ``keepers`` stays in
+    entry-order to match the previous sequential behaviour.
     """
     progress.start_phase(IngestPhase.CLASSIFY, total=len(entries))
-    keepers: list[tuple[RawEntry, str]] = []
-    for entry in entries:
-        result.seen += 1
-        try:
-            enriched = await _enrich_pipeline(entry, enrichers)
-        except Exception as exc:  # noqa: BLE001 - per-entry isolation.
-            _record_entry_failure(
-                result=result,
-                progress=progress,
-                phase=IngestPhase.CLASSIFY,
-                entry=entry,
-                exc=exc,
-                message=f"enricher failed for {entry.source_id}: {exc!r}",
-            )
-            progress.advance_phase(IngestPhase.CLASSIFY)
-            continue
+    limiter = anyio.CapacityLimiter(config.ingest_concurrency)
 
-        body = _entry_summary_text(enriched, max_tokens=config.max_doc_tokens)
-        if not body:
-            result.skipped += 1
-            progress.advance_phase(IngestPhase.CLASSIFY)
-            continue
-
-        slop_score = await classify_one(
-            entry=enriched,
-            body=body,
-            slop_classifier=slop_classifier,
-            on_error=lambda exc: progress.error(
-                IngestPhase.CLASSIFY, f"slop classifier failed: {exc}"
-            ),
-        )
-
-        if slop_score > config.slop_threshold:
-            if not dry_run:
-                await _quarantine(
-                    journal=journal,
-                    entry=enriched,
-                    body=body,
-                    slop_score=slop_score,
-                    post_mortems_root=post_mortems_root,
+    async def _one(entry: RawEntry) -> tuple[RawEntry, str] | None:
+        async with limiter:
+            result.seen += 1
+            try:
+                enriched = await _enrich_pipeline(entry, enrichers)
+            except Exception as exc:  # noqa: BLE001 - per-entry isolation.
+                _record_entry_failure(
+                    result=result,
+                    progress=progress,
+                    phase=IngestPhase.CLASSIFY,
+                    entry=entry,
+                    exc=exc,
+                    message=f"enricher failed for {entry.source_id}: {exc!r}",
                 )
-            result.quarantined += 1
-            result.span_events.append(SpanEvent.SLOP_QUARANTINED.value)
-            progress.advance_phase(IngestPhase.CLASSIFY)
-            continue
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
 
-        keepers.append((enriched, body))
-        progress.advance_phase(IngestPhase.CLASSIFY)
+            body = _entry_summary_text(enriched, max_tokens=config.max_doc_tokens)
+            if not body:
+                result.skipped += 1
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
+
+            slop_score = await classify_one(
+                entry=enriched,
+                body=body,
+                slop_classifier=slop_classifier,
+                on_error=lambda exc: progress.error(
+                    IngestPhase.CLASSIFY, f"slop classifier failed: {exc}"
+                ),
+            )
+
+            if slop_score > config.slop_threshold:
+                if not dry_run:
+                    await _quarantine(
+                        journal=journal,
+                        entry=enriched,
+                        body=body,
+                        slop_score=slop_score,
+                        post_mortems_root=post_mortems_root,
+                    )
+                result.quarantined += 1
+                result.span_events.append(SpanEvent.SLOP_QUARANTINED.value)
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
+
+            progress.advance_phase(IngestPhase.CLASSIFY)
+            return enriched, body
+
+    classified = await gather_resilient(*(_one(e) for e in entries))
+    keepers: list[tuple[RawEntry, str]] = []
+    for entry, item in zip(entries, classified, strict=True):
+        if isinstance(item, Exception):
+            # ``_one`` already routes Exceptions through ``_record_entry_failure``
+            # for known per-entry shapes. Anything reaching here is unexpected
+            # (e.g. ``_quarantine`` disk/journal write blew up) — log it but
+            # don't abort the run, and don't double-count ``errors``.
+            logger.warning(
+                "ingest classify: unhandled exception for %s:%s: %r",
+                entry.source,
+                entry.source_id,
+                item,
+            )
+            continue
+        if item is not None:
+            keepers.append(item)
+
     progress.end_phase(IngestPhase.CLASSIFY)
     return keepers
 
