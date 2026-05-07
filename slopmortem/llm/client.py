@@ -33,4 +33,5 @@ class LLMClient(Protocol):
         response_format: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         extra_body: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult: ...

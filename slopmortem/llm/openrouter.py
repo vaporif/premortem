@@ -102,8 +102,12 @@ class OpenRouterClient:
         response_format: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         extra_body: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult:
         """Run a chat completion, including the tool-call loop and transient-error retries."""
+        # ``single_tool_call`` is wired in Task 2; accepted here only so the
+        # Protocol signature is stable across this commit.
+        del single_tool_call
         # Pre-call gate: a runaway loop stops issuing calls once the budget is
         # exhausted. Concurrent fan-out can still tail-overshoot by up to
         # N_synthesize x per-call cost.

@@ -511,6 +511,7 @@ async def test_run_query_marks_budget_exceeded_on_llm_overspend(
             response_format: dict[str, Any] | None = None,
             extra_body: dict[str, Any] | None = None,
             max_tokens: int | None = None,
+            single_tool_call: bool = False,
         ) -> CompletionResult:
             result = await self.inner.complete(
                 prompt,
@@ -521,6 +522,7 @@ async def test_run_query_marks_budget_exceeded_on_llm_overspend(
                 response_format=response_format,
                 extra_body=extra_body,
                 max_tokens=max_tokens,
+                single_tool_call=single_tool_call,
             )
             if result.cost_usd > 0.0:
                 await self.budget.settle("test:llm", result.cost_usd)
@@ -619,6 +621,7 @@ async def test_ctrl_c_cancels_in_flight(monkeypatch: pytest.MonkeyPatch) -> None
             response_format: dict[str, Any] | None = None,
             extra_body: dict[str, Any] | None = None,
             max_tokens: int | None = None,
+            single_tool_call: bool = False,
         ) -> CompletionResult:
             await asyncio.sleep(0.5)
             return await self.inner.complete(
@@ -630,6 +633,7 @@ async def test_ctrl_c_cancels_in_flight(monkeypatch: pytest.MonkeyPatch) -> None
                 response_format=response_format,
                 extra_body=extra_body,
                 max_tokens=max_tokens,
+                single_tool_call=single_tool_call,
             )
 
     slow_llm = _SlowFakeLLMClient(inner=FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL))

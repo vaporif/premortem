@@ -261,6 +261,7 @@ class _ByModelLLM:
         response_format: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         extra_body: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult:
         if model is None or model not in self._by_model:
             msg = f"no recording wrapper for model={model!r}"
@@ -274,6 +275,7 @@ class _ByModelLLM:
             response_format=response_format,
             extra_body=extra_body,
             max_tokens=max_tokens,
+            single_tool_call=single_tool_call,
         )
 
 

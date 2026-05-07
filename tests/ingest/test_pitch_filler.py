@@ -41,6 +41,7 @@ class _StubLLM:
         response_format: dict[str, Any] | None = None,
         extra_body: dict[str, Any] | None = None,
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult:
         self.calls.append(
             {
@@ -52,6 +53,7 @@ class _StubLLM:
                 "response_format": response_format,
                 "extra_body": extra_body,
                 "max_tokens": max_tokens,
+                "single_tool_call": single_tool_call,
             }
         )
         if self.raise_exc is not None:

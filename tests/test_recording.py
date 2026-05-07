@@ -39,6 +39,7 @@ class _FakeInnerLLM:
         response_format=None,
         extra_body=None,
         max_tokens=None,
+        single_tool_call=False,
     ):
         self.calls += 1
         if self.raise_on_call is not None and self.calls == self.raise_on_call:

@@ -76,7 +76,9 @@ class FakeLLMClient:
         response_format: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         extra_body: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult:
+        del single_tool_call  # Protocol-only kwarg; behavior lands in OpenRouterClient.
         eff_model = model or self.default_model
         template_sha: str | None = None
         if extra_body and "prompt_template_sha" in extra_body:
