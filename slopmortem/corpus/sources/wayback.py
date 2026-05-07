@@ -101,7 +101,7 @@ class WaybackEnricher:
             return None
         return payload
 
-    async def enrich(self, entry: RawEntry) -> RawEntry:
+    async def enrich(self, entry: RawEntry) -> RawEntry:  # noqa: PLR0911 - guards are semantically distinct; splitting just spreads them.
         """Skip when *any* body is already present.
 
         The ``markdown_text`` guard matters for HN: without it, a Wayback
@@ -121,13 +121,23 @@ class WaybackEnricher:
             logger.info("wayback: no snapshot for %s", entry.url)
             return entry
         html = await self._fetch(snapshot_url)
-        if not html:
+        if html is None:
             return entry
         markdown_text = extract_clean(html) or None
+        if markdown_text is None:
+            # Snapshot HTML didn't yield extractable text — typically a nav-only
+            # archived homepage or a paywall stub. Don't half-fill the entry:
+            # leaving raw_html set here would short-circuit the next enricher
+            # (Tavily's skip-guard treats any non-empty raw_html as "done").
+            logger.info(
+                "wayback: snapshot for %s extracted to empty text; leaving for next enricher",
+                entry.url,
+            )
+            return entry
         logger.info(
             "wayback: recovered %s (%d bytes html, %d chars text)",
             entry.url,
             len(html),
-            len(markdown_text or ""),
+            len(markdown_text),
         )
         return entry.model_copy(update={"raw_html": html, "markdown_text": markdown_text})

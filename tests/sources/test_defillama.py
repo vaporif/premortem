@@ -236,9 +236,10 @@ async def test_emits_dead_protocol_with_wayback_url(monkeypatch: pytest.MonkeyPa
     assert e.url is not None
     assert "web.archive.org" in e.url
     assert "20220525120000" in e.url
-    assert e.markdown_text is not None
-    assert "Dead Protocol" in e.markdown_text
-    assert "Options" in e.markdown_text
+    # Body is intentionally empty: TavilyEnricher's "skip if markdown_text non-empty"
+    # short-circuit means a seed body would block extraction of the real Wayback pitch.
+    assert e.markdown_text is None
+    assert e.raw_html is None
 
 
 async def test_skips_when_no_wayback_coverage(monkeypatch: pytest.MonkeyPatch) -> None:

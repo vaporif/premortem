@@ -54,10 +54,6 @@ class DeathVerdict:
     current_tvl: float | None = None
 
 
-def _str_or_empty(value: object) -> str:
-    return value if isinstance(value, str) else ""
-
-
 def _merge_chain_series(chain_tvls: dict[str, object]) -> list[tuple[date, float]]:
     """Sum daily totalLiquidityUSD across chains; dedupe intra-day duplicates last-write-wins.
 
@@ -179,29 +175,6 @@ async def wayback_snapshot_near(
     return None
 
 
-def _seed_markdown(
-    *,
-    name: str,
-    category: str,
-    chain: str,
-    description: str,
-    verdict: DeathVerdict,
-) -> str:
-    """Minimal pitch-shaped seed text. TavilyEnricher fills the real body from Wayback."""
-    parts = [
-        f"# {name}",
-        "",
-        f"category: {category}",
-        f"chain: {chain}",
-        f"tvl_peak_usd: {verdict.peak_tvl}",
-        f"peak_date: {verdict.peak_date}",
-        f"tvl_current_usd: {verdict.current_tvl}",
-        "",
-        description,
-    ]
-    return "\n".join(parts).strip()
-
-
 class DefiLlamaSource:
     """[Source] Yields dead/zombie DeFi protocols, anchored to peak-era Wayback snapshots."""
 
@@ -243,8 +216,13 @@ class DefiLlamaSource:
             logger.warning("defillama: non-JSON response for %s: %r", url, exc)
             return None
 
-    async def _classify_candidate(self, slug: str, live_url: str) -> tuple[str, str] | None:
-        """Fetch detail, classify, anchor to Wayback. Return (markdown_body, snapshot_url)."""
+    async def _classify_candidate(self, slug: str, live_url: str) -> str | None:
+        """Fetch detail, classify, anchor to Wayback. Return the snapshot URL or None.
+
+        Body intentionally left empty — `TavilyEnricher` populates `markdown_text` from
+        the Wayback page. Emitting a metadata seed here would short-circuit the enricher
+        (it skips entries with non-empty markdown_text) and we'd ingest a stub.
+        """
         detail_payload = await self._fetch_json(f"{DETAIL_ENDPOINT_BASE}/{slug}")
         if not isinstance(detail_payload, dict):
             return None
@@ -272,14 +250,7 @@ class DefiLlamaSource:
             logger.info("defillama: %s no wayback coverage near %s", slug, verdict.peak_date)
             return None
 
-        body = _seed_markdown(
-            name=_str_or_empty(detail.get("name")),
-            category=_str_or_empty(detail.get("category")),
-            chain=_str_or_empty(detail.get("chain")),
-            description=_str_or_empty(detail.get("description")),
-            verdict=verdict,
-        )
-        return body, snapshot_url
+        return snapshot_url
 
     async def _process_candidate(self, row: dict[str, object]) -> RawEntry | None:
         slug: object = row.get("slug")
@@ -290,17 +261,16 @@ class DefiLlamaSource:
             logger.info("defillama: %s missing url, skipping", slug)
             return None
 
-        result = await self._classify_candidate(slug, live_url)
-        if result is None:
+        snapshot_url = await self._classify_candidate(slug, live_url)
+        if snapshot_url is None:
             return None
-        markdown_text, snapshot_url = result
 
         return RawEntry(
             source=SOURCE_DEFILLAMA,
             source_id=slug,
             url=snapshot_url,
             raw_html=None,
-            markdown_text=markdown_text,
+            markdown_text=None,
             fetched_at=datetime.now(UTC),
         )
 

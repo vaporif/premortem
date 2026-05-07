@@ -139,3 +139,64 @@ async def test_wayback_returns_entry_unchanged_when_no_snapshot(
     out = await enr.enrich(entry)
     assert out.raw_html is None
     assert out.markdown_text is None
+
+
+async def test_wayback_leaves_entry_unchanged_when_extraction_yields_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Snapshot found but trafilatura returns nothing — must not poison raw_html.
+
+    Regression: an archived nav-only homepage would set raw_html=<html> and
+    markdown_text=None, which short-circuited TavilyEnricher's skip-guard and
+    left the entry effectively bodyless.
+    """
+    snapshot_url = "https://web.archive.org/web/20160614000000/http://acme.example/"
+    availability_payload = {
+        "archived_snapshots": {
+            "closest": {
+                "available": True,
+                "url": snapshot_url,
+                "timestamp": "20160614000000",
+                "status": "200",
+            }
+        }
+    }
+    # HTML that trafilatura/readability will reduce to no extracted content.
+    nav_only_html = "<html><head><title>x</title></head><body></body></html>"
+    responses = {
+        "https://archive.org/wayback/available?url=http%3A%2F%2Facme.example%2F": _FakeResp(
+            json_payload=availability_payload
+        ),
+        snapshot_url: _FakeResp(text=nav_only_html),
+    }
+
+    async def fake_get(url: str, **_kw: object) -> Any:
+        if url not in responses:
+            msg = f"unexpected URL: {url}"
+            raise AssertionError(msg)
+        return responses[url]
+
+    monkeypatch.setattr("slopmortem.corpus.sources.wayback.safe_get", fake_get)
+    monkeypatch.setattr(
+        "slopmortem.corpus.sources.wayback.respect_robots",
+        AsyncMock(return_value=True),
+    )
+    monkeypatch.setattr(
+        "slopmortem.corpus.sources.wayback.throttle_for",
+        AsyncMock(return_value=None),
+    )
+
+    entry = RawEntry(
+        source="hn_algolia",
+        source_id="42",
+        url="http://acme.example/",
+        raw_html=None,
+        markdown_text=None,
+        fetched_at=datetime.now(UTC),
+    )
+    enr = WaybackEnricher()
+    out = await enr.enrich(entry)
+    # Critical: raw_html stays None so the next enricher in the chain (Tavily)
+    # can attempt the live URL instead of being short-circuited.
+    assert out.raw_html is None
+    assert out.markdown_text is None
