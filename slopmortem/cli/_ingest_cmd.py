@@ -287,14 +287,13 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             msg = f"--only-source: unknown source {only_source!r}. Valid: {valid}."
             raise typer.BadParameter(msg)
         spec = _SOURCE_REGISTRY[only_source]
-        # Auto-enable: flip the source's --enable-* flag on if it has one.
-        # Each opt-in flag needs an explicit branch — Python's keyword-only
-        # parameter binding can't be table-driven without ``locals()`` tricks.
-        # Add a branch when introducing a new opt-in source.
-        if spec.enable_flag == "enable_tavily_news":
+        # Each opt-in source's --enable-* flag needs an explicit branch here —
+        # Python's keyword-only parameter binding can't be table-driven without
+        # ``locals()`` tricks. Add one when introducing a new opt-in source.
+        if spec.source_class is TavilyNewsSource:
             enable_tavily_news = True
         # crunchbase_csv is gated by a path argument, not a boolean — require it explicitly.
-        if only_source == "crunchbase_csv" and crunchbase_csv is None:
+        if spec.source_class is CrunchbaseCsvSource and crunchbase_csv is None:
             msg = "--only-source crunchbase_csv requires --crunchbase-csv PATH."
             raise typer.BadParameter(msg)
 
@@ -330,9 +329,8 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         )
 
     if only_source is not None:
-        # _SOURCE_REGISTRY[only_source] was already validated in Step 2.5.
-        wanted_class = _SOURCE_REGISTRY[only_source].class_name
-        sources = [s for s in sources if type(s).__name__ == wanted_class]
+        wanted_class = _SOURCE_REGISTRY[only_source].source_class
+        sources = [s for s in sources if isinstance(s, wanted_class)]
         if not sources:
             msg = (
                 f"--only-source {only_source!r}: source enabled but not constructed; "
@@ -391,15 +389,14 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
 
 @dataclass(frozen=True)
 class _SourceSpec:
-    class_name: str  # constructed-source class name, used by the --only-source filter
-    enable_flag: str | None  # name of the kwarg in _run_ingest, or None for always-on sources
+    source_class: type[Source]
 
 
 _SOURCE_REGISTRY: dict[str, _SourceSpec] = {
-    "curated": _SourceSpec(class_name="CuratedSource", enable_flag=None),
-    "hn_algolia": _SourceSpec(class_name="HNAlgoliaSource", enable_flag=None),
-    "crunchbase_csv": _SourceSpec(class_name="CrunchbaseCsvSource", enable_flag="crunchbase_csv"),
-    "tavily_news": _SourceSpec(class_name="TavilyNewsSource", enable_flag="enable_tavily_news"),
+    "curated": _SourceSpec(source_class=CuratedSource),
+    "hn_algolia": _SourceSpec(source_class=HNAlgoliaSource),
+    "crunchbase_csv": _SourceSpec(source_class=CrunchbaseCsvSource),
+    "tavily_news": _SourceSpec(source_class=TavilyNewsSource),
 }
 
 

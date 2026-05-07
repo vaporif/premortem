@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -77,12 +77,12 @@ def test_dedup_keeps_highest_score() -> None:
 
 def test_drop_mirror_hosts_suffix_match() -> None:
     rows: list[dict[str, object]] = [
-        {"canonical_url": "https://bundle.app/article"},
-        {"canonical_url": "https://m.bundle.app/article"},
-        {"canonical_url": "https://news.google.com/foo"},
-        {"canonical_url": "https://techcrunch.com/keep"},
+        {"canonical_url": "https://bundle.app/article", "host": "bundle.app"},
+        {"canonical_url": "https://m.bundle.app/article", "host": "m.bundle.app"},
+        {"canonical_url": "https://news.google.com/foo", "host": "news.google.com"},
+        {"canonical_url": "https://techcrunch.com/keep", "host": "techcrunch.com"},
     ]
-    out = _drop_mirror_hosts(rows, mirrors={"bundle.app", "news.google.com"})
+    out = _drop_mirror_hosts(rows, mirrors=frozenset({"bundle.app", "news.google.com"}))
     urls = {r["canonical_url"] for r in out}
     assert urls == {"https://techcrunch.com/keep"}
 
@@ -105,7 +105,9 @@ def test_parse_published_returns_none_on_garbage() -> None:
 
 
 def test_build_call_descriptors_quarterly_windows() -> None:
-    calls = _build_call_descriptors(queries=["q1", "q2"], start_year=2024, end_year=2024)
+    calls = _build_call_descriptors(
+        queries=["q1", "q2"], start_year=2024, end_year=2024, today=date(2025, 1, 1)
+    )
     # 2 queries x 1 year x 4 quarters = 8 calls
     assert len(calls) == 8
     quarters = {(c["start_date"], c["end_date"]) for c in calls}
@@ -113,6 +115,25 @@ def test_build_call_descriptors_quarterly_windows() -> None:
     assert ("2024-04-01", "2024-06-30") in quarters
     assert ("2024-07-01", "2024-09-30") in quarters
     assert ("2024-10-01", "2024-12-31") in quarters
+
+
+def test_build_call_descriptors_skips_future_quarters_and_clamps_current() -> None:
+    """Tavily 400s on fully-future windows; current quarter's end is clamped to today."""
+    calls = _build_call_descriptors(
+        queries=["q"], start_year=2026, end_year=2026, today=date(2026, 5, 7)
+    )
+    quarters = {(c["start_date"], c["end_date"]) for c in calls}
+    assert quarters == {
+        ("2026-01-01", "2026-03-31"),
+        ("2026-04-01", "2026-05-07"),
+    }
+
+
+def test_build_call_descriptors_skips_when_start_year_in_future() -> None:
+    calls = _build_call_descriptors(
+        queries=["q"], start_year=2027, end_year=2027, today=date(2026, 5, 7)
+    )
+    assert calls == []
 
 
 # ---- TavilyNewsSource.fetch integration --------------------------------------

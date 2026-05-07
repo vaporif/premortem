@@ -24,10 +24,11 @@ queries x years x 4 fan-out is trivial.
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
 from importlib import resources
 from typing import TYPE_CHECKING, Final, cast
@@ -90,6 +91,7 @@ def _load_yaml(package: str, filename: str) -> object:
     return yaml.safe_load(text)  # pyright: ignore[reportAny]
 
 
+@functools.cache
 def _load_defaults() -> dict[str, object]:
     payload = _load_yaml("slopmortem.corpus.sources.queries", "tavily_news.yml")
     if not isinstance(payload, dict):
@@ -98,12 +100,13 @@ def _load_defaults() -> dict[str, object]:
     return cast("dict[str, object]", payload)
 
 
-def _load_mirror_domains() -> set[str]:
+@functools.cache
+def _load_mirror_domains() -> frozenset[str]:
     payload = _load_yaml("slopmortem.corpus.sources", "mirror_domains.yml")
     if not isinstance(payload, list):
-        return set()
+        return frozenset()
     rows = cast("list[object]", payload)
-    return {r.lower() for r in rows if isinstance(r, str) and r}
+    return frozenset(r.lower() for r in rows if isinstance(r, str) and r)
 
 
 # ---- pure helpers ------------------------------------------------------------
@@ -150,14 +153,13 @@ def _parse_published_date(value: object) -> datetime | None:
 def _drop_mirror_hosts(
     rows: Iterable[dict[str, object]],
     *,
-    mirrors: set[str],
+    mirrors: frozenset[str],
 ) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
     for row in rows:
-        canonical = row.get("canonical_url")
-        if not isinstance(canonical, str):
+        host = row.get("host")
+        if not isinstance(host, str):
             continue
-        host = (urlparse(canonical).hostname or "").lower()
         if any(host == d or host.endswith("." + d) for d in mirrors):
             logger.debug("tavily_news: dropping mirror host %s", host)
             continue
@@ -192,18 +194,26 @@ def _build_call_descriptors(
     queries: list[str],
     start_year: int,
     end_year: int,
+    today: date | None = None,
 ) -> list[dict[str, object]]:
-    """Cross-product (query, year, quarter) → list of call payload dicts."""
+    """Cross-product (query, year, quarter) → list of call payload dicts.
+
+    Future quarters are skipped and the current quarter's ``end_date`` is
+    clamped to ``today``: Tavily 400s on fully-future windows. ISO-8601
+    dates sort lexicographically, so plain string compare is enough.
+    """
+    today_iso = (today or datetime.now(UTC).date()).isoformat()
     return [
         {
             "query": query,
             "year": year,
             "start_date": f"{year}-{q_start}",
-            "end_date": f"{year}-{q_end}",
+            "end_date": min(f"{year}-{q_end}", today_iso),
         }
         for query in queries
         for year in range(start_year, end_year + 1)
         for q_start, q_end in _QUARTERS
+        if f"{year}-{q_start}" <= today_iso
     ]
 
 
@@ -287,7 +297,7 @@ class TavilyNewsSource:
 
         self.rps = rps
         self.concurrency = concurrency
-        self._mirrors: set[str] = _load_mirror_domains()
+        self._mirrors: frozenset[str] = _load_mirror_domains()
 
     async def _one_call(
         self,
@@ -370,9 +380,11 @@ class TavilyNewsSource:
                 continue
             if not isinstance(raw_content, str) or not raw_content:
                 continue
+            canonical = _canonicalize_url(url)
             kept.append(
                 {
-                    "canonical_url": _canonicalize_url(url),
+                    "canonical_url": canonical,
+                    "host": (urlparse(canonical).hostname or "").lower(),
                     "score": float(score),
                     "raw_content": raw_content,
                     "title": row.get("title", ""),
