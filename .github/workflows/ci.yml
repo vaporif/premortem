@@ -39,7 +39,7 @@ jobs:
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Wait for Qdrant readiness
         run: |
           for i in {1..30}; do
@@ -101,7 +101,7 @@ jobs:
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Wait for Qdrant readiness
         run: |
           for i in {1..30}; do
