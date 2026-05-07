@@ -293,7 +293,7 @@ class TavilyNewsSource:
                 )
             except (httpx.HTTPError, ValueError) as exc:
                 logger.warning(
-                    "tavily_news: fetch failed query=%r year=%s start=%s: %s",
+                    "tavily_news: fetch failed query=%r year=%s start=%s: %r",
                     spec.query,
                     spec.year,
                     spec.start_date,

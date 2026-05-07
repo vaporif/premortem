@@ -141,7 +141,7 @@ async def _gather_entries(
                     break
         except Exception as exc:  # noqa: BLE001 - never abort the run on a per-source failure.
             logger.warning(
-                "ingest: source %r failed: %s",
+                "ingest: source %r failed: %r",
                 type(src).__name__,
                 exc,
             )

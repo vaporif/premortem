@@ -224,7 +224,7 @@ class QdrantCorpus:
             try:
                 cp = _payload_dict_to_candidate_payload(payload)
             except Exception as exc:  # noqa: BLE001 — per-doc isolation; we log and continue
-                logger.warning("qdrant_query: dropped malformed payload for %r: %s", cid, exc)
+                logger.warning("qdrant_query: dropped malformed payload for %r: %r", cid, exc)
                 continue
             candidates.append(Candidate(canonical_id=cid, score=score, payload=cp))
 

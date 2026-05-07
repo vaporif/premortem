@@ -149,7 +149,7 @@ async def wayback_snapshot_near(
         try:
             resp = await safe_get(cdx_url)
         except (SSRFBlockedError, httpx.HTTPError) as exc:
-            logger.warning("defillama: wayback fetch failed for %s: %s", url, exc)
+            logger.warning("defillama: wayback fetch failed for %s: %r", url, exc)
             continue
         if resp.status_code >= HTTP_BAD_REQUEST:
             logger.warning("defillama: wayback HTTP %s for %s", resp.status_code, url)
@@ -157,7 +157,7 @@ async def wayback_snapshot_near(
         try:
             payload = cast("object", resp.json())
         except ValueError as exc:
-            logger.warning("defillama: wayback non-JSON response for %s: %s", url, exc)
+            logger.warning("defillama: wayback non-JSON response for %s: %r", url, exc)
             continue
         if not isinstance(payload, list):
             continue
@@ -223,7 +223,7 @@ class DefiLlamaSource:
         try:
             resp = await safe_get(url)
         except (SSRFBlockedError, httpx.HTTPError) as exc:
-            logger.warning("defillama: fetch failed for %s: %s", url, exc)
+            logger.warning("defillama: fetch failed for %s: %r", url, exc)
             return None
         if resp.status_code >= HTTP_BAD_REQUEST:
             logger.warning("defillama: HTTP %s for %s", resp.status_code, url)
@@ -231,7 +231,7 @@ class DefiLlamaSource:
         try:
             return cast("object", resp.json())
         except ValueError as exc:
-            logger.warning("defillama: non-JSON response for %s: %s", url, exc)
+            logger.warning("defillama: non-JSON response for %s: %r", url, exc)
             return None
 
     async def _classify_candidate(

@@ -66,7 +66,7 @@ class TavilyEnricher:
                 json={"api_key": api_key, "urls": [url]},
             )
         except (httpx.HTTPError, ValueError) as exc:
-            logger.warning("tavily enricher: fetch failed for %s: %s", url, exc)
+            logger.warning("tavily enricher: fetch failed for %s: %r", url, exc)
             return None
 
         if resp.status_code >= httpx.codes.BAD_REQUEST:

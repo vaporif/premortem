@@ -138,7 +138,7 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 phase=IngestPhase.CLASSIFY,
                 entry=entry,
                 exc=exc,
-                message=f"enricher failed for {entry.source_id}: {exc}",
+                message=f"enricher failed for {entry.source_id}: {exc!r}",
             )
             progress.advance_phase(IngestPhase.CLASSIFY)
             continue
@@ -209,7 +209,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 phase=IngestPhase.FAN_OUT,
                 entry=entry,
                 exc=fan,
-                message=f"fan-out failed for {entry.source}:{entry.source_id}: {fan}",
+                message=f"fan-out failed for {entry.source}:{entry.source_id}: {fan!r}",
             )
             progress.advance_phase(IngestPhase.WRITE)
             continue
@@ -236,7 +236,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 phase=IngestPhase.WRITE,
                 entry=entry,
                 exc=exc,
-                message=f"write phase failed for {entry.source}:{entry.source_id}: {exc}",
+                message=f"write phase failed for {entry.source}:{entry.source_id}: {exc!r}",
             )
             progress.advance_phase(IngestPhase.WRITE)
             continue

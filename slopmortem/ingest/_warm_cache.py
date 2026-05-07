@@ -56,7 +56,7 @@ async def cache_warm(
             span.append(SpanEvent.CACHE_WARM_FAILED.value)
             return False, 0, span
     except Exception as exc:  # noqa: BLE001 - warming is best-effort
-        logger.warning("ingest: cache warm failed: %s", exc)
+        logger.warning("ingest: cache warm failed: %r", exc)
         span.append(SpanEvent.CACHE_WARM_FAILED.value)
         return False, 0, span
     else:

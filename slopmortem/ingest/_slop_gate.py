@@ -58,7 +58,7 @@ async def classify_one(
     try:
         return await slop_classifier.score(body)
     except Exception as exc:  # noqa: BLE001 - defensive: never abort on classifier failure.
-        logger.warning("ingest: slop classifier failed: %s", exc)
+        logger.warning("ingest: slop classifier failed: %r", exc)
         on_error(exc)
         return 0.0
 

@@ -74,7 +74,7 @@ class WaybackEnricher:
         try:
             resp = await safe_get(url)
         except (SSRFBlockedError, httpx.HTTPError) as exc:
-            logger.warning("wayback: fetch failed for %s: %s", url, exc)
+            logger.warning("wayback: fetch failed for %s: %r", url, exc)
             return None
         if resp.status_code >= HTTP_BAD_REQUEST:
             logger.warning("wayback: HTTP %s for %s", resp.status_code, url)
@@ -88,7 +88,7 @@ class WaybackEnricher:
         try:
             resp = await safe_get(url)
         except (SSRFBlockedError, httpx.HTTPError) as exc:
-            logger.warning("wayback: availability fetch failed for %s: %s", url, exc)
+            logger.warning("wayback: availability fetch failed for %s: %r", url, exc)
             return None
         if resp.status_code >= HTTP_BAD_REQUEST:
             return None

@@ -182,7 +182,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
                 },
             )
             logger.warning(
-                "ingest aborted entry: delete_chunks_for_canonical failed for %s: %s",
+                "ingest aborted entry: delete_chunks_for_canonical failed for %s: %r",
                 canonical_id,
                 exc,
             )
