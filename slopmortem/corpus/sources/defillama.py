@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Final, Literal, cast
+from typing import TYPE_CHECKING, Final, Literal, cast
 from urllib.parse import urlencode
 
 import httpx
@@ -54,24 +54,30 @@ class DeathVerdict:
     current_tvl: float | None = None
 
 
-def _merge_chain_series(chain_tvls: dict[str, dict[str, Any]]) -> list[tuple[date, float]]:  # pyright: ignore[reportExplicitAny]
+def _str_or_empty(value: object) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _merge_chain_series(chain_tvls: dict[str, object]) -> list[tuple[date, float]]:
     """Sum daily totalLiquidityUSD across chains; dedupe intra-day duplicates last-write-wins.
 
     DefiLlama ships multiple "today" snapshots; naive summing double-counts current TVL.
     """
     totals: dict[date, float] = {}
     for chain_payload in chain_tvls.values():
-        if not isinstance(chain_payload, dict):  # pyright: ignore[reportUnnecessaryIsInstance] — runtime defence; Any values are not statically narrowable
+        if not isinstance(chain_payload, dict):
             continue
-        series_obj: object = chain_payload.get("tvl")
+        chain_dict = cast("dict[str, object]", chain_payload)
+        series_obj: object = chain_dict.get("tvl")
         if not isinstance(series_obj, list):
             continue
         per_day: dict[date, float] = {}
-        for point in series_obj:  # pyright: ignore[reportUnknownVariableType] — list[Any] from JSON
-            if not isinstance(point, dict):
+        for raw_point in cast("list[object]", series_obj):
+            if not isinstance(raw_point, dict):
                 continue
-            ts: object = point.get("date")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType] — Any from JSON
-            tvl: object = point.get("totalLiquidityUSD")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType] — Any from JSON
+            point = cast("dict[str, object]", raw_point)
+            ts: object = point.get("date")
+            tvl: object = point.get("totalLiquidityUSD")
             if not isinstance(ts, (int, float)) or not isinstance(tvl, (int, float)):
                 continue
             d = datetime.fromtimestamp(float(ts), tz=UTC).date()
@@ -82,7 +88,7 @@ def _merge_chain_series(chain_tvls: dict[str, dict[str, Any]]) -> list[tuple[dat
 
 
 def classify_death(
-    chain_tvls: dict[str, dict[str, Any]],  # pyright: ignore[reportExplicitAny]
+    chain_tvls: dict[str, object],
     *,
     threshold_pct: float = DEFAULT_DEAD_THRESHOLD_PCT,
     peak_floor_usd: float = DEFAULT_PEAK_FLOOR_USD,
@@ -173,12 +179,15 @@ async def wayback_snapshot_near(
     return None
 
 
-def _seed_markdown(detail: dict[str, Any], verdict: DeathVerdict) -> str:  # pyright: ignore[reportExplicitAny]
+def _seed_markdown(
+    *,
+    name: str,
+    category: str,
+    chain: str,
+    description: str,
+    verdict: DeathVerdict,
+) -> str:
     """Minimal pitch-shaped seed text. TavilyEnricher fills the real body from Wayback."""
-    name: object = detail.get("name") or ""
-    category: object = detail.get("category") or ""
-    chain: object = detail.get("chain") or ""
-    description: object = detail.get("description") or ""
     parts = [
         f"# {name}",
         "",
@@ -188,7 +197,7 @@ def _seed_markdown(detail: dict[str, Any], verdict: DeathVerdict) -> str:  # pyr
         f"peak_date: {verdict.peak_date}",
         f"tvl_current_usd: {verdict.current_tvl}",
         "",
-        str(description),
+        description,
     ]
     return "\n".join(parts).strip()
 
@@ -234,18 +243,17 @@ class DefiLlamaSource:
             logger.warning("defillama: non-JSON response for %s: %r", url, exc)
             return None
 
-    async def _classify_candidate(
-        self, slug: str, live_url: str
-    ) -> tuple[dict[str, Any], DeathVerdict, str] | None:  # pyright: ignore[reportExplicitAny]
+    async def _classify_candidate(self, slug: str, live_url: str) -> tuple[str, str] | None:
+        """Fetch detail, classify, anchor to Wayback. Return (markdown_body, snapshot_url)."""
         detail_payload = await self._fetch_json(f"{DETAIL_ENDPOINT_BASE}/{slug}")
         if not isinstance(detail_payload, dict):
             return None
-        detail = cast("dict[str, Any]", detail_payload)  # pyright: ignore[reportExplicitAny]
+        detail = cast("dict[str, object]", detail_payload)
 
-        chain_tvls_raw: object = detail.get("chainTvls") or {}
+        chain_tvls_raw: object = detail.get("chainTvls")
         if not isinstance(chain_tvls_raw, dict):
             return None
-        chain_tvls = cast("dict[str, dict[str, Any]]", chain_tvls_raw)  # pyright: ignore[reportExplicitAny]
+        chain_tvls = cast("dict[str, object]", chain_tvls_raw)
 
         verdict = classify_death(
             chain_tvls,
@@ -264,9 +272,16 @@ class DefiLlamaSource:
             logger.info("defillama: %s no wayback coverage near %s", slug, verdict.peak_date)
             return None
 
-        return detail, verdict, snapshot_url
+        body = _seed_markdown(
+            name=_str_or_empty(detail.get("name")),
+            category=_str_or_empty(detail.get("category")),
+            chain=_str_or_empty(detail.get("chain")),
+            description=_str_or_empty(detail.get("description")),
+            verdict=verdict,
+        )
+        return body, snapshot_url
 
-    async def _process_candidate(self, row: dict[str, Any]) -> RawEntry | None:  # pyright: ignore[reportExplicitAny]
+    async def _process_candidate(self, row: dict[str, object]) -> RawEntry | None:
         slug: object = row.get("slug")
         live_url: object = row.get("url")
         if not isinstance(slug, str) or not slug:
@@ -278,14 +293,14 @@ class DefiLlamaSource:
         result = await self._classify_candidate(slug, live_url)
         if result is None:
             return None
-        detail, verdict, snapshot_url = result
+        markdown_text, snapshot_url = result
 
         return RawEntry(
             source=SOURCE_DEFILLAMA,
             source_id=slug,
             url=snapshot_url,
             raw_html=None,
-            markdown_text=_seed_markdown(detail, verdict),
+            markdown_text=markdown_text,
             fetched_at=datetime.now(UTC),
         )
 
@@ -303,7 +318,7 @@ class DefiLlamaSource:
                 return
             if not isinstance(raw, dict):
                 continue
-            row = cast("dict[str, Any]", raw)  # pyright: ignore[reportExplicitAny]
+            row = cast("dict[str, object]", raw)
             tvl_field: object = row.get("tvl")
             if not isinstance(tvl_field, (int, float)):
                 continue
