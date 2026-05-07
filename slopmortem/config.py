@@ -67,7 +67,7 @@ class Config(BaseSettings):
     retry_max_attempts: int = Field(default=3, ge=0)
     retry_initial_backoff: float = Field(default=1.0, ge=0.0)
 
-    taxonomy_version: str = "v1"
+    taxonomy_version: str = "v2"
     reliability_rank_version: str = "v1"
 
     enable_tavily_synthesis: bool = False

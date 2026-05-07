@@ -6,6 +6,7 @@
 # field names.
 sector:
   - fintech
+  - crypto_web3
   - healthtech
   - edtech
   - climate_energy
