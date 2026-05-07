@@ -47,8 +47,8 @@ def test_ingest_dry_run_dispatches_to_orchestrator(
     monkeypatch.setattr("slopmortem.cli._ingest_cmd.ingest", fake_ingest)
     # Block real Qdrant / OpenRouter / OpenAI / sqlite construction.
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
-    # Default sources include HNAlgoliaSource, which auto-enables the Tavily
-    # enricher and so requires TAVILY_API_KEY at flag-parse time.
+    # Default sources include HNAlgoliaSource, which auto-enables the LLM pitch
+    # filler and so requires TAVILY_API_KEY at flag-parse time.
     monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
     runner = CliRunner()
     result = runner.invoke(app, ["ingest", "--dry-run", "--post-mortems-root", str(tmp_path)])
@@ -87,10 +87,14 @@ def test_ingest_tavily_enrich_appends_enricher(
     assert "TavilyEnricher" in enricher_classnames
 
 
-def test_ingest_default_auto_enables_enrichers_for_hn_algolia(
+def test_ingest_default_auto_enables_pitch_filler_for_hn_algolia(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """HNAlgoliaSource emits URL-only stubs, so both enrichers must be on by default."""
+    """HNAlgoliaSource emits URL-only stubs, so the LLM pitch filler runs by default.
+
+    Wayback and Tavily-extract are no longer auto-enabled — the cheap fetch chain
+    is opt-in (--enrich-wayback / --tavily-enrich) since 2026-05-07.
+    """
     captured: dict[str, object] = {}
 
     async def fake_ingest(**kwargs: object) -> object:
@@ -106,12 +110,13 @@ def test_ingest_default_auto_enables_enrichers_for_hn_algolia(
     enrichers = captured["enrichers"]
     assert isinstance(enrichers, list)
     enricher_classnames = [type(e).__name__ for e in enrichers]
-    assert "WaybackEnricher" in enricher_classnames
-    assert "TavilyEnricher" in enricher_classnames
+    assert "HaikuPitchFiller" in enricher_classnames
+    assert "WaybackEnricher" not in enricher_classnames
+    assert "TavilyEnricher" not in enricher_classnames
 
 
 def test_ingest_default_without_tavily_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Default sources include hn_algolia → require TAVILY_API_KEY at parse time."""
+    """Default sources include hn_algolia → pitch filler requires TAVILY_API_KEY."""
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     runner = CliRunner()
@@ -120,6 +125,7 @@ def test_ingest_default_without_tavily_key_fails(monkeypatch: pytest.MonkeyPatch
     combined = result.output + (result.stderr or "")
     assert "TAVILY_API_KEY" in combined
     assert "hn_algolia" in combined
+    assert "pitch filler" in combined
 
 
 def test_only_source_crunchbase_skips_enricher_auto_enable(
@@ -160,6 +166,9 @@ def test_only_source_crunchbase_skips_enricher_auto_enable(
     assert classnames == ["CrunchbaseCsvSource"]
     enrichers = captured["enrichers"]
     assert isinstance(enrichers, list)
+    enricher_classnames = [type(e).__name__ for e in enrichers]
+    # No hn_algolia in the source list → no auto-enabled pitch filler either.
+    assert "HaikuPitchFiller" not in enricher_classnames
     assert enrichers == []
 
 

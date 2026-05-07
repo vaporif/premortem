@@ -260,26 +260,26 @@ The HN Algolia source is changed to populate a new `RawEntry.title: str | None` 
 
 ### Steps
 
-- [ ] **Step 6.1:** Create `tests/ingest/test_pitch_filler.py`:
-  - Build a `FakeLLMClient` that records the request and returns a canned response.
+- [x] **Step 6.1:** Create `tests/ingest/test_pitch_filler.py`:
+  - Build a `FakeLLMClient` that records the request and returns a canned response. *(Used a focused `_StubLLM` instead of the cassette-keyed `FakeLLMClient` — the filler's contract is independent of the cassette key shape, and the stub is simpler to reason about.)*
   - Test `confidence="high"` → entry returned with `markdown_text` populated and `synthesized=True`.
   - Test `confidence="low"` → entry returned untouched.
   - Test `confidence="medium"` → entry returned untouched (gate is high-only).
   - Test pre-filled `markdown_text` → no LLM call.
   - Test `entry.title is None` → no LLM call.
   - Test malformed JSON output → no-op + WARNING log captured (no exception bubbles).
-- [ ] **Step 6.2:** Update `tests/sources/test_hn_algolia_yaml.py` — add `assert e.title == ...` on at least one fixture path.
-- [ ] **Step 6.3:** Update `tests/test_cli_ingest.py`:
+- [x] **Step 6.2:** Update `tests/sources/test_hn_algolia_yaml.py` — add `assert e.title == ...` on at least one fixture path. *(Done as part of Task 1.)*
+- [x] **Step 6.3:** Update `tests/test_cli_ingest.py`:
   - Remove `test_ingest_default_auto_enables_enrichers_for_hn_algolia` (no longer current behavior).
   - Add `test_ingest_default_auto_enables_pitch_filler_for_hn_algolia` — assert `HaikuPitchFiller` appears in the enricher list when default flags are passed; assert `WaybackEnricher` and `TavilyEnricher` do NOT.
   - Update `test_ingest_default_without_tavily_key_fails` — error message references pitch filler.
   - Update `test_only_source_crunchbase_skips_enricher_auto_enable` — also assert the pitch filler is NOT in the enricher list when `--only-source crunchbase_csv` is passed.
-- [ ] **Step 6.4:** Run `just lint`, `just typecheck`, `just test` — all green.
+- [x] **Step 6.4:** Run `just lint`, `just typecheck`, `just test` — all green. *(Pre-existing failures in `tests/ingest/test_orchestration.py` and `test_per_entry_isolation.py` are environmental — sandbox `PermissionError` on `/private/tmp` paths, unrelated to this diff. Confirmed by stashing changes and re-running on a clean tree.)*
 - [ ] **Step 6.5:** Run a small live slice to confirm end-to-end:
   ```sh
   uv run slopmortem ingest --only-source hn_algolia --limit 5 --dry-run
   ```
-  Expect: 5 entries seen, ~1-3 with `synthesized=True` and high confidence, the rest skipped (confidence below threshold or filler errored on per-entry isolation). Log lines should include `pitch filler: kept ...` / `pitch filler: refused (confidence=low) ...`.
+  Expect: 5 entries seen, ~1-3 with `synthesized=True` and high confidence, the rest skipped (confidence below threshold or filler errored on per-entry isolation). Log lines should include `pitch filler: kept ...` / `pitch filler: refused (confidence=low) ...`. *(Deferred — needs live API keys and Qdrant; can't run in this environment.)*
 
 **Done when:** All tests pass; small live slice confirms wiring.
 
