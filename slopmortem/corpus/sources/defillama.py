@@ -12,6 +12,8 @@ from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final, Literal, cast
 from urllib.parse import urlencode
 
+import httpx
+
 from slopmortem.corpus.sources._names import SOURCE_DEFILLAMA
 from slopmortem.corpus.sources._throttle import (
     HTTP_BAD_REQUEST,
@@ -19,7 +21,7 @@ from slopmortem.corpus.sources._throttle import (
     respect_robots,
     throttle_for,
 )
-from slopmortem.http import safe_get
+from slopmortem.http import SSRFBlockedError, safe_get
 from slopmortem.models import RawEntry
 
 if TYPE_CHECKING:
@@ -144,11 +146,19 @@ async def wayback_snapshot_near(
             logger.info("defillama: robots blocked %s", cdx_url)
             return None
         await throttle_for(cdx_url, rps=2.0)
-        resp = await safe_get(cdx_url)
+        try:
+            resp = await safe_get(cdx_url)
+        except (SSRFBlockedError, httpx.HTTPError) as exc:
+            logger.warning("defillama: wayback fetch failed for %s: %s", url, exc)
+            continue
         if resp.status_code >= HTTP_BAD_REQUEST:
             logger.warning("defillama: wayback HTTP %s for %s", resp.status_code, url)
             continue
-        payload = cast("object", resp.json())
+        try:
+            payload = cast("object", resp.json())
+        except ValueError as exc:
+            logger.warning("defillama: wayback non-JSON response for %s: %s", url, exc)
+            continue
         if not isinstance(payload, list):
             continue
         rows = cast("list[object]", payload)
@@ -210,11 +220,19 @@ class DefiLlamaSource:
             logger.info("defillama: robots blocked %s", url)
             return None
         await throttle_for(url, rps=self.rps)
-        resp = await safe_get(url)
+        try:
+            resp = await safe_get(url)
+        except (SSRFBlockedError, httpx.HTTPError) as exc:
+            logger.warning("defillama: fetch failed for %s: %s", url, exc)
+            return None
         if resp.status_code >= HTTP_BAD_REQUEST:
             logger.warning("defillama: HTTP %s for %s", resp.status_code, url)
             return None
-        return cast("object", resp.json())
+        try:
+            return cast("object", resp.json())
+        except ValueError as exc:
+            logger.warning("defillama: non-JSON response for %s: %s", url, exc)
+            return None
 
     async def _classify_candidate(
         self, slug: str, live_url: str

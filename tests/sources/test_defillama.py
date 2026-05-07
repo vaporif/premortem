@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 
 from slopmortem.corpus.sources import DefiLlamaSource
@@ -320,6 +321,91 @@ async def test_max_emit_caps_yield(monkeypatch: pytest.MonkeyPatch) -> None:
     src = DefiLlamaSource(shortlist_tvl_ceiling_usd=100_000.0, max_emit=3)
     entries = [e async for e in src.fetch()]
     assert len(entries) == 3
+
+
+async def test_bulk_httpx_error_returns_no_entries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A transient httpx error on /protocols must not propagate out of fetch()."""
+    fake = AsyncMock(side_effect=httpx.ReadTimeout("boom"))
+    monkeypatch.setattr("slopmortem.corpus.sources.defillama.safe_get", fake)
+    _setup_throttle(monkeypatch)
+
+    src = DefiLlamaSource()
+    entries = [e async for e in src.fetch()]
+    assert entries == []
+
+
+async def test_cdx_httpx_error_drops_candidate_not_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Wayback CDX timeout drops the affected candidate; siblings still yield.
+
+    Plan §1.1 explicitly anticipates Wayback CDX flakiness; the source must
+    treat a CDX exception identically to a status-200-less window — skip the
+    candidate, keep iterating.
+    """
+    bulk = [
+        {
+            "id": "1",
+            "name": "Flaky",
+            "slug": "flaky",
+            "url": "https://flaky.example",
+            "tvl": 50_000.0,
+        },
+        {
+            "id": "2",
+            "name": "Healthy",
+            "slug": "healthy",
+            "url": "https://healthy.example",
+            "tvl": 50_000.0,
+        },
+    ]
+
+    def make_detail(name: str) -> dict[str, object]:
+        return {
+            "name": name,
+            "url": f"https://{name.lower()}.example",
+            "chainTvls": {
+                "Ethereum": _series([("2022-01-01", 5_000_000.0), ("2025-01-01", 0.0)]),
+            },
+        }
+
+    cdx_ok = [
+        _CDX_HEADER,
+        [
+            "example,healthy)/",
+            "20220525120000",
+            "https://healthy.example/",
+            "text/html",
+            "200",
+            "X",
+            "1",
+        ],
+    ]
+
+    async def fake_get(url: str, **_: object) -> _FakeResp:
+        if url.endswith("/protocols"):
+            return _FakeResp(bulk)
+        if "/protocol/flaky" in url:
+            return _FakeResp(make_detail("Flaky"))
+        if "/protocol/healthy" in url:
+            return _FakeResp(make_detail("Healthy"))
+        if "web.archive.org/cdx" in url and "flaky.example" in url:
+            timeout_msg = "cdx down"
+            raise httpx.ReadTimeout(timeout_msg)
+        if "web.archive.org/cdx" in url and "healthy.example" in url:
+            return _FakeResp(cdx_ok)
+        msg = f"unexpected url: {url}"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(
+        "slopmortem.corpus.sources.defillama.safe_get", AsyncMock(side_effect=fake_get)
+    )
+    _setup_throttle(monkeypatch)
+
+    src = DefiLlamaSource(shortlist_tvl_ceiling_usd=100_000.0)
+    entries = [e async for e in src.fetch()]
+    assert len(entries) == 1
+    assert entries[0].source_id == "healthy"
 
 
 @pytest.mark.vcr
