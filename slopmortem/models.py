@@ -200,7 +200,7 @@ class CandidatePayload(BaseModel):
     failure_date: date | None
     founding_date_unknown: bool
     failure_date_unknown: bool
-    provenance: Literal["curated_real", "scraped"]
+    provenance: Literal["curated_real", "scraped", "synthesized"]
     slop_score: float
     sources: list[str]
     provenance_id: str = ""
@@ -334,6 +334,10 @@ class RawEntry(BaseModel):
     raw_html: str | None = None
     markdown_text: str | None = None
     fetched_at: datetime
+    # True when ``markdown_text`` was synthesized by the LLM pitch filler
+    # (no primary HTML body backing it). Threads through to
+    # ``CandidatePayload.provenance="synthesized"`` at payload assembly.
+    synthesized: bool = False
 
 
 class AliasEdge(BaseModel):

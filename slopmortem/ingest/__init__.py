@@ -12,6 +12,7 @@ from slopmortem.ingest._impls import (
     InMemoryCorpus as InMemoryCorpus,
 )
 from slopmortem.ingest._ingest import ingest as ingest
+from slopmortem.ingest._pitch_filler import HaikuPitchFiller as HaikuPitchFiller
 from slopmortem.ingest._ports import (
     INGEST_PHASE_LABELS as INGEST_PHASE_LABELS,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "INGEST_PHASE_LABELS",
     "Corpus",
     "FakeSlopClassifier",
+    "HaikuPitchFiller",
     "HaikuSlopClassifier",
     "InMemoryCorpus",
     "IngestPhase",

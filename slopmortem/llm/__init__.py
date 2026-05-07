@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from slopmortem.llm._pitch_filler_tools import (
+    PitchFillerSearchArgs as PitchFillerSearchArgs,
+)
+from slopmortem.llm._pitch_filler_tools import (
+    build_pitch_filler_tavily_tool as build_pitch_filler_tavily_tool,
+)
 from slopmortem.llm.cassettes import (
     NoCannedEmbeddingError as NoCannedEmbeddingError,
 )
@@ -90,6 +96,8 @@ __all__ = [
     "NoCannedResponseError",
     "OpenAIEmbeddingClient",
     "OpenRouterClient",
+    "PitchFillerSearchArgs",
+    "build_pitch_filler_tavily_tool",
     "embed_cassette_key",
     "gather_with_limit",
     "is_transient_http",

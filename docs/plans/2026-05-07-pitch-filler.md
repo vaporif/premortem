@@ -166,8 +166,8 @@ The HN Algolia source is changed to populate a new `RawEntry.title: str | None` 
 
 ### Steps
 
-- [ ] **Step 2.1:** Create `slopmortem/llm/_pitch_filler_tools.py` exporting `build_pitch_filler_tavily_tool() -> ToolSpec`. The wrapped async fn POSTs to `https://api.tavily.com/search` with `{api_key, query, max_results: 5, include_raw_content: True, search_depth: "basic"}`, truncates each `raw_content` to `pitch_filler_max_chars_per_result`, returns JSON `{results: [{url, title, raw_content, score}]}`. ToolSpec args: `q: str, limit: int = 5`.
-- [ ] **Step 2.2:** Create `slopmortem/ingest/_pitch_filler.py`. `HaikuPitchFiller` class:
+- [x] **Step 2.1:** Create `slopmortem/llm/_pitch_filler_tools.py` exporting `build_pitch_filler_tavily_tool() -> ToolSpec`. The wrapped async fn POSTs to `https://api.tavily.com/search` with `{api_key, query, max_results: 5, include_raw_content: True, search_depth: "basic"}`, truncates each `raw_content` to `pitch_filler_max_chars_per_result`, returns JSON `{results: [{url, title, raw_content, score}]}`. ToolSpec args: `q: str, limit: int = 5`.
+- [x] **Step 2.2:** Create `slopmortem/ingest/_pitch_filler.py`. `HaikuPitchFiller` class:
   - `__init__(self, *, llm: LLMClient, model: str, budget: Budget, max_tokens: int = 1500, max_chars_per_result: int = 2500)`.
   - `async def enrich(entry: RawEntry) -> RawEntry`.
   - Skip-guards: return entry untouched if `entry.markdown_text` non-empty, or `entry.raw_html` non-empty, or `entry.url is None`, or `entry.title is None`.
@@ -176,9 +176,9 @@ The HN Algolia source is changed to populate a new `RawEntry.title: str | None` 
   - Call `llm.complete(prompt, system=<system block from template>, tools=[tool], model=self.model, response_format=<strict JSON schema>, max_tokens=self.max_tokens, extra_body={"prompt_template_sha": prompt_template_sha("pitch_filler")})`.
   - Parse output. On `confidence == "high"` and non-empty `pitch_markdown`: return `entry.model_copy(update={"markdown_text": pitch_markdown, "synthesized": True})`. Otherwise return `entry` unchanged.
   - Wrap LLM call in `try: ... except (httpx.HTTPError, json.JSONDecodeError, ValidationError) as exc:` — log warning, return entry unchanged. Never raise (per-entry isolation contract).
-- [ ] **Step 2.3:** Add `synthesized: bool = False` field to `RawEntry` in `slopmortem/models.py`.
-- [ ] **Step 2.4:** Re-export `HaikuPitchFiller` from `slopmortem/ingest/__init__.py`.
-- [ ] **Step 2.5:** Run `just lint` and `just typecheck` — clean.
+- [x] **Step 2.3:** Add `synthesized: bool = False` field to `RawEntry` in `slopmortem/models.py`. *(Also extended `CandidatePayload.provenance` Literal to include `"synthesized"` per File Structure §Modified.)*
+- [x] **Step 2.4:** Re-export `HaikuPitchFiller` from `slopmortem/ingest/__init__.py`.
+- [x] **Step 2.5:** Run `just lint` and `just typecheck` — clean.
 
 **Done when:** Module exists, lints, typechecks, importable.
 
