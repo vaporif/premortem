@@ -1,25 +1,7 @@
-"""Tavily news source: rolling-window shutdown-event discovery.
+"""Tavily /search source: fan out (query, year, quarter), then dedup-and-rank.
 
-Pipeline:
-  1. Materialise (query, year, quarter) triples from YAML defaults
-     overridden by constructor kwargs.
-  2. Fan out one POST /search per triple under the configured
-     CapacityLimiter, routed through gather_resilient so a bad
-     call doesn't take down siblings.
-  3. Flatten + filter (min_score, missing url/raw_content/score).
-  4. Canonicalise URLs (strip utm_*, fbclid, gclid, ref, ref_src,
-     feature, _ga; lowercase host; drop fragment; trailing slash).
-  5. Drop mirror/aggregator hosts via mirror_domains.yml suffix match.
-  6. Dedup on canonical URL keeping the highest-scored row.
-  7. Sort (score desc, published_date desc, canonical_url asc) and
-     cap at max_emit (default 200).
-  8. Yield one RawEntry per kept row, with raw_content as
-     markdown_text (no Wayback / Tavily-extract hop required).
-
-Why collect-then-rank instead of streaming: parallel gather_resilient
-completion order is non-deterministic. Score-best-wins matters more
-than first-yield latency, and the peak memory across the
-queries x years x 4 fan-out is trivial.
+Collect-then-rank (not stream) because gather_resilient completion order is
+non-deterministic and score-best-wins matters more than first-yield latency.
 """
 
 from __future__ import annotations
@@ -182,11 +164,10 @@ def _build_call_descriptors(
     end_year: int,
     today: date | None = None,
 ) -> list[dict[str, object]]:
-    """Cross-product (query, year, quarter) → list of call payload dicts.
+    """Cross-product (query, year, quarter) → call payloads.
 
-    Future quarters are skipped and the current quarter's ``end_date`` is
-    clamped to ``today``: Tavily 400s on fully-future windows. ISO-8601
-    dates sort lexicographically, so plain string compare is enough.
+    Future quarters dropped; current quarter's end_date clamped to today
+    (Tavily 400s on fully-future windows).
     """
     today_iso = (today or datetime.now(UTC).date()).isoformat()
     return [
@@ -289,11 +270,10 @@ class TavilyNewsSource:
         api_key: str,
         limiter: anyio.CapacityLimiter,
     ) -> list[dict[str, object]] | None:
-        """Issue one POST /search; return its ``results`` list, or ``None`` on failure.
+        """POST /search → ``results``, or ``None`` on failure.
 
-        ``None`` lets the caller distinguish "call failed" from "call returned
-        zero rows", which the per-call counter relies on. Returning ``[]``
-        would silently masquerade as an empty-but-successful page.
+        ``None`` (vs ``[]``) lets the caller distinguish failure from an
+        empty-but-successful page, which the per-call counter relies on.
         """
         async with limiter:
             await throttle_for(TAVILY_SEARCH_ENDPOINT, rps=self.rps)
