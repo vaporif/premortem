@@ -31,6 +31,7 @@ from slopmortem.ingest._ports import (
 from slopmortem.ingest._ports import (
     _Point as _Point,
 )
+from slopmortem.ingest._title_pre_filter import HaikuTitlePreFilter as HaikuTitlePreFilter
 
 __all__ = [
     "INGEST_PHASE_LABELS",
@@ -38,6 +39,7 @@ __all__ = [
     "FakeSlopClassifier",
     "HaikuPitchFiller",
     "HaikuSlopClassifier",
+    "HaikuTitlePreFilter",
     "InMemoryCorpus",
     "IngestPhase",
     "IngestResult",
