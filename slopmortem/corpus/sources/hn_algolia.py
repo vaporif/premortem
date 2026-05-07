@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Final, cast
 from urllib.parse import quote_plus
 
 import yaml
@@ -182,16 +182,13 @@ class HNAlgoliaSource:
         )
 
     @staticmethod
-    def _hit_to_entry(hit: dict[str, Any]) -> RawEntry | None:  # pyright: ignore[reportExplicitAny]
-        # Annotate every ``hit.get(...)`` as ``object`` immediately so subsequent
-        # ``isinstance`` / ``str(...)`` calls don't propagate ``Any``; basedpyright
-        # strict with ``reportAny=error`` otherwise flags the implicit __str__.
-        object_id: object = hit.get("objectID")
-        url: object = hit.get("url")
-        title: object = hit.get("title") or ""
-        created_at: object = hit.get("created_at") or ""
-        points: object = hit.get("points")
-        num_comments: object = hit.get("num_comments")
+    def _hit_to_entry(hit: dict[str, object]) -> RawEntry | None:
+        object_id = hit.get("objectID")
+        url = hit.get("url")
+        title = hit.get("title") or ""
+        created_at = hit.get("created_at") or ""
+        points = hit.get("points")
+        num_comments = hit.get("num_comments")
         if not isinstance(object_id, str) or not object_id:
             return None
         if not isinstance(url, str) or not url:
@@ -218,7 +215,7 @@ class HNAlgoliaSource:
 
     async def _fetch_page(
         self, phrase: str, page: int, win_start: int, win_end: int
-    ) -> list[dict[str, Any]] | None:  # pyright: ignore[reportExplicitAny]
+    ) -> list[dict[str, object]] | None:
         url = self._build_url(phrase, page, win_start, win_end)
         # Robots is host-cached and checked once at the top of fetch();
         # skip per-call recheck.
@@ -242,7 +239,7 @@ class HNAlgoliaSource:
         if not isinstance(hits_obj, list):
             return None
         hits_list = cast("list[object]", hits_obj)
-        return [cast("dict[str, Any]", h) for h in hits_list if isinstance(h, dict)]  # pyright: ignore[reportExplicitAny]
+        return [cast("dict[str, object]", h) for h in hits_list if isinstance(h, dict)]
 
     async def fetch(self) -> AsyncIterator[RawEntry]:
         # Robots check is per-host, not per-URL: hit it once up front so a
