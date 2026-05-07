@@ -40,8 +40,10 @@ class TavilyEnricher:
     """[Enricher] Tavily /extract client that recovers article bodies on empty entries."""
 
     async def enrich(self, entry: RawEntry) -> RawEntry:
-        """Best-effort. Returns *entry* unchanged on failure or when raw_html is populated."""
+        """Best-effort. Returns *entry* unchanged on failure or when the body is already there."""
         if entry.raw_html is not None and entry.raw_html.strip():
+            return entry
+        if entry.markdown_text is not None and entry.markdown_text.strip():
             return entry
         if not entry.url:
             return entry

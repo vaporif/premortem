@@ -163,6 +163,39 @@ init-env:
 
     echo "wrote $ENV_FILE"
 
+# Snapshot ingested state into a single zip under backups/. Stops Qdrant
+# briefly (only if it's running) so the storage volume is copied at rest,
+# then restarts it. Captures data/qdrant/, journal.sqlite, and post_mortems/
+# — the same surface `just nuke` wipes.
+backup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p backups
+    stamp=$(date +%Y%m%d-%H%M%S)
+    out="backups/slopmortem-backup-${stamp}.zip"
+
+    qdrant_running=0
+    if docker compose ps --status running --services 2>/dev/null | grep -qx qdrant; then
+        qdrant_running=1
+        echo "→ stopping qdrant for a consistent snapshot"
+        docker compose stop qdrant >/dev/null
+    fi
+
+    trap '[ "$qdrant_running" = "1" ] && docker compose start qdrant >/dev/null || true' EXIT
+
+    targets=()
+    [ -d data/qdrant ]   && targets+=(data/qdrant)
+    [ -f journal.sqlite ] && targets+=(journal.sqlite)
+    [ -d post_mortems ]   && targets+=(post_mortems)
+
+    if [ ${#targets[@]} -eq 0 ]; then
+        echo "nothing to back up (no qdrant, journal, or post_mortems present)"
+        exit 0
+    fi
+
+    zip -qr "$out" "${targets[@]}"
+    echo "wrote $out ($(du -h "$out" | cut -f1))"
+
 # Wipe all ingested state: stop Qdrant, delete its storage volume, drop
 # the merge journal, and remove the post_mortems tree. Prompts before
 # touching anything. Run before a fresh `just ingest` when you want to

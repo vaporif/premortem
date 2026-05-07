@@ -107,6 +107,7 @@
           git
           git-lfs
           curl
+          zip
         ];
 
         env = {

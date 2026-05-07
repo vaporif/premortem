@@ -11,13 +11,18 @@ from slopmortem.corpus.sources import TavilyEnricher
 from slopmortem.models import RawEntry
 
 
-def _entry(*, raw_html: str | None = None, url: str | None = "https://example.com/x") -> RawEntry:
+def _entry(
+    *,
+    raw_html: str | None = None,
+    markdown_text: str | None = None,
+    url: str | None = "https://example.com/x",
+) -> RawEntry:
     return RawEntry(
         source="hn_algolia",
         source_id="abc123",
         url=url,
         raw_html=raw_html,
-        markdown_text=None,
+        markdown_text=markdown_text,
         fetched_at=datetime.now(UTC),
     )
 
@@ -29,6 +34,18 @@ async def test_skips_when_raw_html_already_populated(monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     entry = _entry(raw_html="<html>already there</html>")
+    result = await TavilyEnricher().enrich(entry)
+    assert result is entry
+    mock_post.assert_not_called()
+
+
+async def test_skips_when_markdown_text_already_populated(monkeypatch):
+    """tavily_news yields markdown_text with raw_html=None — don't re-fetch via /extract."""
+    mock_post = AsyncMock()
+    monkeypatch.setattr("slopmortem.corpus.sources.tavily.safe_post", mock_post)
+    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
+
+    entry = _entry(markdown_text="already extracted body text")
     result = await TavilyEnricher().enrich(entry)
     assert result is entry
     mock_post.assert_not_called()

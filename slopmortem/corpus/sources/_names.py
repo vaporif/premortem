@@ -7,3 +7,4 @@ from typing import Final
 SOURCE_CURATED: Final = "curated"
 SOURCE_HN_ALGOLIA: Final = "hn_algolia"
 SOURCE_CRUNCHBASE_CSV: Final = "crunchbase_csv"
+SOURCE_TAVILY_NEWS: Final = "tavily_news"
