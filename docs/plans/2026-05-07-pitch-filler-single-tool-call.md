@@ -513,7 +513,7 @@ What stays:
 What goes:
 - The "Tool budget" section in its entirety (lines 14-15 of the current file: the heading and the one-paragraph explanation).
 
-- [ ] **Step 3.1: Edit `slopmortem/llm/prompts/pitch_filler.j2`**
+- [x] **Step 3.1: Edit `slopmortem/llm/prompts/pitch_filler.j2`**
 
 Replace the file contents with:
 
@@ -562,14 +562,14 @@ The diff vs the current prompt:
 - A short "Search query" hint replaces it (one paragraph), telling the model how to formulate the query. This is now a hint, not a budget rule.
 - "Then synthesize from the results — do not ask for another search" wording is gone. `tool_choice="none"` enforces it mechanically.
 
-- [ ] **Step 3.2: Run prompt-rendering tests**
+- [x] **Step 3.2: Run prompt-rendering tests**
 
 Run: `uv run pytest tests/llm -k "prompt or pitch_filler" -v`
 Expected: all pass. The prompt template is loaded by name, not by content; the file rename does not happen, so `render_prompt("pitch_filler")` and `prompt_template_sha("pitch_filler")` both still resolve.
 
 If a test pins the template SHA to a specific value, that test will need its expected SHA regenerated. The current `tests/ingest/test_pitch_filler.py::test_passes_prompt_template_sha_in_extra_body` only checks length (16) and type, not the value, so it should pass unchanged.
 
-- [ ] **Step 3.3: Commit**
+- [x] **Step 3.3: Commit**
 
 Run:
 
