@@ -45,11 +45,19 @@ DEFAULT_HITS_PER_PAGE: Final = 30
 DEFAULT_LOOKBACK_YEARS: Final = 11  # fallback lookback when date_from is unset
 
 
-def _epoch(date_str: str) -> int | None:
-    """Parse YYYY-MM-DD to UTC epoch seconds; return None for empty string."""
+def _epoch(date_str: str, *, end_of_day: bool = False) -> int | None:
+    """Parse YYYY-MM-DD to UTC epoch seconds; return None for empty string.
+
+    With ``end_of_day=True``, returns 23:59:59 of the date instead of midnight —
+    so an operator setting ``date_to: "2017-12-31"`` includes the full day, not
+    just its midnight boundary.
+    """
     if not date_str:
         return None
-    return int(datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC).timestamp())
+    parsed = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
+    if end_of_day:
+        parsed = parsed.replace(hour=23, minute=59, second=59)
+    return int(parsed.timestamp())
 
 
 def _coerce_int(name: str, raw: object, default: int) -> int:
@@ -139,7 +147,7 @@ class HNAlgoliaSource:
             raise ValueError(msg)
 
         self.date_from_epoch: int | None = _epoch(str(defaults.get("date_from") or ""))
-        self.date_to_epoch: int | None = _epoch(str(defaults.get("date_to") or ""))
+        self.date_to_epoch: int | None = _epoch(str(defaults.get("date_to") or ""), end_of_day=True)
         self.pages_per_window: int = _coerce_int(
             "pages_per_window",
             defaults.get("pages_per_window"),

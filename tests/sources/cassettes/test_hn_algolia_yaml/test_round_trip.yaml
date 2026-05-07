@@ -36,13 +36,13 @@ interactions:
       content-type:
       - text/html; charset=utf-8
       date:
-      - Thu, 07 May 2026 02:18:44 GMT
+      - Thu, 07 May 2026 02:41:30 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google
       x-cloud-trace-context:
-      - 86afd013a7d596d4fa6b468d413d10aa
+      - 1956462580b92c463b2b8c2fa8b2a588
     status:
       code: 404
       message: Not Found
@@ -60,10 +60,18 @@ interactions:
       User-Agent:
       - slopmortem/0.1.0 (+https://github.com/vaporif/slopmortem)
     method: GET
-    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=0&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514678400
+    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=0&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799
   response:
     body:
-      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"networked"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Webscript.io
+      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"some_account"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Iranian
+        authorities are blocking access to Telegram for the majority of Iranians after
+        Telegrams public refusal to <em>shut down</em> https://t.me/sedaiemardom  and
+        other peacefully protesting channels.<p>https://twitter.com/durov/status/947441456238735360"},"title":{"matchLevel":"none","matchedWords":[],"value":"Iranian
+        authorities are now blocking access to Telegram"}},"_tags":["story","author_some_account","story_16040444","ask_hn"],"author":"some_account","children":[16040453],"created_at":"2017-12-31T13:05:53Z","created_at_i":1514725553,"num_comments":1,"objectID":"16040444","points":1,"story_id":16040444,"story_text":"Iranian
+        authorities are blocking access to Telegram for the majority of Iranians after
+        Telegrams public refusal to shut down https:&#x2F;&#x2F;t.me&#x2F;sedaiemardom  and
+        other peacefully protesting channels.<p>https:&#x2F;&#x2F;twitter.com&#x2F;durov&#x2F;status&#x2F;947441456238735360","title":"Iranian
+        authorities are now blocking access to Telegram","updated_at":"2024-09-20T01:51:22Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"networked"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Webscript.io
         has <em>shut down</em>"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.webscript.io/"}},"_tags":["story","author_networked","story_15997470"],"author":"networked","created_at":"2017-12-24T02:00:06Z","created_at_i":1514080806,"num_comments":0,"objectID":"15997470","points":2,"story_id":15997470,"title":"Webscript.io
         has shut down","updated_at":"2024-09-20T01:52:37Z","url":"https://www.webscript.io/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"lnguyen"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Is
         it legal to <em>shut down</em> a Bitcoin exchange while the price is falling?"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://theoutline.com/post/2779/coinbase-bitcoin-trades-<em>shut-down</em>-price-cryptocurrency-exchanges"}},"_tags":["story","author_lnguyen","story_15996591"],"author":"lnguyen","created_at":"2017-12-23T22:26:18Z","created_at_i":1514067978,"num_comments":0,"objectID":"15996591","points":5,"story_id":15996591,"title":"Is
@@ -260,29 +268,27 @@ interactions:
         in 2018"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://arstechnica.com/gadgets/2017/11/logitech-to-<em>shut-down</em>-service-and-support-for-harmony-link-devices-in-2018/"}},"_tags":["story","author_AndrewDucker","story_15655153"],"author":"AndrewDucker","created_at":"2017-11-08T18:11:30Z","created_at_i":1510164690,"num_comments":0,"objectID":"15655153","points":2,"story_id":15655153,"title":"Logitech
         to shut down \u201cservice and support\u201d for Harmony Link devices in 2018","updated_at":"2024-09-20T01:37:36Z","url":"https://arstechnica.com/gadgets/2017/11/logitech-to-shut-down-service-and-support-for-harmony-link-devices-in-2018/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"eplanit"},"title":{"matchLevel":"none","matchedWords":[],"value":"Amazon
         is shutting down its Fresh grocery delivery service in parts of 9+ states"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.recode.net/2017/11/3/16601488/amazon-fresh-cancellation-<em>shut-down</em>-grocery-delivery-whole-foods"}},"_tags":["story","author_eplanit","story_15648251"],"author":"eplanit","children":[15648390],"created_at":"2017-11-07T22:24:07Z","created_at_i":1510093447,"num_comments":1,"objectID":"15648251","points":3,"story_id":15648251,"title":"Amazon
-        is shutting down its Fresh grocery delivery service in parts of 9+ states","updated_at":"2024-09-20T01:36:56Z","url":"https://www.recode.net/2017/11/3/16601488/amazon-fresh-cancellation-shut-down-grocery-delivery-whole-foods"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"aaronbrethorst"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Court
-        orders Sci-Hub to <em>shut down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.theverge.com/2017/11/7/16618874/court-pirate-science-site-sci-hub-<em>shut-down</em>"}},"_tags":["story","author_aaronbrethorst","story_15646749"],"author":"aaronbrethorst","created_at":"2017-11-07T19:39:22Z","created_at_i":1510083562,"num_comments":0,"objectID":"15646749","points":2,"story_id":15646749,"title":"Court
-        orders Sci-Hub to shut down","updated_at":"2024-09-20T01:36:44Z","url":"https://www.theverge.com/2017/11/7/16618874/court-pirate-science-site-sci-hub-shut-down"}],"hitsPerPage":30,"nbHits":231,"nbPages":8,"page":0,"params":"query=%22shut+down%22&tags=story&page=0&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514678400&advancedSyntax=true&analyticsTags=backend","processingTimeMS":14,"processingTimingsMS":{"_request":{"queue":1,"roundTrip":20},"afterFetch":{"merge":{"mergeLoop":{"prepareNextHit":11,"total":11},"total":12},"total":12},"fetch":{"total":1},"total":14},"query":"\"shut
-        down\"","serverTimeMS":16}
+        is shutting down its Fresh grocery delivery service in parts of 9+ states","updated_at":"2024-09-20T01:36:56Z","url":"https://www.recode.net/2017/11/3/16601488/amazon-fresh-cancellation-shut-down-grocery-delivery-whole-foods"}],"hitsPerPage":30,"nbHits":232,"nbPages":8,"page":0,"params":"query=%22shut+down%22&tags=story&page=0&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799&advancedSyntax=true&analyticsTags=backend","processingTimeMS":10,"processingTimingsMS":{"_request":{"roundTrip":17},"afterFetch":{"format":{"highlighting":1,"total":1},"merge":{"mergeLoop":{"prepareNextHit":7,"total":7},"total":7},"total":7},"fetch":{"scanning":1,"total":2},"total":10},"query":"\"shut
+        down\"","serverTimeMS":13}
 
         '
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       Content-Length:
-      - '35242'
+      - '35675'
       access-control-allow-origin:
       - '*'
       content-type:
       - application/json
       date:
-      - Thu, 07 May 2026 02:18:44 GMT
+      - Thu, 07 May 2026 02:41:30 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google
       x-cloud-trace-context:
-      - c8f01397ffbf791ab9782ad93737f92b
+      - fc49fe1227c85de400e8be330856bb9c
     status:
       code: 200
       message: OK
@@ -300,10 +306,12 @@ interactions:
       User-Agent:
       - slopmortem/0.1.0 (+https://github.com/vaporif/slopmortem)
     method: GET
-    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=1&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514678400
+    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=1&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799
   response:
     body:
-      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"nishant_K_gupta"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"After
+      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"aaronbrethorst"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Court
+        orders Sci-Hub to <em>shut down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.theverge.com/2017/11/7/16618874/court-pirate-science-site-sci-hub-<em>shut-down</em>"}},"_tags":["story","author_aaronbrethorst","story_15646749"],"author":"aaronbrethorst","created_at":"2017-11-07T19:39:22Z","created_at_i":1510083562,"num_comments":0,"objectID":"15646749","points":2,"story_id":15646749,"title":"Court
+        orders Sci-Hub to shut down","updated_at":"2024-09-20T01:36:44Z","url":"https://www.theverge.com/2017/11/7/16618874/court-pirate-science-site-sci-hub-shut-down"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"nishant_K_gupta"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"After
         Google decided to <em>shut down</em> it;s airfare data api, what will be your
         alternative to it? \nHave you already evaluated any other API?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
         HN: What''s Your Alternative to Google''s QPX Express API?"}},"_tags":["story","author_nishant_K_gupta","story_15642267","ask_hn"],"author":"nishant_K_gupta","children":[15642310],"created_at":"2017-11-07T10:32:49Z","created_at_i":1510050769,"num_comments":1,"objectID":"15642267","points":1,"story_id":15642267,"story_text":"After
@@ -533,31 +541,27 @@ interactions:
         U.S.A. attempts to <em>shut down</em> Patreon of open source emulator RPCS3"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.reddit.com/r/emulation/comments/72lo12/statement_atlus_usa_attempts_to_<em>shut_down</em>/"}},"_tags":["story","author_mb53","story_15342449"],"author":"mb53","created_at":"2017-09-26T20:57:45Z","created_at_i":1506459465,"num_comments":0,"objectID":"15342449","points":3,"story_id":15342449,"title":"Atlus
         U.S.A. attempts to shut down Patreon of open source emulator RPCS3","updated_at":"2024-09-20T01:25:07Z","url":"https://www.reddit.com/r/emulation/comments/72lo12/statement_atlus_usa_attempts_to_shut_down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"scdoshi"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Stranger
         Things pop-up bar asked to <em>shut down</em> with humorous cease-and-desist"},"url":{"matchLevel":"none","matchedWords":[],"value":"http://www.businessinsider.com/netflix-stranger-things-pop-up-bar-funny-cease-and-desist-letter-2017-9"}},"_tags":["story","author_scdoshi","story_15327295"],"author":"scdoshi","created_at":"2017-09-25T00:37:37Z","created_at_i":1506299857,"num_comments":0,"objectID":"15327295","points":2,"story_id":15327295,"title":"Stranger
-        Things pop-up bar asked to shut down with humorous cease-and-desist","updated_at":"2024-09-20T01:23:36Z","url":"http://www.businessinsider.com/netflix-stranger-things-pop-up-bar-funny-cease-and-desist-letter-2017-9"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"MuyoSan"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
-        <em>shut down</em> my Y Combinator-backed African startup after 2 years. Here\u2019s
-        why"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techpoint.ng/2017/09/22/afrostream-<em>shut-down</em>/"}},"_tags":["story","author_MuyoSan","story_15316698"],"author":"MuyoSan","created_at":"2017-09-22T23:00:23Z","created_at_i":1506121223,"num_comments":0,"objectID":"15316698","points":3,"story_id":15316698,"title":"I
-        shut down my Y Combinator-backed African startup after 2 years. Here\u2019s
-        why","updated_at":"2024-09-20T01:22:28Z","url":"https://techpoint.ng/2017/09/22/afrostream-shut-down/"}],"hitsPerPage":30,"nbHits":231,"nbPages":8,"page":1,"params":"query=%22shut+down%22&tags=story&page=1&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514678400&advancedSyntax=true&analyticsTags=backend","processingTimeMS":7,"processingTimingsMS":{"_request":{"roundTrip":20},"afterFetch":{"format":{"highlighting":1,"total":1},"merge":{"mergeLoop":{"prepareNextHit":3,"total":3},"total":3},"total":3},"fetch":{"query":1,"total":2},"total":7},"query":"\"shut
-        down\"","serverTimeMS":9}
+        Things pop-up bar asked to shut down with humorous cease-and-desist","updated_at":"2024-09-20T01:23:36Z","url":"http://www.businessinsider.com/netflix-stranger-things-pop-up-bar-funny-cease-and-desist-letter-2017-9"}],"hitsPerPage":30,"nbHits":232,"nbPages":8,"page":1,"params":"query=%22shut+down%22&tags=story&page=1&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799&advancedSyntax=true&analyticsTags=backend","processingTimeMS":9,"processingTimingsMS":{"_request":{"roundTrip":19},"afterFetch":{"format":{"total":1},"merge":{"mergeLoop":{"prepareNextHit":6,"total":6},"total":6},"total":6},"fetch":{"query":1,"total":2},"total":9},"query":"\"shut
+        down\"","serverTimeMS":11}
 
         '
     headers:
       Alt-Svc:
-      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      - h3=":443"; ma=2592000
       Content-Length:
-      - '37966'
+      - '37943'
       access-control-allow-origin:
       - '*'
       content-type:
       - application/json
       date:
-      - Thu, 07 May 2026 02:18:45 GMT
+      - Thu, 07 May 2026 02:41:31 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google
       x-cloud-trace-context:
-      - 971b50611347fa2b931d8afd6b16afaf
+      - 378576b149c345af88f58e3b0e7f704e
     status:
       code: 200
       message: OK
@@ -575,10 +579,14 @@ interactions:
       User-Agent:
       - slopmortem/0.1.0 (+https://github.com/vaporif/slopmortem)
     method: GET
-    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=2&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514678400
+    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=2&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799
   response:
     body:
-      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rinchik"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"This
+      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"MuyoSan"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        <em>shut down</em> my Y Combinator-backed African startup after 2 years. Here\u2019s
+        why"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techpoint.ng/2017/09/22/afrostream-<em>shut-down</em>/"}},"_tags":["story","author_MuyoSan","story_15316698"],"author":"MuyoSan","created_at":"2017-09-22T23:00:23Z","created_at_i":1506121223,"num_comments":0,"objectID":"15316698","points":3,"story_id":15316698,"title":"I
+        shut down my Y Combinator-backed African startup after 2 years. Here\u2019s
+        why","updated_at":"2024-09-20T01:22:28Z","url":"https://techpoint.ng/2017/09/22/afrostream-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rinchik"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"This
         is a re-post of this question: https://news.ycombinator.com/item?id=15261955
         Which I submitted this past Saturday, it got 8 up-votes but unfortunately
         no comments. Since it was Saturday, I figured most of the techies most likely
@@ -826,47 +834,27 @@ interactions:
         and decided to shut down? Is it ever possible to keep the business operating
         or does the entire site have to shut down? What was the process like for considering
         shutting down and ultimately doing so?","title":"Ask HN: Have you shut down
-        a company before?","updated_at":"2024-09-20T01:11:29Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"11thEarlOfMar"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"We''ve
-        been interviewing for an embedded SW position for a few weeks. Our interview
-        process includes a code review of code written by the candidate as homework.
-        All candidates exhibit some degree of nervousness during the review, however,
-        there have been a couple who virtually <em>shut down</em> and basically stopped
-        being able to think. In one-on-one discussions, these same engineers were
-        more or less fine and expressed a high level of competence. But the code reviews
-        were just really painful: Stuttering, perspiring, unable to process even rudimentary
-        responses to questions that you know they know the answer to...<p>Have you
-        had this experience and if so, were you able to mitigate it and if so, how?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
-        HN: Handling Pathologically Nervous Interviewees"}},"_tags":["story","author_11thEarlOfMar","story_14932242","ask_hn"],"author":"11thEarlOfMar","children":[14932507],"created_at":"2017-08-04T21:03:14Z","created_at_i":1501880594,"num_comments":1,"objectID":"14932242","points":1,"story_id":14932242,"story_text":"We&#x27;ve
-        been interviewing for an embedded SW position for a few weeks. Our interview
-        process includes a code review of code written by the candidate as homework.
-        All candidates exhibit some degree of nervousness during the review, however,
-        there have been a couple who virtually shut down and basically stopped being
-        able to think. In one-on-one discussions, these same engineers were more or
-        less fine and expressed a high level of competence. But the code reviews were
-        just really painful: Stuttering, perspiring, unable to process even rudimentary
-        responses to questions that you know they know the answer to...<p>Have you
-        had this experience and if so, were you able to mitigate it and if so, how?","title":"Ask
-        HN: Handling Pathologically Nervous Interviewees","updated_at":"2024-09-20T01:08:30Z"}],"hitsPerPage":30,"nbHits":231,"nbPages":8,"page":2,"params":"query=%22shut+down%22&tags=story&page=2&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514678400&advancedSyntax=true&analyticsTags=backend","processingTimeMS":8,"processingTimingsMS":{"_request":{"roundTrip":22},"afterFetch":{"format":{"highlighting":1,"total":2},"merge":{"mergeLoop":{"prepareNextHit":4,"total":5},"total":5},"total":5},"fetch":{"scanning":1,"total":2},"total":8},"query":"\"shut
-        down\"","serverTimeMS":10}
+        a company before?","updated_at":"2024-09-20T01:11:29Z"}],"hitsPerPage":30,"nbHits":232,"nbPages":8,"page":2,"params":"query=%22shut+down%22&tags=story&page=2&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799&advancedSyntax=true&analyticsTags=backend","processingTimeMS":18,"processingTimingsMS":{"_request":{"roundTrip":18},"afterFetch":{"format":{"highlighting":1,"total":1},"merge":{"mergeLoop":{"prepareNextHit":11,"total":11},"total":11},"total":11},"fetch":{"query":1,"total":2},"getIdx":{"load":{"gens":2,"total":3},"total":3},"total":18},"query":"\"shut
+        down\"","serverTimeMS":20}
 
         '
     headers:
       Alt-Svc:
-      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      - h3=":443"; ma=2592000
       Content-Length:
-      - '41717'
+      - '40514'
       access-control-allow-origin:
       - '*'
       content-type:
       - application/json
       date:
-      - Thu, 07 May 2026 02:18:45 GMT
+      - Thu, 07 May 2026 02:41:31 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google
       x-cloud-trace-context:
-      - 24d2de792494bb985073f44372635b52
+      - b6888d6b14965795154a5ca3c134d7d1
     status:
       code: 200
       message: OK

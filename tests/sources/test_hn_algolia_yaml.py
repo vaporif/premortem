@@ -276,6 +276,42 @@ async def test_iterates_one_window_per_year(
         ), f"expected one URL bracketing year starting at epoch {epoch}; got {call_log}"
 
 
+async def test_date_to_includes_full_last_day(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit date_to of YYYY-12-31 must include the entire last day,
+    not stop at midnight."""
+    yaml_path = _yaml(
+        tmp_path,
+        """
+        defaults:
+          date_from: "2017-01-01"
+          date_to: "2017-12-31"
+          pages_per_window: 1
+          hits_per_page: 30
+        phrases:
+          - "shut down"
+        """,
+    )
+    call_log: list[str] = []
+
+    async def fake_get(url: str, **_: object) -> _FakeResp:
+        call_log.append(url)
+        return _FakeResp(_hits_payload([]))
+
+    monkeypatch.setattr(
+        "slopmortem.corpus.sources.hn_algolia.safe_get",
+        AsyncMock(side_effect=fake_get),
+    )
+    _setup_throttle(monkeypatch)
+
+    src = HNAlgoliaSource(queries_yaml_path=yaml_path)
+    _ = [e async for e in src.fetch()]
+    # 2017 window upper bound must be Dec 31 23:59:59 = 1514764799, not midnight = 1514678400.
+    assert any("1514764799" in u for u in call_log), call_log
+    assert not any("1514678400" in u for u in call_log), call_log
+
+
 async def test_respects_pages_per_window_cap(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
