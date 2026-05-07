@@ -158,3 +158,41 @@ async def test_post_settle_raise_stops_subsequent_calls(fake_sdk):
     with pytest.raises(BudgetExceededError, match="exhausted"):
         await c.complete("hi again")
     assert fake_sdk.chat.completions.create.call_count == 1
+
+
+async def test_default_call_does_not_send_tool_choice(fake_sdk):
+    """Synthesis path: no single_tool_call → no tool_choice kwarg ever sent."""
+    fake_sdk.chat.completions.create.return_value = _stub_response(
+        finish_reason="stop", content="ok", usage=_stub_usage()
+    )
+    c = OpenRouterClient(sdk=fake_sdk, budget=Budget(2.0))
+    await c.complete("hi")
+    kwargs = fake_sdk.chat.completions.create.call_args.kwargs
+    assert "tool_choice" not in kwargs
+
+
+async def test_single_tool_call_pins_one_tool_invocation(fake_sdk):
+    """single_tool_call=True forces tool_choice='required' on turn 0, 'none' on turn 1."""
+
+    class Args(BaseModel):
+        x: int
+
+    async def fn(x: int) -> str:
+        return f"got {x}"
+
+    tool = ToolSpec(name="t", description="", args_model=Args, fn=fn)
+    fake_sdk.chat.completions.create.side_effect = [
+        _stub_response(
+            finish_reason="tool_calls",
+            tool_calls=[{"id": "t1", "function": {"name": "t", "arguments": '{"x":1}'}}],
+            usage=_stub_usage(),
+        ),
+        _stub_response(finish_reason="stop", content="done", usage=_stub_usage()),
+    ]
+    c = OpenRouterClient(sdk=fake_sdk, budget=Budget(2.0))
+    r = await c.complete("hi", tools=[tool], single_tool_call=True)
+    assert r.text == "done"
+    calls = fake_sdk.chat.completions.create.call_args_list
+    assert len(calls) == 2
+    assert calls[0].kwargs["tool_choice"] == "required"
+    assert calls[1].kwargs["tool_choice"] == "none"

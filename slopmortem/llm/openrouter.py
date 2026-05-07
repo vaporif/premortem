@@ -91,7 +91,7 @@ class OpenRouterClient:
         self._initial_backoff = initial_backoff
         self._sleep: Callable[[float], Awaitable[None]] = sleep or anyio.sleep
 
-    async def complete(  # noqa: C901, PLR0913 - mirrors OpenAI chat.create kwargs.
+    async def complete(  # noqa: C901, PLR0912, PLR0913, PLR0915 - mirrors OpenAI chat.create kwargs.
         self,
         prompt: str,
         *,
@@ -105,9 +105,6 @@ class OpenRouterClient:
         single_tool_call: bool = False,
     ) -> CompletionResult:
         """Run a chat completion, including the tool-call loop and transient-error retries."""
-        # ``single_tool_call`` is wired in Task 2; accepted here only so the
-        # Protocol signature is stable across this commit.
-        del single_tool_call
         # Pre-call gate: a runaway loop stops issuing calls once the budget is
         # exhausted. Concurrent fan-out can still tail-overshoot by up to
         # N_synthesize x per-call cost.
@@ -132,11 +129,15 @@ class OpenRouterClient:
             base_kw["max_tokens"] = max_tokens
 
         try:
-            for _turn in range(self._max_tool_turns):
+            effective_max_turns = 2 if single_tool_call else self._max_tool_turns
+            for turn in range(effective_max_turns):
+                per_turn_kw: dict[str, Any] = dict(base_kw)  # pyright: ignore[reportExplicitAny]
+                if single_tool_call:
+                    per_turn_kw["tool_choice"] = "required" if turn == 0 else "none"
                 resp = await self._call_with_retry(
                     messages=messages,
                     tools=tools_payload,
-                    **base_kw,
+                    **per_turn_kw,
                 )
                 usage = resp.usage
                 if usage is not None:

@@ -367,7 +367,7 @@ This task introduces the behavior. The signature already exists (Task 1 Step 1.2
 
 We test both branches. The "synthesis path unchanged" property is encoded as: when `single_tool_call=False`, the `tool_choice` kwarg is **never** present in the SDK call.
 
-- [ ] **Step 2.1: Pin a regression test — default path sends no `tool_choice`**
+- [x] **Step 2.1: Pin a regression test — default path sends no `tool_choice`**
 
 This is a contract pin, not RED→GREEN. The test asserts behavior that holds today and must keep holding after Step 2.5. Append to `tests/llm/test_openrouter_unit.py`:
 
@@ -383,14 +383,14 @@ async def test_default_call_does_not_send_tool_choice(fake_sdk):
     assert "tool_choice" not in kwargs
 ```
 
-- [ ] **Step 2.2: Run the new regression test — should PASS today**
+- [x] **Step 2.2: Run the new regression test — should PASS today**
 
 Run: `uv run pytest tests/llm/test_openrouter_unit.py::test_default_call_does_not_send_tool_choice -v`
 Expected: PASS. Today's code never sends `tool_choice`; this test pins the contract before we change anything.
 
 If this test fails today, stop — investigate whether someone already added `tool_choice` plumbing.
 
-- [ ] **Step 2.3: Write failing test — `single_tool_call=True` sends `required` then `none`**
+- [x] **Step 2.3: Write failing test — `single_tool_call=True` sends `required` then `none`**
 
 Append to `tests/llm/test_openrouter_unit.py`:
 
@@ -422,12 +422,12 @@ async def test_single_tool_call_pins_one_tool_invocation(fake_sdk):
     assert calls[1].kwargs["tool_choice"] == "none"
 ```
 
-- [ ] **Step 2.4: Run the failing test**
+- [x] **Step 2.4: Run the failing test**
 
 Run: `uv run pytest tests/llm/test_openrouter_unit.py::test_single_tool_call_pins_one_tool_invocation -v`
 Expected: FAIL — Task 1 made `complete()` accept the kwarg but the loop body still ignores it, so `tool_choice` is never set on the SDK call and the assertion on `calls[0].kwargs["tool_choice"]` fails with `KeyError`.
 
-- [ ] **Step 2.5: Implement the flag's behavior in the loop body**
+- [x] **Step 2.5: Implement the flag's behavior in the loop body**
 
 Edit `slopmortem/llm/openrouter.py:131-189`. The signature was already updated in Task 1 Step 1.2; only the loop body changes here. Replace the existing `_call_with_retry(...)` call with a per-turn `tool_choice` overlay.
 
@@ -465,22 +465,22 @@ Notes for the implementer:
 - `effective_max_turns = 2` is structural belt-and-suspenders: if the model misbehaves and returns `tool_calls` on turn 1 anyway, the loop exits with the existing `RuntimeError("tool-loop bound exceeded")` — same surface, but tighter cap.
 - Do not branch on `tools_payload is None`. If `single_tool_call=True` is passed without tools, we let the upstream API reject it. That's a programmer error worth surfacing loudly.
 
-- [ ] **Step 2.6: Run the new tests — both pass**
+- [x] **Step 2.6: Run the new tests — both pass**
 
 Run: `uv run pytest tests/llm/test_openrouter_unit.py -v`
 Expected: all openrouter unit tests pass, including the two new ones.
 
-- [ ] **Step 2.7: Run the full test suite**
+- [x] **Step 2.7: Run the full test suite**
 
 Run: `just test`
 Expected: pass. The synthesis path is unchanged because no caller passes `single_tool_call=True` yet.
 
-- [ ] **Step 2.8: Run typecheck**
+- [x] **Step 2.8: Run typecheck**
 
 Run: `just typecheck`
 Expected: clean.
 
-- [ ] **Step 2.9: Run lint**
+- [x] **Step 2.9: Run lint**
 
 Run: `just lint`
 Expected: clean. If ruff complains about the unused-variable rename (`_turn` → `turn`), it's because it interpreted the underscore prefix as "intentionally unused"; the rename is correct.
