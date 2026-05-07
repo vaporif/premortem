@@ -55,9 +55,6 @@ def test_canonicalize_preserves_port() -> None:
     )
 
 
-# ---- _dedup_keep_highest_score -----------------------------------------------
-
-
 def test_dedup_keeps_highest_score() -> None:
     rows: list[dict[str, object]] = [
         {"canonical_url": "https://x/a", "score": 0.4, "title": "lo"},
@@ -72,9 +69,6 @@ def test_dedup_keeps_highest_score() -> None:
     assert by_url["https://x/a"]["score"] == 0.6
 
 
-# ---- _drop_mirror_hosts ------------------------------------------------------
-
-
 def test_drop_mirror_hosts_suffix_match() -> None:
     rows: list[dict[str, object]] = [
         {"canonical_url": "https://bundle.app/article", "host": "bundle.app"},
@@ -85,9 +79,6 @@ def test_drop_mirror_hosts_suffix_match() -> None:
     out = _drop_mirror_hosts(rows, mirrors=frozenset({"bundle.app", "news.google.com"}))
     urls = {r["canonical_url"] for r in out}
     assert urls == {"https://techcrunch.com/keep"}
-
-
-# ---- _parse_published_date ---------------------------------------------------
 
 
 def test_parse_published_rfc1123() -> None:
@@ -205,7 +196,6 @@ async def test_emits_dedup_sorted_capped(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 async def test_per_call_failure_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
-    """One failing call must not abort siblings."""
     raises_once: dict[str, int] = {"n": 0}
 
     async def fake_post(url: str, *, json: dict[str, object], **_: object) -> httpx.Response:
@@ -306,10 +296,9 @@ async def test_round_trip() -> None:
         start_year=2024,
         end_year=2024,
         max_emit=5,
-        # Constrain to a single quarter via direct override at call site if needed.
     )
     entries = [e async for e in src.fetch()]
     assert all(e.source == "tavily_news" for e in entries)
     for e in entries:
         assert e.url is not None
-        assert e.markdown_text  # non-empty body
+        assert e.markdown_text

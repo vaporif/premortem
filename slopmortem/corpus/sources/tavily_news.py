@@ -54,7 +54,6 @@ DEFAULT_CONCURRENCY: Final = 5
 DEFAULT_RPS: Final = 1.0
 DEFAULT_MAX_RESULTS: Final = 20  # Tavily per-call cap
 
-# URL canonicalisation: tracking parameters to drop.
 _TRACKING_PARAMS: Final[frozenset[str]] = frozenset(
     {
         "utm_source",
@@ -85,7 +84,6 @@ _QUARTERS: Final[tuple[tuple[str, str], ...]] = (
 
 
 def _load_yaml(package: str, filename: str) -> object:
-    """Load a YAML file packaged inside ``slopmortem``."""
     text = resources.files(package).joinpath(filename).read_text(encoding="utf-8")
     # PyYAML's stub types safe_load as Any; downstream callers narrow with isinstance.
     return yaml.safe_load(text)  # pyright: ignore[reportAny]
@@ -113,13 +111,7 @@ def _load_mirror_domains() -> frozenset[str]:
 
 
 def _canonicalize_url(url: str) -> str:
-    """Normalise a URL for stable dedup.
-
-    - lowercase scheme + host
-    - drop fragment
-    - drop tracking query params
-    - normalise trailing slash on non-root paths
-    """
+    """Normalise a URL for stable dedup."""
     parsed = urlparse(url)
     scheme = parsed.scheme.lower()
     host = (parsed.hostname or "").lower()

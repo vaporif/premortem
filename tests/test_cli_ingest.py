@@ -120,7 +120,6 @@ def test_ingest_with_crunchbase_csv_appends_source(
 
 
 def test_enable_tavily_news_without_api_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    """--enable-tavily-news without TAVILY_API_KEY exits non-zero with a clear message."""
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     runner = CliRunner()
@@ -133,7 +132,6 @@ def test_enable_tavily_news_without_api_key_fails(monkeypatch: pytest.MonkeyPatc
 def test_only_source_tavily_news_runs_in_isolation(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """--only-source tavily_news auto-enables and filters the source list to just that source."""
     captured: dict[str, object] = {}
 
     async def fake_ingest(**kwargs: object) -> object:
@@ -165,7 +163,6 @@ def test_only_source_tavily_news_runs_in_isolation(
 def test_only_source_unknown_name_lists_valid(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """--only-source <unknown> exits non-zero and surfaces the registered source names."""
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     runner = CliRunner()
     result = runner.invoke(
