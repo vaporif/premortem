@@ -959,7 +959,7 @@ git commit -m "feat(sources): add tavily news source"
 - Modify: `tests/ingest/test_reliability_rank.py`
 - Modify: `tests/test_cli_ingest.py`
 
-- [ ] **Step 2.1: Extend `_RELIABILITY_RANK`**
+- [x] **Step 2.1: Extend `_RELIABILITY_RANK`**
 
 Edit `slopmortem/ingest/_helpers.py:11-15`. Update the import block to include `SOURCE_TAVILY_NEWS` (alphabetical):
 
@@ -985,7 +985,7 @@ _RELIABILITY_RANK: Final[dict[str, int]] = {
 
 If `SOURCE_DEFILLAMA: 3` is already present (DefiLlama plan landed first), insert `SOURCE_TAVILY_NEWS: 4` after it instead.
 
-- [ ] **Step 2.2: Extend the reliability-rank regression test**
+- [x] **Step 2.2: Extend the reliability-rank regression test**
 
 Edit `tests/ingest/test_reliability_rank.py:7-11`. Add `SOURCE_TAVILY_NEWS` to the import block (alphabetical):
 
@@ -1006,12 +1006,12 @@ Append to the existing `@pytest.mark.parametrize` list (after the `SOURCE_CRUNCH
 
 `test_unknown_source_lands_at_dead_letter_rank` already covers the fallback case — do not duplicate it.
 
-- [ ] **Step 2.3: Run the reliability test**
+- [x] **Step 2.3: Run the reliability test**
 
 Run: `uv run pytest tests/ingest/test_reliability_rank.py -v`
 Expected: 5 PASS (4 parametrized cases + the existing `test_unknown_source_lands_at_dead_letter_rank`).
 
-- [ ] **Step 2.4: Add the CLI flags**
+- [x] **Step 2.4: Add the CLI flags**
 
 Edit `slopmortem/cli/_ingest_cmd.py`. Five edits:
 
@@ -1117,7 +1117,7 @@ from slopmortem.corpus.sources import (
 
 **5. Add `import os` at the top of the file** if it isn't already imported (it isn't — `_ingest_cmd.py` currently uses none of `os`).
 
-- [ ] **Step 2.5: Add the source registry and `--only-source` filter**
+- [x] **Step 2.5: Add the source registry and `--only-source` filter**
 
 Still in `slopmortem/cli/_ingest_cmd.py`, add the registry table near the other module-level helpers (above `_default_curated_yaml`). The registry maps a source-name string to the spec it needs to be filterable: which `--enable-*` flag (if any) gates it, and a `gate` callable that decides whether the source is currently constructable from the run's kwargs.
 
@@ -1192,7 +1192,7 @@ In `_run_ingest`, just after the read-only short-circuits return (currently afte
 
 The source itself reads `TAVILY_API_KEY` via `os.environ.get` inside the module (matching `TavilyEnricher`); `slopmortem/config.py`'s `tavily_api_key: SecretStr` is intentionally not threaded through.
 
-- [ ] **Step 2.6: Wire the source into the sources list and apply the filter**
+- [x] **Step 2.6: Wire the source into the sources list and apply the filter**
 
 Still in `slopmortem/cli/_ingest_cmd.py`, edit the existing sources-list block (currently lines 224-229). Construct the full source list first, then filter on `--only-source` if set:
 
@@ -1226,7 +1226,7 @@ Still in `slopmortem/cli/_ingest_cmd.py`, edit the existing sources-list block (
 
 If DefiLlama's plan added entries here, keep them — concatenate, do not overwrite.
 
-- [ ] **Step 2.7: Add the regression tests**
+- [x] **Step 2.7: Add the regression tests**
 
 Edit `tests/test_cli_ingest.py`. Append three tests at the end of the file, matching the existing `monkeypatch` + `_fake_deps` + `CliRunner` pattern.
 
@@ -1297,19 +1297,19 @@ def test_only_source_unknown_name_lists_valid(
     assert "curated" in combined
 ```
 
-- [ ] **Step 2.8: Run the three new tests**
+- [x] **Step 2.8: Run the three new tests**
 
 Run: `uv run pytest tests/test_cli_ingest.py -v`
 Expected: 7 PASS — the existing 4 (`test_default_curated_yaml_resolves_to_existing_file`, `test_ingest_dry_run_dispatches_to_orchestrator`, `test_ingest_tavily_enrich_appends_enricher`, `test_ingest_with_crunchbase_csv_appends_source`) plus the 3 new ones above.
 
 If `test_only_source_tavily_news_runs_in_isolation` fails because `sources` is empty, the auto-enable step in `_run_ingest` (Step 2.5) didn't flip `enable_tavily_news` to `True` before the sources-list construction in Step 2.6 — re-check ordering inside `_run_ingest`.
 
-- [ ] **Step 2.9: Smoke-test the CLI surface**
+- [x] **Step 2.9: Smoke-test the CLI surface**
 
 Run: `uv run slopmortem ingest --help | grep -E '(enable-tavily-news|only-source|tavily-news-)'`
 Expected: at least 6 matching lines (the boolean flag, four override flags, and `--only-source`). If a flag is missing, Step 2.4 dropped a typer Option — re-add and re-run.
 
-- [ ] **Step 2.10: Dry-run with the source enabled (cheap; one-quarter window)**
+- [x] **Step 2.10: Dry-run with the source enabled (cheap; one-quarter window)**
 
 If a `TAVILY_API_KEY` is configured locally, smoke the live integration. Otherwise skip this step.
 
@@ -1331,7 +1331,7 @@ Expected:
 
 If the run fails with `HTTP 401` or similar, the key isn't reaching the source — verify `TAVILY_API_KEY` is exported, not just in `.env`.
 
-- [ ] **Step 2.11: Lint + typecheck + full test suite**
+- [x] **Step 2.11: Lint + typecheck + full test suite**
 
 Run: `just lint && just typecheck && just test`
 Expected: all clean. The full test run is the last gate before commit because the CLI wiring touches an import block that other tests indirectly load (`test_cli_smoke`, `test_cli_reconcile`, etc.).

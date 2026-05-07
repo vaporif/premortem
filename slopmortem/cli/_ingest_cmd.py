@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, cast
 
@@ -38,12 +40,15 @@ from slopmortem.corpus.sources import (
     CuratedSource,
     HNAlgoliaSource,
     TavilyEnricher,
+    TavilyNewsSource,
     WaybackEnricher,
 )
 from slopmortem.ingest import INGEST_PHASE_LABELS, IngestPhase, IngestResult, ingest
 from slopmortem.llm import OpenRouterClient, make_embedder
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from slopmortem.config import Config
     from slopmortem.corpus import Corpus, MergeJournal
     from slopmortem.corpus.sources import Enricher, Source
@@ -97,6 +102,58 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
     tavily_enrich: Annotated[
         bool, typer.Option("--tavily-enrich", help="Enable the Tavily enricher.")
     ] = False,
+    enable_tavily_news: Annotated[
+        bool,
+        typer.Option(
+            "--enable-tavily-news",
+            help=(
+                "Enable the Tavily news shutdown-event source. "
+                "Requires TAVILY_API_KEY. Bodies are returned inline; "
+                "no Tavily-extract hop is implied."
+            ),
+        ),
+    ] = False,
+    tavily_news_start_year: Annotated[
+        int | None,
+        typer.Option(
+            "--tavily-news-start-year",
+            help="Override year_range.start for the Tavily news source.",
+        ),
+    ] = None,
+    tavily_news_end_year: Annotated[
+        int | None,
+        typer.Option(
+            "--tavily-news-end-year",
+            help="Override year_range.end for the Tavily news source. Defaults to current year.",
+        ),
+    ] = None,
+    tavily_news_max_emit: Annotated[
+        int | None,
+        typer.Option(
+            "--tavily-news-max-emit",
+            help="Override the Tavily news source's max_emit cap.",
+        ),
+    ] = None,
+    tavily_news_search_depth: Annotated[
+        str | None,
+        typer.Option(
+            "--tavily-news-search-depth",
+            help=(
+                "Override search_depth for the Tavily news source: "
+                "basic (1 credit) or advanced (2)."
+            ),
+        ),
+    ] = None,
+    only_source: Annotated[
+        str | None,
+        typer.Option(
+            "--only-source",
+            help=(
+                "Run only the named source, auto-enabling its --enable-* flag if any. "
+                "Accepts source identifiers (curated, hn_algolia, crunchbase_csv, tavily_news)."
+            ),
+        ),
+    ] = None,
     post_mortems_root: Annotated[
         Path,
         typer.Option(
@@ -128,6 +185,12 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             crunchbase_csv=crunchbase_csv,
             enrich_wayback=enrich_wayback,
             tavily_enrich=tavily_enrich,
+            enable_tavily_news=enable_tavily_news,
+            tavily_news_start_year=tavily_news_start_year,
+            tavily_news_end_year=tavily_news_end_year,
+            tavily_news_max_emit=tavily_news_max_emit,
+            tavily_news_search_depth=tavily_news_search_depth,
+            only_source=only_source,
             post_mortems_root=post_mortems_root,
             limit=limit,
         )
@@ -176,7 +239,7 @@ async def _run_reconcile(config: Config, post_mortems_root: Path) -> None:
 
 
 @observe(name="cli.ingest")
-async def _run_ingest(  # noqa: PLR0913, C901 - the ingest CLI surface is wide.
+async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI surface is wide.
     *,
     dry_run: bool,
     force: bool,
@@ -187,6 +250,12 @@ async def _run_ingest(  # noqa: PLR0913, C901 - the ingest CLI surface is wide.
     crunchbase_csv: Path | None,
     enrich_wayback: bool,
     tavily_enrich: bool,
+    enable_tavily_news: bool,
+    tavily_news_start_year: int | None,
+    tavily_news_end_year: int | None,
+    tavily_news_max_emit: int | None,
+    tavily_news_search_depth: str | None,
+    only_source: str | None,
     post_mortems_root: Path,
 ) -> None:
     config = load_config()
@@ -214,6 +283,31 @@ async def _run_ingest(  # noqa: PLR0913, C901 - the ingest CLI surface is wide.
         await _run_reconcile(config, post_mortems_root)
         return
 
+    if only_source is not None:
+        if only_source not in _SOURCE_REGISTRY:
+            valid = ", ".join(sorted(_SOURCE_REGISTRY))
+            msg = f"--only-source: unknown source {only_source!r}. Valid: {valid}."
+            raise typer.BadParameter(msg)
+        spec = _SOURCE_REGISTRY[only_source]
+        # Auto-enable: flip the source's --enable-* flag on if it has one.
+        # Each opt-in flag needs an explicit branch — Python's keyword-only
+        # parameter binding can't be table-driven without ``locals()`` tricks.
+        # Add a branch when introducing a new opt-in source.
+        if spec.enable_flag == "enable_tavily_news":
+            enable_tavily_news = True
+        # crunchbase_csv is gated by a path argument, not a boolean — require it explicitly.
+        if only_source == "crunchbase_csv" and crunchbase_csv is None:
+            msg = "--only-source crunchbase_csv requires --crunchbase-csv PATH."
+            raise typer.BadParameter(msg)
+
+    if enable_tavily_news and not os.environ.get("TAVILY_API_KEY"):
+        msg = (
+            "--enable-tavily-news requires TAVILY_API_KEY: the Tavily news source "
+            "calls /search and pulls article bodies via include_raw_content. "
+            "Set TAVILY_API_KEY in .env or unset --enable-tavily-news."
+        )
+        raise typer.BadParameter(msg)
+
     llm, embedder, corpus, budget, journal, classifier = await _build_ingest_deps(
         config, post_mortems_root, dry_run=dry_run
     )
@@ -227,6 +321,26 @@ async def _run_ingest(  # noqa: PLR0913, C901 - the ingest CLI surface is wide.
     ]
     if crunchbase_csv is not None:
         sources.append(CrunchbaseCsvSource(csv_path=crunchbase_csv))
+    if enable_tavily_news:
+        sources.append(
+            TavilyNewsSource(
+                start_year=tavily_news_start_year,
+                end_year=tavily_news_end_year,
+                max_emit=tavily_news_max_emit,
+                search_depth=tavily_news_search_depth,
+            )
+        )
+
+    if only_source is not None:
+        # _SOURCE_REGISTRY[only_source] was already validated in Step 2.5.
+        wanted_class = _SOURCE_REGISTRY[only_source].class_name
+        sources = [s for s in sources if type(s).__name__ == wanted_class]
+        if not sources:
+            msg = (
+                f"--only-source {only_source!r}: source enabled but not constructed; "
+                "check that its prerequisites (e.g. --crunchbase-csv path) are present."
+            )
+            raise typer.BadParameter(msg)
 
     enrichers: list[Enricher] = []
     if enrich_wayback:
@@ -275,6 +389,33 @@ async def _run_ingest(  # noqa: PLR0913, C901 - the ingest CLI surface is wide.
         _render_ingest_result(bar.console, result, budget)
     else:
         typer.echo(f"slopmortem ingest result: {result} cost=${budget.spent_usd:.4f}")
+
+
+@dataclass(frozen=True)
+class _SourceSpec:
+    class_name: str  # constructed-source class name, used by the --only-source filter
+    enable_flag: str | None  # name of the kwarg in _run_ingest, or None for always-on sources
+    gate: Callable[..., bool]  # returns True if the source can run given kwargs
+
+
+def _always_on(**_: object) -> bool:
+    return True
+
+
+def _crunchbase_gate(*, crunchbase_csv: Path | None, **_: object) -> bool:
+    return crunchbase_csv is not None
+
+
+_SOURCE_REGISTRY: dict[str, _SourceSpec] = {
+    "curated": _SourceSpec(class_name="CuratedSource", enable_flag=None, gate=_always_on),
+    "hn_algolia": _SourceSpec(class_name="HNAlgoliaSource", enable_flag=None, gate=_always_on),
+    "crunchbase_csv": _SourceSpec(
+        class_name="CrunchbaseCsvSource", enable_flag="crunchbase_csv", gate=_crunchbase_gate
+    ),
+    "tavily_news": _SourceSpec(
+        class_name="TavilyNewsSource", enable_flag="enable_tavily_news", gate=_always_on
+    ),
+}
 
 
 def _default_curated_yaml() -> Path:

@@ -117,3 +117,69 @@ def test_ingest_with_crunchbase_csv_appends_source(
     assert "CrunchbaseCsvSource" in source_classnames
     assert "CuratedSource" in source_classnames
     assert "HNAlgoliaSource" in source_classnames
+
+
+def test_enable_tavily_news_without_api_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--enable-tavily-news without TAVILY_API_KEY exits non-zero with a clear message."""
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
+    runner = CliRunner()
+    result = runner.invoke(app, ["ingest", "--enable-tavily-news", "--dry-run"])
+    assert result.exit_code != 0, result.output
+    combined = result.output + (result.stderr or "")
+    assert "TAVILY_API_KEY" in combined
+
+
+def test_only_source_tavily_news_runs_in_isolation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """--only-source tavily_news auto-enables and filters the source list to just that source."""
+    captured: dict[str, object] = {}
+
+    async def fake_ingest(**kwargs: object) -> object:
+        captured["sources"] = kwargs["sources"]
+        return MagicMock(dry_run=True, processed=0)
+
+    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
+    monkeypatch.setattr("slopmortem.cli._ingest_cmd.ingest", fake_ingest)
+    monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "ingest",
+            "--dry-run",
+            "--only-source",
+            "tavily_news",
+            "--post-mortems-root",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    sources = captured["sources"]
+    assert isinstance(sources, list)
+    classnames = [type(s).__name__ for s in sources]
+    assert classnames == ["TavilyNewsSource"]
+
+
+def test_only_source_unknown_name_lists_valid(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """--only-source <unknown> exits non-zero and surfaces the registered source names."""
+    monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "ingest",
+            "--dry-run",
+            "--only-source",
+            "definitely-not-a-source",
+            "--post-mortems-root",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code != 0, result.output
+    combined = result.output + (result.stderr or "")
+    assert "tavily_news" in combined
+    assert "curated" in combined
