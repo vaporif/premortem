@@ -132,7 +132,7 @@ Expected: clean.
 **Files:**
 - Create: `slopmortem/llm/prompts/title_pre_filter.j2`
 
-- [ ] **Step 1: Write the prompt file**
+- [x] **Step 1: Write the prompt file**
 
 Create `slopmortem/llm/prompts/title_pre_filter.j2`:
 
@@ -174,12 +174,12 @@ Is this likely a post about a specific startup that has shut down or is shutting
 {%- endblock %}
 ```
 
-- [ ] **Step 2: Verify the template parses**
+- [x] **Step 2: Verify the template parses**
 
 Run: `uv run python -c "from slopmortem.llm import render_blocks, prompt_template_sha; print(prompt_template_sha('title_pre_filter')); print(render_blocks('title_pre_filter', title='Lytro is shutting down'))"`
 Expected: 16-char SHA prints, then `{'system': '...', 'user': 'HN title: Lytro is shutting down\n\nIs this likely...'}`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 `git add slopmortem/llm/prompts/title_pre_filter.j2 && git commit -m "prompt: title_pre_filter"`
 
