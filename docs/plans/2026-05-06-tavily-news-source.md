@@ -1336,7 +1336,7 @@ If the run fails with `HTTP 401` or similar, the key isn't reaching the source â
 Run: `just lint && just typecheck && just test`
 Expected: all clean. The full test run is the last gate before commit because the CLI wiring touches an import block that other tests indirectly load (`test_cli_smoke`, `test_cli_reconcile`, etc.).
 
-- [ ] **Step 2.12: Commit**
+- [x] **Step 2.12: Commit**
 
 ```
 git add slopmortem/ingest/_helpers.py \
