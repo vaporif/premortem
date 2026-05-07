@@ -7,6 +7,8 @@ the import-linter contract enforces it.
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import TYPE_CHECKING
 
 import typer
@@ -30,8 +32,29 @@ __all__ = [
     "_QUERY_PHASE_LABELS",
     "RichQueryProgress",
     "_maybe_init_tracing",
+    "_maybe_setup_logging",
     "_render_query_footer",
 ]
+
+
+def _maybe_setup_logging() -> None:
+    """Configure stdlib logging from ``SLOPMORTEM_LOG`` env var.
+
+    Off by default so library use of the CLI module doesn't hijack the root
+    logger. Set ``SLOPMORTEM_LOG=info`` (or ``debug``) to see per-entry ingest
+    progress (defillama emit lines, tavily fill lines, ingest save lines).
+    Third-party loggers (httpx, lmnr) are pinned to WARNING so the slopmortem
+    signal isn't drowned out.
+    """
+    level_name = os.environ.get("SLOPMORTEM_LOG", "").strip().lower()
+    if not level_name:
+        return
+    level = getattr(logging, level_name.upper(), None)
+    if not isinstance(level, int):
+        return
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    for noisy in ("httpx", "httpcore", "lmnr", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 def _maybe_init_tracing(config: Config) -> None:

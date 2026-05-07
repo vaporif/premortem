@@ -54,9 +54,23 @@ class TavilyEnricher:
 
         raw_content = await self._fetch_raw_content(entry.url, api_key)
         if not raw_content:
+            logger.info(
+                "tavily enricher: empty/no extract for %s:%s url=%s",
+                entry.source,
+                entry.source_id,
+                entry.url,
+            )
             return entry
 
         markdown_text = extract_clean(raw_content) or None
+        logger.info(
+            "tavily enricher: filled %s:%s body=%d chars (raw=%d) url=%s",
+            entry.source,
+            entry.source_id,
+            len(markdown_text or ""),
+            len(raw_content),
+            entry.url,
+        )
         return entry.model_copy(update={"raw_html": raw_content, "markdown_text": markdown_text})
 
     async def _fetch_raw_content(self, url: str, api_key: str) -> str | None:

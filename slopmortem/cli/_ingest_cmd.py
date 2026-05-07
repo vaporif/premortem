@@ -26,7 +26,7 @@ from rich.table import Table
 
 from slopmortem.budget import Budget
 from slopmortem.cli import app
-from slopmortem.cli._common import _maybe_init_tracing
+from slopmortem.cli._common import _maybe_init_tracing, _maybe_setup_logging
 from slopmortem.cli_progress import RichPhaseProgress
 from slopmortem.config import load_config
 from slopmortem.corpus import (
@@ -282,6 +282,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     post_mortems_root: Path,
 ) -> None:
     config = load_config()
+    _maybe_setup_logging()
     _maybe_init_tracing(config)
 
     # Read-only short-circuits run before the full LLM/embedder build so they

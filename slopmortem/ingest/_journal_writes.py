@@ -231,4 +231,12 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         merged_at=utcnow_iso(),
         content_hash=content_hash,
     )
+    logger.info(
+        "ingest: saved %s:%s → canonical=%s chunks=%d body=%d chars",
+        entry.source,
+        entry.source_id,
+        canonical_id,
+        chunks_written,
+        len(merged),
+    )
     return ProcessOutcome.PROCESSED

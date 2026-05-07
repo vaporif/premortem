@@ -250,6 +250,18 @@ class DefiLlamaSource:
             logger.info("defillama: %s no wayback coverage near %s", slug, verdict.peak_date)
             return None
 
+        peak_tvl = verdict.peak_tvl or 0.0
+        current_tvl = verdict.current_tvl or 0.0
+        pct_of_peak = (current_tvl / peak_tvl * 100.0) if peak_tvl else 0.0
+        logger.info(
+            "defillama: emit %s peak=$%.0f (%s) current=$%.0f (%.1f%% of peak) → %s",
+            slug,
+            peak_tvl,
+            verdict.peak_date,
+            current_tvl,
+            pct_of_peak,
+            snapshot_url,
+        )
         return snapshot_url
 
     async def _process_candidate(self, row: dict[str, object]) -> RawEntry | None:

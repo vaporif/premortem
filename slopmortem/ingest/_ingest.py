@@ -155,6 +155,12 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
 
             body = _entry_summary_text(enriched, max_tokens=config.max_doc_tokens)
             if not body:
+                logger.info(
+                    "ingest: skipped %s:%s — empty body url=%s",
+                    entry.source,
+                    entry.source_id,
+                    entry.url,
+                )
                 result.skipped += 1
                 progress.advance_phase(IngestPhase.CLASSIFY)
                 return None
@@ -177,11 +183,29 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                         slop_score=slop_score,
                         post_mortems_root=post_mortems_root,
                     )
+                logger.info(
+                    "ingest: quarantined %s:%s slop=%.2f body=%d chars url=%s",
+                    entry.source,
+                    entry.source_id,
+                    slop_score,
+                    len(body),
+                    entry.url,
+                )
                 result.quarantined += 1
                 result.span_events.append(SpanEvent.SLOP_QUARANTINED.value)
                 progress.advance_phase(IngestPhase.CLASSIFY)
                 return None
 
+            preview = body[:160].replace("\n", " ")
+            logger.info(
+                "ingest: kept %s:%s slop=%.2f body=%d chars url=%s preview=%r",
+                entry.source,
+                entry.source_id,
+                slop_score,
+                len(body),
+                entry.url,
+                preview,
+            )
             progress.advance_phase(IngestPhase.CLASSIFY)
             return enriched, body
 
