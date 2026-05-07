@@ -105,7 +105,7 @@ An earlier draft of this plan added five sources (DefiLlama + four RSS feeds: re
 - Create: `tests/sources/test_defillama.py`
 - Modify: `slopmortem/corpus/sources/_names.py`
 
-- [ ] **Step 1.1: Verify the live endpoints**
+- [x] **Step 1.1: Verify the live endpoints**
 
 Run all three `curl` commands listed under **API verification** above and confirm:
 
@@ -115,7 +115,7 @@ Run all three `curl` commands listed under **API verification** above and confir
 
 If any of these fail, **stop and surface** — either the DefiLlama API has changed (update endpoints in this plan) or Wayback dropped the snapshots (pick a different reference protocol like `siren`). Do not proceed with implementation against a stale spec.
 
-- [ ] **Step 1.2: Add the source-name constant**
+- [x] **Step 1.2: Add the source-name constant**
 
 Edit `slopmortem/corpus/sources/_names.py`. Append after `SOURCE_TAVILY_NEWS` (the current last entry):
 
@@ -123,7 +123,7 @@ Edit `slopmortem/corpus/sources/_names.py`. Append after `SOURCE_TAVILY_NEWS` (t
 SOURCE_DEFILLAMA: Final = "defillama"
 ```
 
-- [ ] **Step 1.3: Write the failing tests**
+- [x] **Step 1.3: Write the failing tests**
 
 Create `tests/sources/test_defillama.py`. The tests cover three layers:
 
@@ -440,12 +440,12 @@ async def test_defillama_round_trip() -> None:
         assert "web.archive.org" in e.url
 ```
 
-- [ ] **Step 1.4: Run tests, confirm they fail**
+- [x] **Step 1.4: Run tests, confirm they fail**
 
 Run: `uv run pytest tests/sources/test_defillama.py -v`
 Expected: `ImportError` or `AttributeError` for `DefiLlamaSource`.
 
-- [ ] **Step 1.5: Implement the source**
+- [x] **Step 1.5: Implement the source**
 
 Create `slopmortem/corpus/sources/defillama.py`. The module exposes one class (`DefiLlamaSource`) and two helpers (`classify_death`, `wayback_snapshot_near`) so each piece is unit-testable in isolation.
 
@@ -768,19 +768,19 @@ class DefiLlamaSource:
                 emitted += 1
 ```
 
-- [ ] **Step 1.6: Run tests**
+- [x] **Step 1.6: Run tests**
 
 Run: `uv run pytest tests/sources/test_defillama.py -v -k "not round_trip"`
 Expected: 11 PASS — six `classify_death` cases (`dead_zombie`, `alive`, `never_launched`, `too_early`, `recently_dipped`, `dedupes_intra_day_duplicates`), two `wayback` cases (`picks_closest_200`, `returns_none_when_no_200`), three `DefiLlamaSource.fetch` cases (`emits_dead_protocol_with_wayback_url`, `skips_when_no_wayback_coverage`, `max_emit_caps_yield`). The `defillama_round_trip` cassette test is excluded by `-k`.
 
 If the `@pytest.mark.vcr` round-trip case picks up an unexpected `vcr_config` collection error, mirror the fixture pattern used by an existing cassette test (e.g. one of `tests/sources/test_*` already on cassettes) — `pytest-recording`'s discovery is project-config dependent.
 
-- [ ] **Step 1.7: Lint + typecheck**
+- [x] **Step 1.7: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
 
-- [ ] **Step 1.8: Commit**
+- [x] **Step 1.8: Commit**
 
 ```
 git add slopmortem/corpus/sources/defillama.py slopmortem/corpus/sources/_names.py tests/sources/test_defillama.py
