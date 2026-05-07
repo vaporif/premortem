@@ -133,7 +133,7 @@ class OpenRouterClient:
             # synthesis turn with tools disabled. Anything more is a misuse.
             effective_max_turns = 2 if single_tool_call else self._max_tool_turns
             for turn in range(effective_max_turns):
-                per_turn_kw: dict[str, Any] = dict(base_kw)  # pyright: ignore[reportExplicitAny]
+                per_turn_kw: dict[str, Any] = base_kw.copy()  # pyright: ignore[reportExplicitAny]
                 if single_tool_call:
                     per_turn_kw["tool_choice"] = "required" if turn == 0 else "none"
                 resp = await self._call_with_retry(
