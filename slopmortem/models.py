@@ -330,6 +330,7 @@ class RawEntry(BaseModel):
     source: str
     source_id: str
     url: str | None
+    title: str | None = None
     raw_html: str | None = None
     markdown_text: str | None = None
     fetched_at: datetime

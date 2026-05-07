@@ -62,6 +62,12 @@ model_summarize = "anthropic/claude-haiku-4.5"
 model_rerank = "anthropic/claude-sonnet-4.6"
 model_synthesize = "anthropic/claude-sonnet-4.6"
 
+# Model used by the LLM-driven pitch filler that synthesizes bodies for
+# URL-only HN-Algolia stubs via the tavily_search tool. Haiku was probe-
+# validated as sufficient; flip to Sonnet if a corpus run shows wrong-entity
+# bodies. Switching invalidates recorded cassettes until re-recorded.
+model_pitch_filler = "anthropic/claude-haiku-4.5"
+
 # Per-stage output token caps. Without these, OpenRouter holds upfront
 # credit for the model's full max-output ceiling (~64K on Claude), which
 # can fail with HTTP 402 on low-balance keys even when the actual reply
@@ -72,6 +78,9 @@ max_tokens_rerank = 4000
 max_tokens_synthesize = 16000
 max_tokens_slop_judge = 64
 max_tokens_tiebreaker = 256
+# 1500 cap matches probe-validated synthesis output size for a ~500-700 word
+# pitch + cause-of-death narrative plus JSON envelope.
+max_tokens_pitch_filler = 1500
 
 # Embedding provider. "fastembed" runs locally via ONNX (free, offline).
 # "openai" uses text-embedding-3-{small,large} via OPENAI_API_KEY.
@@ -101,6 +110,18 @@ reliability_rank_version = "v1"
 # synthesis call may invoke tavily_search up to tavily_calls_per_synthesis
 # times to fill missing context. Needs TAVILY_API_KEY.
 enable_tavily_synthesis = false
+
+# Toggle the LLM-driven pitch filler that synthesizes bodies for URL-only
+# stubs (e.g. hn_algolia). When true, the filler runs as the last enricher
+# and only fires for entries earlier enrichers couldn't fill. Needs
+# TAVILY_API_KEY for its tavily_search tool. Auto-enabled by the CLI when
+# hn_algolia is in the resolved source list.
+enable_pitch_filler = false
+
+# Per-result raw_content truncation for the filler's tavily_search tool.
+# Keeps prompt size bounded across 5 results so a single filler turn fits
+# Haiku's context window comfortably and stays cheap.
+pitch_filler_max_chars_per_result = 2500
 
 # Toggle Laminar tracing (LMNR_PROJECT_API_KEY, LMNR_BASE_URL). When false,
 # every SpanEvent call is a no-op.

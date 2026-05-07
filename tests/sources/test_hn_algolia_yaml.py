@@ -134,6 +134,8 @@ async def test_emits_one_entry_per_phrase_match(
     assert e.source == "hn_algolia"
     assert e.source_id == "1"
     assert e.url == "https://rethinkdb.com/blog/sunset"
+    # Title is plumbed through so the LLM pitch filler can search with it.
+    assert e.title == "RethinkDB is shutting down"
     # Source emits URL-only stubs; the body is filled by the enricher chain
     # (TavilyEnricher / WaybackEnricher) at ingest time.
     assert e.markdown_text is None

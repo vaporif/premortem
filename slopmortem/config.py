@@ -48,6 +48,7 @@ class Config(BaseSettings):
     model_rerank: str = "anthropic/claude-sonnet-4.6"
     model_synthesize: str = "anthropic/claude-sonnet-4.6"
     model_consolidate: str = "anthropic/claude-sonnet-4.6"
+    model_pitch_filler: str = "anthropic/claude-haiku-4.5"
 
     # Per-stage output caps. OpenRouter holds upfront credit for the model's
     # max output, so leaving these unset reserves the full 64K Anthropic
@@ -60,6 +61,7 @@ class Config(BaseSettings):
     max_tokens_consolidate: int = Field(default=2048, ge=1)
     max_tokens_slop_judge: int = Field(default=64, ge=1)
     max_tokens_tiebreaker: int = Field(default=256, ge=1)
+    max_tokens_pitch_filler: int = Field(default=1500, ge=1)
 
     embedding_provider: Literal["fastembed", "openai"] = "fastembed"
     embed_model_id: str = "nomic-ai/nomic-embed-text-v1.5"
@@ -71,6 +73,8 @@ class Config(BaseSettings):
     reliability_rank_version: str = "v1"
 
     enable_tavily_synthesis: bool = False
+    enable_pitch_filler: bool = False
+    pitch_filler_max_chars_per_result: int = Field(default=2500, ge=1)
     enable_tracing: bool = False
     strict_deaths: bool = False
 
@@ -119,6 +123,12 @@ class Config(BaseSettings):
     def _check_required_api_keys(self) -> Config:
         if self.enable_tavily_synthesis and not self.tavily_api_key.get_secret_value():
             msg = "enable_tavily_synthesis=True requires tavily_api_key"
+            raise ValueError(msg)
+        if self.enable_pitch_filler and not self.tavily_api_key.get_secret_value():
+            msg = (
+                "enable_pitch_filler=True requires tavily_api_key "
+                "(the filler's tavily_search tool needs the Tavily API key)"
+            )
             raise ValueError(msg)
         if self.embedding_provider == "openai" and not self.openai_api_key.get_secret_value():
             msg = 'embedding_provider="openai" requires openai_api_key'
