@@ -47,8 +47,6 @@ from slopmortem.ingest import INGEST_PHASE_LABELS, IngestPhase, IngestResult, in
 from slopmortem.llm import OpenRouterClient, make_embedder
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from slopmortem.config import Config
     from slopmortem.corpus import Corpus, MergeJournal
     from slopmortem.corpus.sources import Enricher, Source
@@ -395,26 +393,13 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
 class _SourceSpec:
     class_name: str  # constructed-source class name, used by the --only-source filter
     enable_flag: str | None  # name of the kwarg in _run_ingest, or None for always-on sources
-    gate: Callable[..., bool]  # returns True if the source can run given kwargs
-
-
-def _always_on(**_: object) -> bool:
-    return True
-
-
-def _crunchbase_gate(*, crunchbase_csv: Path | None, **_: object) -> bool:
-    return crunchbase_csv is not None
 
 
 _SOURCE_REGISTRY: dict[str, _SourceSpec] = {
-    "curated": _SourceSpec(class_name="CuratedSource", enable_flag=None, gate=_always_on),
-    "hn_algolia": _SourceSpec(class_name="HNAlgoliaSource", enable_flag=None, gate=_always_on),
-    "crunchbase_csv": _SourceSpec(
-        class_name="CrunchbaseCsvSource", enable_flag="crunchbase_csv", gate=_crunchbase_gate
-    ),
-    "tavily_news": _SourceSpec(
-        class_name="TavilyNewsSource", enable_flag="enable_tavily_news", gate=_always_on
-    ),
+    "curated": _SourceSpec(class_name="CuratedSource", enable_flag=None),
+    "hn_algolia": _SourceSpec(class_name="HNAlgoliaSource", enable_flag=None),
+    "crunchbase_csv": _SourceSpec(class_name="CrunchbaseCsvSource", enable_flag="crunchbase_csv"),
+    "tavily_news": _SourceSpec(class_name="TavilyNewsSource", enable_flag="enable_tavily_news"),
 }
 
 
