@@ -1,0 +1,861 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - hn.algolia.com
+      User-Agent:
+      - slopmortem/0.1.0 (+https://github.com/vaporif/slopmortem)
+    method: GET
+    uri: https://hn.algolia.com/robots.txt
+  response:
+    body:
+      string: '<!doctype html>
+
+        <html lang=en>
+
+        <title>404 Not Found</title>
+
+        <h1>Not Found</h1>
+
+        <p>The requested URL was not found on the server. If you entered the URL manually
+        please check your spelling and try again.</p>
+
+        '
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000
+      Content-Length:
+      - '207'
+      content-type:
+      - text/html; charset=utf-8
+      date:
+      - Thu, 07 May 2026 02:41:30 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 1956462580b92c463b2b8c2fa8b2a588
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - hn.algolia.com
+      User-Agent:
+      - slopmortem/0.1.0 (+https://github.com/vaporif/slopmortem)
+    method: GET
+    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=0&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799
+  response:
+    body:
+      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"some_account"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Iranian
+        authorities are blocking access to Telegram for the majority of Iranians after
+        Telegrams public refusal to <em>shut down</em> https://t.me/sedaiemardom  and
+        other peacefully protesting channels.<p>https://twitter.com/durov/status/947441456238735360"},"title":{"matchLevel":"none","matchedWords":[],"value":"Iranian
+        authorities are now blocking access to Telegram"}},"_tags":["story","author_some_account","story_16040444","ask_hn"],"author":"some_account","children":[16040453],"created_at":"2017-12-31T13:05:53Z","created_at_i":1514725553,"num_comments":1,"objectID":"16040444","points":1,"story_id":16040444,"story_text":"Iranian
+        authorities are blocking access to Telegram for the majority of Iranians after
+        Telegrams public refusal to shut down https:&#x2F;&#x2F;t.me&#x2F;sedaiemardom  and
+        other peacefully protesting channels.<p>https:&#x2F;&#x2F;twitter.com&#x2F;durov&#x2F;status&#x2F;947441456238735360","title":"Iranian
+        authorities are now blocking access to Telegram","updated_at":"2024-09-20T01:51:22Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"networked"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Webscript.io
+        has <em>shut down</em>"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.webscript.io/"}},"_tags":["story","author_networked","story_15997470"],"author":"networked","created_at":"2017-12-24T02:00:06Z","created_at_i":1514080806,"num_comments":0,"objectID":"15997470","points":2,"story_id":15997470,"title":"Webscript.io
+        has shut down","updated_at":"2024-09-20T01:52:37Z","url":"https://www.webscript.io/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"lnguyen"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Is
+        it legal to <em>shut down</em> a Bitcoin exchange while the price is falling?"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://theoutline.com/post/2779/coinbase-bitcoin-trades-<em>shut-down</em>-price-cryptocurrency-exchanges"}},"_tags":["story","author_lnguyen","story_15996591"],"author":"lnguyen","created_at":"2017-12-23T22:26:18Z","created_at_i":1514067978,"num_comments":0,"objectID":"15996591","points":5,"story_id":15996591,"title":"Is
+        it legal to shut down a Bitcoin exchange while the price is falling?","updated_at":"2024-09-20T01:52:31Z","url":"https://theoutline.com/post/2779/coinbase-bitcoin-trades-shut-down-price-cryptocurrency-exchanges"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"knes"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Mattermark
+        to <em>shut down</em> after selling to FullContact"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/12/21/mattermark-to-<em>shut-down</em>-after-selling-to-full-contact/?ncid=rss"}},"_tags":["story","author_knes","story_15986452"],"author":"knes","created_at":"2017-12-22T10:22:50Z","created_at_i":1513938170,"num_comments":0,"objectID":"15986452","points":1,"story_id":15986452,"title":"Mattermark
+        to shut down after selling to FullContact","updated_at":"2024-09-20T01:51:29Z","url":"https://techcrunch.com/2017/12/21/mattermark-to-shut-down-after-selling-to-full-contact/?ncid=rss"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"minimaxir"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Mattermark
+        (YC S12) to <em>shut down</em> after selling to FullContact"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/12/21/mattermark-to-<em>shut-down</em>-after-selling-to-full-contact/"}},"_tags":["story","author_minimaxir","story_15984772"],"author":"minimaxir","children":[15986301,15985909,15985019,15985198,15985360,15985080,15984912,15985281,15991059,15992213,15984977,15985067,15985629,15987207,15986723,15985044,15985074,15984794,15985341],"created_at":"2017-12-22T02:19:16Z","created_at_i":1513909156,"num_comments":58,"objectID":"15984772","points":120,"story_id":15984772,"title":"Mattermark
+        (YC S12) to shut down after selling to FullContact","updated_at":"2024-09-20T01:51:18Z","url":"https://techcrunch.com/2017/12/21/mattermark-to-shut-down-after-selling-to-full-contact/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"bko"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"White
+        House today announced it would temporarily <em>shut down</em> We The People,
+        saying a new platform would save $1mm. The site is basically a petition site
+        where users can create and sign petitions and the president could personally
+        reply after the signatures reach a certain threshold.<p>How much does it normally
+        cost to build and maintain a site like this? Is there any information about
+        how much the White House spends on this site? Is the number normally inflated
+        because it\u2019s a government site?<p>http://thehill.com/homenews/administration/365521-trump-admin-to-temporarily-take-down-petition-website<p>https://petitions.whitehouse.gov/"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: How much does it cost to maintain a petition site like We the People?"}},"_tags":["story","author_bko","story_15960209","ask_hn"],"author":"bko","children":[15960335],"created_at":"2017-12-19T13:58:37Z","created_at_i":1513691917,"num_comments":1,"objectID":"15960209","points":1,"story_id":15960209,"story_text":"White
+        House today announced it would temporarily shut down We The People, saying
+        a new platform would save $1mm. The site is basically a petition site where
+        users can create and sign petitions and the president could personally reply
+        after the signatures reach a certain threshold.<p>How much does it normally
+        cost to build and maintain a site like this? Is there any information about
+        how much the White House spends on this site? Is the number normally inflated
+        because it\u2019s a government site?<p>http:&#x2F;&#x2F;thehill.com&#x2F;homenews&#x2F;administration&#x2F;365521-trump-admin-to-temporarily-take-down-petition-website<p>https:&#x2F;&#x2F;petitions.whitehouse.gov&#x2F;","title":"Ask
+        HN: How much does it cost to maintain a petition site like We the People?","updated_at":"2024-09-20T01:48:53Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rbanffy"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Google
+        to <em>Shut Down</em> Project Tango in Favor of ARCore"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.anandtech.com/show/12166/google-to-<em>shut-down</em>-project-tango-in-favor-of-arcore?utm_source=twitter&utm_medium=social"}},"_tags":["story","author_rbanffy","story_15951737"],"author":"rbanffy","created_at":"2017-12-18T14:20:42Z","created_at_i":1513606842,"num_comments":0,"objectID":"15951737","points":2,"story_id":15951737,"title":"Google
+        to Shut Down Project Tango in Favor of ARCore","updated_at":"2024-09-20T01:48:02Z","url":"https://www.anandtech.com/show/12166/google-to-shut-down-project-tango-in-favor-of-arcore?utm_source=twitter&utm_medium=social"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"jbuzbee"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Hackers
+        <em>shut down</em> plant by targeting its safety system"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.engadget.com/2017/12/17/hackers-<em>shut-down</em>-plant-by-targeting-safety-system/"}},"_tags":["story","author_jbuzbee","story_15947575"],"author":"jbuzbee","children":[15948514,15951177,15950660,15948940,15949468,15953020,15948452,15950376,15949895],"created_at":"2017-12-17T20:49:50Z","created_at_i":1513543790,"num_comments":26,"objectID":"15947575","points":102,"story_id":15947575,"title":"Hackers
+        shut down plant by targeting its safety system","updated_at":"2024-09-20T01:47:38Z","url":"https://www.engadget.com/2017/12/17/hackers-shut-down-plant-by-targeting-safety-system/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"danso"},"title":{"matchLevel":"none","matchedWords":[],"value":"A
+        Going-Away Message: AOL Instant Messenger Is Shutting Down"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.nytimes.com/2017/10/06/technology/aol-aim-<em>shut-down</em>.html"}},"_tags":["story","author_danso","story_15923526"],"author":"danso","created_at":"2017-12-14T16:26:27Z","created_at_i":1513268787,"num_comments":0,"objectID":"15923526","points":2,"story_id":15923526,"title":"A
+        Going-Away Message: AOL Instant Messenger Is Shutting Down","updated_at":"2024-09-20T01:45:18Z","url":"https://www.nytimes.com/2017/10/06/technology/aol-aim-shut-down.html"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"sj4nz"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Adeos
+        as in Adaptive Domain Environment for Operating Systems. It had a Wikipedia
+        write up at https://en.wikipedia.org/wiki/Adaptive_Domain_Environment_for_Operating_Systems
+        but all the hosted pages appear to have evaporated when https://en.wikipedia.org/wiki/Gna!
+        <em>shut down</em>."},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: What happened to Adeos?"}},"_tags":["story","author_sj4nz","story_15894762","ask_hn"],"author":"sj4nz","created_at":"2017-12-11T02:33:46Z","created_at_i":1512959626,"num_comments":0,"objectID":"15894762","points":1,"story_id":15894762,"story_text":"Adeos
+        as in Adaptive Domain Environment for Operating Systems. It had a Wikipedia
+        write up at https:&#x2F;&#x2F;en.wikipedia.org&#x2F;wiki&#x2F;Adaptive_Domain_Environment_for_Operating_Systems
+        but all the hosted pages appear to have evaporated when https:&#x2F;&#x2F;en.wikipedia.org&#x2F;wiki&#x2F;Gna!
+        shut down.","title":"Ask HN: What happened to Adeos?","updated_at":"2024-09-20T01:46:56Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"fmihaila"},"title":{"matchLevel":"none","matchedWords":[],"value":"Mecklenburg
+        County hacked, $23K ransom demanded"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.usatoday.com/story/news/2017/12/06/hackers-<em>shut-down</em>-mecklenburg-county-servers-demand-23-k-ransom/926779001/"}},"_tags":["story","author_fmihaila","story_15863186"],"author":"fmihaila","created_at":"2017-12-06T17:53:51Z","created_at_i":1512582831,"num_comments":0,"objectID":"15863186","points":1,"story_id":15863186,"title":"Mecklenburg
+        County hacked, $23K ransom demanded","updated_at":"2024-09-20T01:43:49Z","url":"https://www.usatoday.com/story/news/2017/12/06/hackers-shut-down-mecklenburg-county-servers-demand-23-k-ransom/926779001/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"Aaronmacaron"},"title":{"matchLevel":"none","matchedWords":[],"value":"The
+        death of iOS Jailbreaking"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.macrumors.com/2017/11/23/modmyi-macciti-cydia-repos-<em>shut-down</em>/?utm_source=Benedict%27s+newsletter&utm_campaign=3558ad1e7e-Benedict%27s+Newsletter&utm_medium=email&utm_term=0_4999ca107f-3558ad1e7e-70561001"}},"_tags":["story","author_Aaronmacaron","story_15849876"],"author":"Aaronmacaron","created_at":"2017-12-05T05:10:45Z","created_at_i":1512450645,"num_comments":0,"objectID":"15849876","points":2,"story_id":15849876,"title":"The
+        death of iOS Jailbreaking","updated_at":"2024-09-20T01:42:26Z","url":"https://www.macrumors.com/2017/11/23/modmyi-macciti-cydia-repos-shut-down/?utm_source=Benedict%27s+newsletter&utm_campaign=3558ad1e7e-Benedict%27s+Newsletter&utm_medium=email&utm_term=0_4999ca107f-3558ad1e7e-70561001"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"suhail"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Bittrex
+        wants its own subreddit to be <em>shut down</em> for no reason"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.reddit.com/r/Bittrex/comments/7gwipa/bittrex_wants_its_own_subreddit_to_be_<em>shut_down</em>/"}},"_tags":["story","author_suhail","story_15829106"],"author":"suhail","created_at":"2017-12-02T00:27:02Z","created_at_i":1512174422,"num_comments":0,"objectID":"15829106","points":11,"story_id":15829106,"title":"Bittrex
+        wants its own subreddit to be shut down for no reason","updated_at":"2024-09-20T01:40:29Z","url":"https://www.reddit.com/r/Bittrex/comments/7gwipa/bittrex_wants_its_own_subreddit_to_be_shut_down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"shime"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Assembly
+        was a product that was <em>shut down</em> a while ago.<p>It looked like a
+        great idea to bring people together to work on products they are passionate
+        about. It used to be a platform where you can find a cofounder or an entire
+        team for building your product. You could also find the next thing to work
+        on if you had some free time. You would exchange your skills for their coins
+        which represented the share of the profit. I remember working on a product
+        there, fixing some bugs or adding new features - it was cool because everything
+        was open source so you could check the code for anything and decide to work
+        on it.<p>It looks like they <em>shut down</em> some time ago and I''m not
+        aware of any good alternatives. I''m wondering what was the insurmountable
+        problem they faced that caused them to <em>shut down</em>. Has anyone got
+        any suggestions for alternatives?<p>For more info check out their Angel List
+        page at https://angel.co/assembly."},"title":{"matchLevel":"none","matchedWords":[],"value":"What
+        happened to Assembly \u2013 http://assemblymade.com/ \u2013 is there an alternative?"}},"_tags":["story","author_shime","story_15826162","ask_hn"],"author":"shime","created_at":"2017-12-01T18:48:42Z","created_at_i":1512154122,"num_comments":0,"objectID":"15826162","points":1,"story_id":15826162,"story_text":"Assembly
+        was a product that was shut down a while ago.<p>It looked like a great idea
+        to bring people together to work on products they are passionate about. It
+        used to be a platform where you can find a cofounder or an entire team for
+        building your product. You could also find the next thing to work on if you
+        had some free time. You would exchange your skills for their coins which represented
+        the share of the profit. I remember working on a product there, fixing some
+        bugs or adding new features - it was cool because everything was open source
+        so you could check the code for anything and decide to work on it.<p>It looks
+        like they shut down some time ago and I&#x27;m not aware of any good alternatives.
+        I&#x27;m wondering what was the insurmountable problem they faced that caused
+        them to shut down. Has anyone got any suggestions for alternatives?<p>For
+        more info check out their Angel List page at https:&#x2F;&#x2F;angel.co&#x2F;assembly.","title":"What
+        happened to Assembly \u2013 http://assemblymade.com/ \u2013 is there an alternative?","updated_at":"2024-09-20T01:40:09Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"audiometry"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Countries
+        import oil across the world.  They have flexibility in choosing the source,
+        often sensitive to relative prices. Hurricane Harvey <em>shut down</em> refinery
+        operations in the US Gulf Coast, leaving excess oil.  India &amp; China bought
+        most of it at discount. It replaced some from the Persian Gulf which cost
+        relatively more.<p>I want to identify the most significant switch patterns.<p>Since
+        2015, I record every global journey of a ship moving oil from one location
+        to another.   Grouped as tuples: (month/year, originCountry, destinationCountry,
+        totalVolume)<p>Markets are constantly changing, switching patterns that made
+        economic sense in 2015 might not make sense today, other patterns emerge.<p>Oil
+        markets have trend-growth, and seasonal cycles. So these switches are not
+        zero-sum actions, where an increase in X necessarily results in a decrease
+        in Y.  Eg. China\u2019s refinery demand is growing, next month instead of
+        increasing Persian Gulf imports by 100k bbls/day,  maybe it only increases
+        40kbd, and instead takes an incremental 60kbd from North America.<p>The source
+        data is very granular, so there are lots of minor, noisy movements that aren\u2019t
+        meaningful.<p>Some countries are semi-groupable.  Many of countries in the
+        PG export similar types/prices of oil.<p>For each originCountry that sends
+        oil to that destinationCountry,  calculate rolling average, and std-deviation
+        of the imports over last N months.  Then  calculate the z-score for each monthly
+        (date, origin, destination) tuple.<p>I then can try to look for sets of origins
+        where  \u201cpostitive Z-scores for (originA, destinationX) are correlated
+        with negative Z-scores (for orginB, destinationX)\u201d<p>These are subtle
+        signals buried in a lot of noise. I guess there are more skillful modern data
+        science approaches.   This is not \u201cBig Data\u201d in any sense \u2013
+        three years of essentially monthly data. I fear that limits the techniques
+        that I can deploy."},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: Data Scientists, how to identify patterns inside oil-movement data"}},"_tags":["story","author_audiometry","story_15822205","ask_hn"],"author":"audiometry","children":[15826478],"created_at":"2017-12-01T05:52:03Z","created_at_i":1512107523,"num_comments":1,"objectID":"15822205","points":2,"story_id":15822205,"story_text":"Countries
+        import oil across the world.  They have flexibility in choosing the source,
+        often sensitive to relative prices. Hurricane Harvey shut down refinery operations
+        in the US Gulf Coast, leaving excess oil.  India &amp; China bought most of
+        it at discount. It replaced some from the Persian Gulf which cost relatively
+        more.<p>I want to identify the most significant switch patterns.<p>Since 2015,
+        I record every global journey of a ship moving oil from one location to another.   Grouped
+        as tuples: (month&#x2F;year, originCountry, destinationCountry, totalVolume)<p>Markets
+        are constantly changing, switching patterns that made economic sense in 2015
+        might not make sense today, other patterns emerge.<p>Oil markets have trend-growth,
+        and seasonal cycles. So these switches are not zero-sum actions, where an
+        increase in X necessarily results in a decrease in Y.  Eg. China\u2019s refinery
+        demand is growing, next month instead of increasing Persian Gulf imports by
+        100k bbls&#x2F;day,  maybe it only increases 40kbd, and instead takes an incremental
+        60kbd from North America.<p>The source data is very granular, so there are
+        lots of minor, noisy movements that aren\u2019t meaningful.<p>Some countries
+        are semi-groupable.  Many of countries in the PG export similar types&#x2F;prices
+        of oil.<p>For each originCountry that sends oil to that destinationCountry,  calculate
+        rolling average, and std-deviation of the imports over last N months.  Then  calculate
+        the z-score for each monthly (date, origin, destination) tuple.<p>I then can
+        try to look for sets of origins where  \u201cpostitive Z-scores for (originA,
+        destinationX) are correlated with negative Z-scores (for orginB, destinationX)\u201d<p>These
+        are subtle signals buried in a lot of noise. I guess there are more skillful
+        modern data science approaches.   This is not \u201cBig Data\u201d in any
+        sense \u2013 three years of essentially monthly data. I fear that limits the
+        techniques that I can deploy.","title":"Ask HN: Data Scientists, how to identify
+        patterns inside oil-movement data","updated_at":"2024-09-20T01:39:42Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"nitinalabur"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"<em>Shut
+        down</em> the Hype to generate value"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://medium.com/@vineetdevaiah/<em>shut-down</em>-the-hype-to-generate-value-1b89b8fd4d17"}},"_tags":["story","author_nitinalabur","story_15797667"],"author":"nitinalabur","created_at":"2017-11-28T14:47:13Z","created_at_i":1511880433,"num_comments":0,"objectID":"15797667","points":2,"story_id":15797667,"title":"Shut
+        down the Hype to generate value","updated_at":"2024-09-20T01:45:56Z","url":"https://medium.com/@vineetdevaiah/shut-down-the-hype-to-generate-value-1b89b8fd4d17"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"wizardforhire"},"title":{"matchLevel":"none","matchedWords":[],"value":"The
+        Death of iOS Jailbreaking"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.macrumors.com/2017/11/23/modmyi-macciti-cydia-repos-<em>shut-down</em>/"}},"_tags":["story","author_wizardforhire","story_15793622"],"author":"wizardforhire","created_at":"2017-11-28T02:01:31Z","created_at_i":1511834491,"num_comments":0,"objectID":"15793622","points":2,"story_id":15793622,"title":"The
+        Death of iOS Jailbreaking","updated_at":"2024-09-20T01:45:31Z","url":"https://www.macrumors.com/2017/11/23/modmyi-macciti-cydia-repos-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"MBCook"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Two
+        Major Cydia Hosts <em>Shut Down</em> as Jailbreaking Fades in Popularity"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.macrumors.com/2017/11/23/modmyi-macciti-cydia-repos-<em>shut-down</em>/"}},"_tags":["story","author_MBCook","story_15769068"],"author":"MBCook","created_at":"2017-11-24T02:26:36Z","created_at_i":1511490396,"num_comments":0,"objectID":"15769068","points":4,"story_id":15769068,"title":"Two
+        Major Cydia Hosts Shut Down as Jailbreaking Fades in Popularity","updated_at":"2024-09-20T01:42:48Z","url":"https://www.macrumors.com/2017/11/23/modmyi-macciti-cydia-repos-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"new_hackers"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        rent a low-end VPS.<p>It is used to host my personal hobby website (very,
+        very low traffic), and for me to generally play around with a Linux server.<p>I
+        feel like it is a waste that it doesn''t really get used that much.<p>Are
+        there any projects that I could host on my server that would help give back
+        to the open source community at large?<p>I had thought about maybe hosting
+        a buildbot?  I don''t want to do Tor or anything that could get my server
+        <em>shut down</em>.  I also don''t want to commit to anything that would suffer
+        when I eventually lose interest.<p>Any ideas?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: How to use my VPS for good?"}},"_tags":["story","author_new_hackers","story_15760064","ask_hn"],"author":"new_hackers","children":[15760738],"created_at":"2017-11-22T20:02:47Z","created_at_i":1511380967,"num_comments":2,"objectID":"15760064","points":3,"story_id":15760064,"story_text":"I
+        rent a low-end VPS.<p>It is used to host my personal hobby website (very,
+        very low traffic), and for me to generally play around with a Linux server.<p>I
+        feel like it is a waste that it doesn&#x27;t really get used that much.<p>Are
+        there any projects that I could host on my server that would help give back
+        to the open source community at large?<p>I had thought about maybe hosting
+        a buildbot?  I don&#x27;t want to do Tor or anything that could get my server
+        shut down.  I also don&#x27;t want to commit to anything that would suffer
+        when I eventually lose interest.<p>Any ideas?","title":"Ask HN: How to use
+        my VPS for good?","updated_at":"2024-09-20T01:41:52Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"E-M"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Wiggio
+        has been <em>shut down</em>"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://wiggio.com/"}},"_tags":["story","author_E-M","story_15754927"],"author":"E-M","created_at":"2017-11-22T07:10:03Z","created_at_i":1511334603,"num_comments":0,"objectID":"15754927","points":1,"story_id":15754927,"title":"Wiggio
+        has been shut down","updated_at":"2024-09-20T01:41:18Z","url":"https://wiggio.com/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"wavesounds"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"What
+        is a practical engineering solution to prevent ISPs from monitoring/filtering
+        a users internet traffic? And what Open Source projects can we contribute
+        to help build this solution?<p>It must be something that has the potential
+        of being mainstream and can''t easily be <em>shut down</em>."},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: What are engineering solutions to preserve Net Neutrality?"}},"_tags":["story","author_wavesounds","story_15754131","ask_hn"],"author":"wavesounds","children":[15754212,15754883,15754186,15754264,15757675],"created_at":"2017-11-22T04:04:54Z","created_at_i":1511323494,"num_comments":9,"objectID":"15754131","points":5,"story_id":15754131,"story_text":"What
+        is a practical engineering solution to prevent ISPs from monitoring&#x2F;filtering
+        a users internet traffic? And what Open Source projects can we contribute
+        to help build this solution?<p>It must be something that has the potential
+        of being mainstream and can&#x27;t easily be shut down.","title":"Ask HN:
+        What are engineering solutions to preserve Net Neutrality?","updated_at":"2025-12-14T20:47:23Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"ychandler"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Given
+        the transient nature of startups, was wondering if there were interesting
+        code bases that HN community found on GitHub that was open sourced after a
+        startup <em>shut down</em>?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: Deadpool-ed startups useful open sourced code"}},"_tags":["story","author_ychandler","story_15730745","ask_hn"],"author":"ychandler","created_at":"2017-11-18T21:16:32Z","created_at_i":1511039792,"num_comments":0,"objectID":"15730745","points":1,"story_id":15730745,"story_text":"Given
+        the transient nature of startups, was wondering if there were interesting
+        code bases that HN community found on GitHub that was open sourced after a
+        startup shut down?","title":"Ask HN: Deadpool-ed startups useful open sourced
+        code","updated_at":"2024-09-20T01:38:44Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"gabrielbrangers"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Google
+        accidentally <em>shut down</em> their own YouTube channel"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://chromeunboxed.com/news/chromebook-youtube-google-flagged-shutdown"}},"_tags":["story","author_gabrielbrangers","story_15715990"],"author":"gabrielbrangers","created_at":"2017-11-16T19:56:07Z","created_at_i":1510862167,"num_comments":0,"objectID":"15715990","points":2,"story_id":15715990,"title":"Google
+        accidentally shut down their own YouTube channel","updated_at":"2024-09-20T01:37:08Z","url":"https://chromeunboxed.com/news/chromebook-youtube-google-flagged-shutdown"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"e1ven"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"MegaBots
+        says it will <em>shut down</em> if it can\u2019t reach its next crowdfunding
+        goal"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/11/16/megabots-says-it-will-<em>shut-down</em>-if-it-cant-reach-its-next-crowdfunding-goal/"}},"_tags":["story","author_e1ven","story_15714266"],"author":"e1ven","children":[15714418],"created_at":"2017-11-16T16:59:13Z","created_at_i":1510851553,"num_comments":2,"objectID":"15714266","points":2,"story_id":15714266,"title":"MegaBots
+        says it will shut down if it can\u2019t reach its next crowdfunding goal","updated_at":"2024-09-20T01:37:02Z","url":"https://techcrunch.com/2017/11/16/megabots-says-it-will-shut-down-if-it-cant-reach-its-next-crowdfunding-goal/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"Erika_Ray"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Covenant
+        and Many Other Streaming Addons <em>Shut Down</em> Due to Legal Threats"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.reviewsdir.com/covenant-and-other-streaming-addons-<em>shut-down</em>/"}},"_tags":["story","author_Erika_Ray","story_15711062"],"author":"Erika_Ray","created_at":"2017-11-16T08:32:57Z","created_at_i":1510821177,"num_comments":0,"objectID":"15711062","points":1,"story_id":15711062,"title":"Covenant
+        and Many Other Streaming Addons Shut Down Due to Legal Threats","updated_at":"2024-09-20T01:36:41Z","url":"https://www.reviewsdir.com/covenant-and-other-streaming-addons-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"jorts"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        went by Techshop SF this morning and was turned away at the gate.  The manager
+        told me that they <em>shut down</em> the business and that he was just notified
+        last night.  There has been no notice to members yet.  He said that he doesn''t
+        know how it''s going to work out with refunds for existing members.<p>Relevant
+        article:  https://makezine.com/2017/11/15/techshop-closes-doors-files-bankruptcy/"},"title":{"matchLevel":"none","matchedWords":[],"value":"Techshop
+        is out of business"}},"_tags":["story","author_jorts","story_15705474","ask_hn"],"author":"jorts","children":[15710671,15708308],"created_at":"2017-11-15T17:21:21Z","created_at_i":1510766481,"num_comments":2,"objectID":"15705474","points":11,"story_id":15705474,"story_text":"I
+        went by Techshop SF this morning and was turned away at the gate.  The manager
+        told me that they shut down the business and that he was just notified last
+        night.  There has been no notice to members yet.  He said that he doesn&#x27;t
+        know how it&#x27;s going to work out with refunds for existing members.<p>Relevant
+        article:  https:&#x2F;&#x2F;makezine.com&#x2F;2017&#x2F;11&#x2F;15&#x2F;techshop-closes-doors-files-bankruptcy&#x2F;","title":"Techshop
+        is out of business","updated_at":"2024-09-20T01:36:01Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rmason"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"CompuServe
+        forums to <em>shut down</em> December 15"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.fastcompany.com/40495831/compuserves-forums-which-still-exist-are-finally-shutting-down"}},"_tags":["story","author_rmason","story_15697573"],"author":"rmason","children":[15697614,15697916,15702016,15699839],"created_at":"2017-11-14T18:11:08Z","created_at_i":1510683068,"num_comments":6,"objectID":"15697573","points":9,"story_id":15697573,"title":"CompuServe
+        forums to shut down December 15","updated_at":"2024-09-20T01:41:51Z","url":"https://www.fastcompany.com/40495831/compuserves-forums-which-still-exist-are-finally-shutting-down"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"brakmic"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"UK
+        threatens to <em>shut down</em> popular Bitcoin investment site BitConnect"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://thenextweb.com/hardfork/2017/11/13/bitcoin-bitconnect-uk-ponzi-investment/"}},"_tags":["story","author_brakmic","story_15693813"],"author":"brakmic","created_at":"2017-11-14T09:44:41Z","created_at_i":1510652681,"num_comments":0,"objectID":"15693813","points":5,"story_id":15693813,"title":"UK
+        threatens to shut down popular Bitcoin investment site BitConnect","updated_at":"2024-09-20T01:41:29Z","url":"https://thenextweb.com/hardfork/2017/11/13/bitcoin-bitconnect-uk-ponzi-investment/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"AndrewDucker"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Logitech
+        to <em>shut down</em> \u201cservice and support\u201d for Harmony Link devices
+        in 2018"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://arstechnica.com/gadgets/2017/11/logitech-to-<em>shut-down</em>-service-and-support-for-harmony-link-devices-in-2018/"}},"_tags":["story","author_AndrewDucker","story_15655153"],"author":"AndrewDucker","created_at":"2017-11-08T18:11:30Z","created_at_i":1510164690,"num_comments":0,"objectID":"15655153","points":2,"story_id":15655153,"title":"Logitech
+        to shut down \u201cservice and support\u201d for Harmony Link devices in 2018","updated_at":"2024-09-20T01:37:36Z","url":"https://arstechnica.com/gadgets/2017/11/logitech-to-shut-down-service-and-support-for-harmony-link-devices-in-2018/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"eplanit"},"title":{"matchLevel":"none","matchedWords":[],"value":"Amazon
+        is shutting down its Fresh grocery delivery service in parts of 9+ states"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.recode.net/2017/11/3/16601488/amazon-fresh-cancellation-<em>shut-down</em>-grocery-delivery-whole-foods"}},"_tags":["story","author_eplanit","story_15648251"],"author":"eplanit","children":[15648390],"created_at":"2017-11-07T22:24:07Z","created_at_i":1510093447,"num_comments":1,"objectID":"15648251","points":3,"story_id":15648251,"title":"Amazon
+        is shutting down its Fresh grocery delivery service in parts of 9+ states","updated_at":"2024-09-20T01:36:56Z","url":"https://www.recode.net/2017/11/3/16601488/amazon-fresh-cancellation-shut-down-grocery-delivery-whole-foods"}],"hitsPerPage":30,"nbHits":232,"nbPages":8,"page":0,"params":"query=%22shut+down%22&tags=story&page=0&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799&advancedSyntax=true&analyticsTags=backend","processingTimeMS":10,"processingTimingsMS":{"_request":{"roundTrip":17},"afterFetch":{"format":{"highlighting":1,"total":1},"merge":{"mergeLoop":{"prepareNextHit":7,"total":7},"total":7},"total":7},"fetch":{"scanning":1,"total":2},"total":10},"query":"\"shut
+        down\"","serverTimeMS":13}
+
+        '
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '35675'
+      access-control-allow-origin:
+      - '*'
+      content-type:
+      - application/json
+      date:
+      - Thu, 07 May 2026 02:41:30 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - fc49fe1227c85de400e8be330856bb9c
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - hn.algolia.com
+      User-Agent:
+      - slopmortem/0.1.0 (+https://github.com/vaporif/slopmortem)
+    method: GET
+    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=1&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799
+  response:
+    body:
+      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"aaronbrethorst"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Court
+        orders Sci-Hub to <em>shut down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.theverge.com/2017/11/7/16618874/court-pirate-science-site-sci-hub-<em>shut-down</em>"}},"_tags":["story","author_aaronbrethorst","story_15646749"],"author":"aaronbrethorst","created_at":"2017-11-07T19:39:22Z","created_at_i":1510083562,"num_comments":0,"objectID":"15646749","points":2,"story_id":15646749,"title":"Court
+        orders Sci-Hub to shut down","updated_at":"2024-09-20T01:36:44Z","url":"https://www.theverge.com/2017/11/7/16618874/court-pirate-science-site-sci-hub-shut-down"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"nishant_K_gupta"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"After
+        Google decided to <em>shut down</em> it;s airfare data api, what will be your
+        alternative to it? \nHave you already evaluated any other API?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: What''s Your Alternative to Google''s QPX Express API?"}},"_tags":["story","author_nishant_K_gupta","story_15642267","ask_hn"],"author":"nishant_K_gupta","children":[15642310],"created_at":"2017-11-07T10:32:49Z","created_at_i":1510050769,"num_comments":1,"objectID":"15642267","points":1,"story_id":15642267,"story_text":"After
+        Google decided to shut down it;s airfare data api, what will be your alternative
+        to it? \nHave you already evaluated any other API?","title":"Ask HN: What''s
+        Your Alternative to Google''s QPX Express API?","updated_at":"2024-09-20T01:36:19Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"marklyon"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Can
+        You Really <em>Shut Down</em> Your Company a Week After Your Workers Unionize?"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://psmag.com/economics/gothamist-and-the-billionaires-who-hate-unions"}},"_tags":["story","author_marklyon","story_15637003"],"author":"marklyon","created_at":"2017-11-06T17:22:48Z","created_at_i":1509988968,"num_comments":0,"objectID":"15637003","points":1,"story_id":15637003,"title":"Can
+        You Really Shut Down Your Company a Week After Your Workers Unionize?","updated_at":"2024-09-20T01:35:50Z","url":"https://psmag.com/economics/gothamist-and-the-billionaires-who-hate-unions"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"pwg"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Torchlight
+        Developer Runic Games <em>Shut Down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.gamespot.com/articles/torchlight-developer-runic-games-<em>shut-down</em>/1100-6454668/"}},"_tags":["story","author_pwg","story_15631407"],"author":"pwg","created_at":"2017-11-05T20:34:43Z","created_at_i":1509914083,"num_comments":0,"objectID":"15631407","points":3,"story_id":15631407,"title":"Torchlight
+        Developer Runic Games Shut Down","updated_at":"2024-09-20T01:35:15Z","url":"https://www.gamespot.com/articles/torchlight-developer-runic-games-shut-down/1100-6454668/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"sds111"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Microsoft
+        is getting ready to <em>shut down</em> the last official free Win 10 upgrade"},"url":{"matchLevel":"none","matchedWords":[],"value":"http://www.zdnet.com/article/microsoft-quietly-announces-end-of-last-free-windows-10-upgrades/"}},"_tags":["story","author_sds111","story_15626713"],"author":"sds111","created_at":"2017-11-04T20:21:02Z","created_at_i":1509826862,"num_comments":0,"objectID":"15626713","points":2,"story_id":15626713,"title":"Microsoft
+        is getting ready to shut down the last official free Win 10 upgrade","updated_at":"2024-09-20T01:34:46Z","url":"http://www.zdnet.com/article/microsoft-quietly-announces-end-of-last-free-windows-10-upgrades/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"EntreJobHunt"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        just <em>shut down</em> my startup (after 2.5 years) and need help deciding
+        next steps. We did great on business development (had partnerships with our
+        best potential customers, gathered enough feedback on MVPs, were a part of
+        one of the best accelerators in Silicon Valley) but could never ship the final
+        product because of some technical challenges (we were building a hardware
+        product, could never achieve some critical network latency v/s packet drop
+        metrics critical for deployment of our product).<p>I started the startup right
+        out of college and this is the first time I''ll be job hunting. I come from
+        one of the best universities in India and have interned in the past with one
+        of the world''s best investment bank, have programmed for Google Summer of
+        Code and interned with an MIT Media Lab remote programme. In the startup,
+        I was the CEO hence had a very generic work role. Now I am having trouble
+        deciding what kind of jobs should I target.<p>I love enabling and helping
+        innovative technologies (passionate about it). I can programme decently but
+        there are better people than me at it and I would prefer to continue to be
+        a generalist than a specialist. Can you recommend which roles/companies should
+        I be targeting?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: Career advice for failed entrepreneur"}},"_tags":["story","author_EntreJobHunt","story_15625697","ask_hn"],"author":"EntreJobHunt","children":[15632539,15632538],"created_at":"2017-11-04T16:21:33Z","created_at_i":1509812493,"num_comments":1,"objectID":"15625697","points":2,"story_id":15625697,"story_text":"I
+        just shut down my startup (after 2.5 years) and need help deciding next steps.
+        We did great on business development (had partnerships with our best potential
+        customers, gathered enough feedback on MVPs, were a part of one of the best
+        accelerators in Silicon Valley) but could never ship the final product because
+        of some technical challenges (we were building a hardware product, could never
+        achieve some critical network latency v&#x2F;s packet drop metrics critical
+        for deployment of our product).<p>I started the startup right out of college
+        and this is the first time I&#x27;ll be job hunting. I come from one of the
+        best universities in India and have interned in the past with one of the world&#x27;s
+        best investment bank, have programmed for Google Summer of Code and interned
+        with an MIT Media Lab remote programme. In the startup, I was the CEO hence
+        had a very generic work role. Now I am having trouble deciding what kind of
+        jobs should I target.<p>I love enabling and helping innovative technologies
+        (passionate about it). I can programme decently but there are better people
+        than me at it and I would prefer to continue to be a generalist than a specialist.
+        Can you recommend which roles&#x2F;companies should I be targeting?","title":"Ask
+        HN: Career advice for failed entrepreneur","updated_at":"2024-09-20T01:34:41Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rbanffy"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"A
+        rogue Twitter employee <em>shut down</em> Donald Trump\u2019s account \u2013
+        The Verge"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.theverge.com/2017/11/2/16600732/donald-trump-twitter-account-gone-realdonaldtrump"}},"_tags":["story","author_rbanffy","story_15618022"],"author":"rbanffy","created_at":"2017-11-03T10:27:49Z","created_at_i":1509704869,"num_comments":0,"objectID":"15618022","points":2,"story_id":15618022,"title":"A
+        rogue Twitter employee shut down Donald Trump\u2019s account \u2013 The Verge","updated_at":"2024-09-20T01:33:58Z","url":"https://www.theverge.com/2017/11/2/16600732/donald-trump-twitter-account-gone-realdonaldtrump"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"babesh"},"title":{"matchLevel":"none","matchedWords":[],"value":"Tech
+        buying out competition and shutting it down"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://www.sfgate.com/bayarea/article/SFist-<em>shut-down</em>-gothamist-dnainfo-ricketts-12327549.php"}},"_tags":["story","author_babesh","story_15616381"],"author":"babesh","children":[15616383,15616458],"created_at":"2017-11-03T03:00:08Z","created_at_i":1509678008,"num_comments":2,"objectID":"15616381","points":2,"story_id":15616381,"title":"Tech
+        buying out competition and shutting it down","updated_at":"2024-09-20T01:33:46Z","url":"http://www.sfgate.com/bayarea/article/SFist-shut-down-gothamist-dnainfo-ricketts-12327549.php"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"anigbrowl"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"DNAinfo,
+        Gothamist <em>shut down</em> by CEO"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://thehill.com/homenews/media/358534-dnainfo-gothamist-<em>shut-down</em>-by-ceo"}},"_tags":["story","author_anigbrowl","story_15614771"],"author":"anigbrowl","children":[15615015,15614863,15615075],"created_at":"2017-11-02T22:11:07Z","created_at_i":1509660667,"num_comments":3,"objectID":"15614771","points":33,"story_id":15614771,"title":"DNAinfo,
+        Gothamist shut down by CEO","updated_at":"2024-09-20T01:33:35Z","url":"http://thehill.com/homenews/media/358534-dnainfo-gothamist-shut-down-by-ceo"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"joeyespo"},"title":{"matchLevel":"none","matchedWords":[],"value":"Google
+        will stop feeding airfare data to travel websites"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.theverge.com/2017/11/1/16591850/google-ita-matrix-<em>shut-down</em>-qpx-express-api"}},"_tags":["story","author_joeyespo","story_15607346"],"author":"joeyespo","created_at":"2017-11-02T02:25:27Z","created_at_i":1509589527,"num_comments":0,"objectID":"15607346","points":1,"story_id":15607346,"title":"Google
+        will stop feeding airfare data to travel websites","updated_at":"2024-09-20T01:32:48Z","url":"https://www.theverge.com/2017/11/1/16591850/google-ita-matrix-shut-down-qpx-express-api"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"imartin2k"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Google
+        has been offering an API for airfare data at https://developers.google.com/qpx-express.<p>I
+        just received this email:<p>&quot;Dear QPX Express API Customer,\nAfter careful
+        consideration, we''ve decided to <em>shut down</em> the QPX Express API as
+        of April 10, 2018.<p>How this affects you<p>After April 10th, you will not
+        be able to access the API and will no longer be charged for this service.
+        Until then, you will be charged a reduced rate of $0.02 per query for any
+        queries beyond the 50 free daily quota.<p>Next steps<p>You don''t need to
+        take any action. However, if you are actively using this product you may want
+        to find an alternate solution before April 10, 2018. If you have any questions
+        about these changes, please don''t hesitate to contact us at any time.\nSincerely,<p>The
+        QPX Express API team&quot;<p>More info on the shutdown: https://developers.google.com/qpx-express/faq#EndOfServiceFAQs"},"title":{"matchLevel":"none","matchedWords":[],"value":"Google
+        is shutting down the QPX Express API for airfare data"}},"_tags":["story","author_imartin2k","story_15594975","ask_hn"],"author":"imartin2k","children":[15595794,15596049,15595631,15595165,15595550,15597083,15595327,15595380,15598061,15596685,15595552,15595384,15595444,15597009,15609176,15609191,15599112,15612379,15597977,15600398,15599568,15602615,15596142,15595157,15595649,15605533,15600472,15598036,15597734,15598714,15595956],"created_at":"2017-10-31T17:36:46Z","created_at_i":1509471406,"num_comments":190,"objectID":"15594975","points":324,"story_id":15594975,"story_text":"Google
+        has been offering an API for airfare data at https:&#x2F;&#x2F;developers.google.com&#x2F;qpx-express.<p>I
+        just received this email:<p>&quot;Dear QPX Express API Customer,\nAfter careful
+        consideration, we&#x27;ve decided to shut down the QPX Express API as of April
+        10, 2018.<p>How this affects you<p>After April 10th, you will not be able
+        to access the API and will no longer be charged for this service. Until then,
+        you will be charged a reduced rate of $0.02 per query for any queries beyond
+        the 50 free daily quota.<p>Next steps<p>You don&#x27;t need to take any action.
+        However, if you are actively using this product you may want to find an alternate
+        solution before April 10, 2018. If you have any questions about these changes,
+        please don&#x27;t hesitate to contact us at any time.\nSincerely,<p>The QPX
+        Express API team&quot;<p>More info on the shutdown: https:&#x2F;&#x2F;developers.google.com&#x2F;qpx-express&#x2F;faq#EndOfServiceFAQs","title":"Google
+        is shutting down the QPX Express API for airfare data","updated_at":"2024-09-20T01:35:58Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"Gaussian"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        have not found any material on what access, if any, Google will offer startups
+        and smaller companies to the ITA/Matrix DB (flight, airline schedules and
+        fare data) going forward. Needless to say, this is disappointing on many levels.<p>Email
+        just received from Google:<p>Dear QPX Express API Customer,<p>After careful
+        consideration, we''ve decided to <em>shut down</em> the QPX Express API as
+        of April 10, 2018.<p>How this affects you<p>After April 10th, you will not
+        be able to access the API and will no longer be charged for this service.
+        Until then, you will be charged a reduced rate of $0.02 per query for any
+        queries beyond the 50 free daily quota.<p>Next steps\nYou don''t need to take
+        any action. However, if you are actively using this product you may want to
+        find an alternate solution before April 10, 2018. If you have any questions
+        about these changes, please don''t hesitate to contact us at any time.<p>Sincerely,\nThe
+        QPX Express API team"},"title":{"matchLevel":"none","matchedWords":[],"value":"RIP
+        Flight Search: Google Shutting Down QPX Express API in April 2018"}},"_tags":["story","author_Gaussian","story_15594837","ask_hn"],"author":"Gaussian","created_at":"2017-10-31T17:18:25Z","created_at_i":1509470305,"num_comments":0,"objectID":"15594837","points":6,"story_id":15594837,"story_text":"I
+        have not found any material on what access, if any, Google will offer startups
+        and smaller companies to the ITA&#x2F;Matrix DB (flight, airline schedules
+        and fare data) going forward. Needless to say, this is disappointing on many
+        levels.<p>Email just received from Google:<p>Dear QPX Express API Customer,<p>After
+        careful consideration, we&#x27;ve decided to shut down the QPX Express API
+        as of April 10, 2018.<p>How this affects you<p>After April 10th, you will
+        not be able to access the API and will no longer be charged for this service.
+        Until then, you will be charged a reduced rate of $0.02 per query for any
+        queries beyond the 50 free daily quota.<p>Next steps\nYou don&#x27;t need
+        to take any action. However, if you are actively using this product you may
+        want to find an alternate solution before April 10, 2018. If you have any
+        questions about these changes, please don&#x27;t hesitate to contact us at
+        any time.<p>Sincerely,\nThe QPX Express API team","title":"RIP Flight Search:
+        Google Shutting Down QPX Express API in April 2018","updated_at":"2024-09-20T01:35:58Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"robk"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"From
+        email - not posted elsewhere yet.<p>Dear QPX Express API Customer,\nAfter
+        careful consideration, we''ve decided to <em>shut down</em> the QPX Express
+        API as of April 10, 2018.\nHow this affects you\nAfter April 10th, you will
+        not be able to access the API and will no longer be charged for this service.
+        Until then, you will be charged a reduced rate of $0.02 per query for any
+        queries beyond the 50 free daily quota.\nNext steps\nYou don''t need to take
+        any action. However, if you are actively using this product you may want to
+        find an alternate solution before April 10, 2018. If you have any questions
+        about these changes, please don''t hesitate to contact us at any time.\nSincerely,\nThe
+        QPX Express API team"},"title":{"matchLevel":"none","matchedWords":[],"value":"Google
+        shuts down flight search API"}},"_tags":["story","author_robk","story_15594820","ask_hn"],"author":"robk","children":[15594822],"created_at":"2017-10-31T17:15:19Z","created_at_i":1509470119,"num_comments":1,"objectID":"15594820","points":7,"story_id":15594820,"story_text":"From
+        email - not posted elsewhere yet.<p>Dear QPX Express API Customer,\nAfter
+        careful consideration, we&#x27;ve decided to shut down the QPX Express API
+        as of April 10, 2018.\nHow this affects you\nAfter April 10th, you will not
+        be able to access the API and will no longer be charged for this service.
+        Until then, you will be charged a reduced rate of $0.02 per query for any
+        queries beyond the 50 free daily quota.\nNext steps\nYou don&#x27;t need to
+        take any action. However, if you are actively using this product you may want
+        to find an alternate solution before April 10, 2018. If you have any questions
+        about these changes, please don&#x27;t hesitate to contact us at any time.\nSincerely,\nThe
+        QPX Express API team","title":"Google shuts down flight search API","updated_at":"2024-09-20T01:35:58Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"karlhughes"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"The
+        Dice job board API has been <em>shut down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.jobapis.com/2017/10/28/dice-job-board-api-<em>shut-down</em>/"}},"_tags":["story","author_karlhughes","story_15575766"],"author":"karlhughes","created_at":"2017-10-28T16:58:46Z","created_at_i":1509209926,"num_comments":0,"objectID":"15575766","points":2,"story_id":15575766,"title":"The
+        Dice job board API has been shut down","updated_at":"2024-09-20T01:34:01Z","url":"https://www.jobapis.com/2017/10/28/dice-job-board-api-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"benburleson"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        have an old DigitalOcean account with an old instance running an old site
+        I built for someone years ago. It''s been happily running, so I haven''t checked
+        on it for quite a while.<p>The DO account was created from an email address
+        with a domain I used for my freelance web business that has since gone defunct.
+        I let the domain go, and it was bought by someone else.<p>Well, to my surprise,
+        when I tried to log in to DO, it appears they started enforcing an MFA policy
+        where email is the only option. Unfortunately, I cannot receive emails at
+        that address now.<p>I''ve reached out to the new domain owner, hoping they
+        have a catch-all address and will forward the MFA code, but no luck there
+        yet.<p>DigitalOcean is taking the stance of &quot;Sorry, nothing we can do
+        on our end.&quot; I''ve asked them to escalate the issue, to mail a letter
+        with the MFA code, to call me, anything other than email on a domain I no
+        longer own. They''re refusing to budge.<p>What options do I have here?<p>I
+        really don''t want to be forced to perform an infrastructure migration right
+        now, but not the end of the world, I guess. I still have ssh access to my
+        server, just not DO account access. The worrying thing is apparently I don''t
+        even have the power to <em>shut down</em> the account! I guess if it comes
+        to it I just have to block the charges on my CC."},"title":{"matchLevel":"none","matchedWords":[],"value":"Locked
+        out of my DigitalOcean account \u2013 what are my options?"}},"_tags":["story","author_benburleson","story_15534379","ask_hn"],"author":"benburleson","created_at":"2017-10-23T16:26:19Z","created_at_i":1508775979,"num_comments":0,"objectID":"15534379","points":1,"story_id":15534379,"story_text":"I
+        have an old DigitalOcean account with an old instance running an old site
+        I built for someone years ago. It&#x27;s been happily running, so I haven&#x27;t
+        checked on it for quite a while.<p>The DO account was created from an email
+        address with a domain I used for my freelance web business that has since
+        gone defunct. I let the domain go, and it was bought by someone else.<p>Well,
+        to my surprise, when I tried to log in to DO, it appears they started enforcing
+        an MFA policy where email is the only option. Unfortunately, I cannot receive
+        emails at that address now.<p>I&#x27;ve reached out to the new domain owner,
+        hoping they have a catch-all address and will forward the MFA code, but no
+        luck there yet.<p>DigitalOcean is taking the stance of &quot;Sorry, nothing
+        we can do on our end.&quot; I&#x27;ve asked them to escalate the issue, to
+        mail a letter with the MFA code, to call me, anything other than email on
+        a domain I no longer own. They&#x27;re refusing to budge.<p>What options do
+        I have here?<p>I really don&#x27;t want to be forced to perform an infrastructure
+        migration right now, but not the end of the world, I guess. I still have ssh
+        access to my server, just not DO account access. The worrying thing is apparently
+        I don&#x27;t even have the power to shut down the account! I guess if it comes
+        to it I just have to block the charges on my CC.","title":"Locked out of my
+        DigitalOcean account \u2013 what are my options?","updated_at":"2024-09-20T01:29:49Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"JackFaker"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Atlas
+        Informatics to <em>shut down</em>"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.geekwire.com/2017/atlas-informatics-shut-pulling-plug-encrypted-personal-search-engine/"}},"_tags":["story","author_JackFaker","story_15527421"],"author":"JackFaker","children":[15528083],"created_at":"2017-10-22T16:06:14Z","created_at_i":1508688374,"num_comments":1,"objectID":"15527421","points":2,"story_id":15527421,"title":"Atlas
+        Informatics to shut down","updated_at":"2024-09-20T01:29:04Z","url":"https://www.geekwire.com/2017/atlas-informatics-shut-pulling-plug-encrypted-personal-search-engine/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"face_mcgace"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Project
+        Elysium <em>Shut Down</em>"},"url":{"matchLevel":"none","matchedWords":[],"value":"http://lightshope.org/"}},"_tags":["story","author_face_mcgace","story_15487570"],"author":"face_mcgace","created_at":"2017-10-16T23:44:45Z","created_at_i":1508197485,"num_comments":0,"objectID":"15487570","points":1,"story_id":15487570,"title":"Project
+        Elysium Shut Down","updated_at":"2024-09-20T01:33:35Z","url":"http://lightshope.org/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"joeyespo"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Trump
+        threatens to <em>shut down</em> NBC and other TV news networks that criticise
+        him"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://www.independent.co.uk/news/world/americas/us-politics/trump-nbc-license-ban-tweet-cnn-<em>shut-down</em>-fake-news-threat-latest-a7994861.html"}},"_tags":["story","author_joeyespo","story_15455497"],"author":"joeyespo","children":[15469780,15456106,15456020,15455574],"created_at":"2017-10-12T03:40:51Z","created_at_i":1507779651,"num_comments":4,"objectID":"15455497","points":6,"story_id":15455497,"title":"Trump
+        threatens to shut down NBC and other TV news networks that criticise him","updated_at":"2024-09-20T01:30:32Z","url":"http://www.independent.co.uk/news/world/americas/us-politics/trump-nbc-license-ban-tweet-cnn-shut-down-fake-news-threat-latest-a7994861.html"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"prostoalex"},"title":{"matchLevel":"none","matchedWords":[],"value":"Google
+        acqui-hires team at podcast app 60dB"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/10/10/google-acqui-hires-team-at-podcast-app-60db-service-will-<em>shut-down</em>-next-month/?ncid=rss&utm_source=feedburner&utm_medium=feed&utm_campaign=Feed%3A+Techcrunch+%28TechCrunch%29"}},"_tags":["story","author_prostoalex","story_15446889"],"author":"prostoalex","created_at":"2017-10-11T02:27:52Z","created_at_i":1507688872,"num_comments":0,"objectID":"15446889","points":1,"story_id":15446889,"title":"Google
+        acqui-hires team at podcast app 60dB","updated_at":"2024-09-20T01:29:42Z","url":"https://techcrunch.com/2017/10/10/google-acqui-hires-team-at-podcast-app-60db-service-will-shut-down-next-month/?ncid=rss&utm_source=feedburner&utm_medium=feed&utm_campaign=Feed%3A+Techcrunch+%28TechCrunch%29"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"jakejohnsen"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        went freelancer in NYC a few years back, and at first, it was great. Always
+        had the intention of growing a small design/dev shop with a target of about
+        12 to 15 in five years. But, I either really suck at finding new business
+        or something is up.<p>Most experienced independent UX and product designers
+        I know are not doing so well. Product management consultants are heading in-house.
+        Smaller shops are converting full-time staff to contractors. A few long-standing
+        digital shops have <em>shut down</em>, others sold. I''m hearing the same
+        story from development firms too.<p>Two questions:\n1. Is anyone not seeing
+        this?<p>2. If so, how are you navigating this and still growing?<p>The only
+        thing I hear from people who claim to be doing OK is that they are recommended
+        by former clients. My clients love working with me and do come back when they
+        have more work, but this is not a big enough pipeline and seems too passive
+        to sustain growth.<p>If you are experiencing the same things, sound off too.
+        If nothing else, others will see they are not alone."},"title":{"matchLevel":"none","matchedWords":[],"value":"Contractors,
+        Freelance and Dev/Design Shop \u2013 Health of the Market?"}},"_tags":["story","author_jakejohnsen","story_15429330","ask_hn"],"author":"jakejohnsen","created_at":"2017-10-08T18:33:19Z","created_at_i":1507487599,"num_comments":0,"objectID":"15429330","points":3,"story_id":15429330,"story_text":"I
+        went freelancer in NYC a few years back, and at first, it was great. Always
+        had the intention of growing a small design&#x2F;dev shop with a target of
+        about 12 to 15 in five years. But, I either really suck at finding new business
+        or something is up.<p>Most experienced independent UX and product designers
+        I know are not doing so well. Product management consultants are heading in-house.
+        Smaller shops are converting full-time staff to contractors. A few long-standing
+        digital shops have shut down, others sold. I&#x27;m hearing the same story
+        from development firms too.<p>Two questions:\n1. Is anyone not seeing this?<p>2.
+        If so, how are you navigating this and still growing?<p>The only thing I hear
+        from people who claim to be doing OK is that they are recommended by former
+        clients. My clients love working with me and do come back when they have more
+        work, but this is not a big enough pipeline and seems too passive to sustain
+        growth.<p>If you are experiencing the same things, sound off too. If nothing
+        else, others will see they are not alone.","title":"Contractors, Freelance
+        and Dev/Design Shop \u2013 Health of the Market?","updated_at":"2024-09-20T01:28:02Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rayuela"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"AOL
+        Instant Messenger to <em>Shut Down</em> in December"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.wsj.com/articles/aol-instant-messenger-to-sign-off-1507301951"}},"_tags":["story","author_rayuela","story_15418625"],"author":"rayuela","children":[15418841],"created_at":"2017-10-06T17:36:44Z","created_at_i":1507311404,"num_comments":0,"objectID":"15418625","points":1,"story_id":15418625,"title":"AOL
+        Instant Messenger to Shut Down in December","updated_at":"2024-09-20T01:26:55Z","url":"https://www.wsj.com/articles/aol-instant-messenger-to-sign-off-1507301951"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"deadmetheny"},"title":{"matchLevel":"none","matchedWords":[],"value":"AOL
+        Instant Messenger is shutting down after 20 years"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/10/06/aol-instant-messenger-<em>shut-down</em>/"}},"_tags":["story","author_deadmetheny","story_15417094"],"author":"deadmetheny","children":[15418014,15417241],"created_at":"2017-10-06T14:37:59Z","created_at_i":1507300679,"num_comments":2,"objectID":"15417094","points":11,"story_id":15417094,"title":"AOL
+        Instant Messenger is shutting down after 20 years","updated_at":"2024-09-20T01:26:50Z","url":"https://techcrunch.com/2017/10/06/aol-instant-messenger-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rbanffy"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"AIM
+        will <em>shut down</em> after 20 years"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.theverge.com/2017/10/6/16435690/aim-shutting-down-after-20-years-aol-instant-messenger"}},"_tags":["story","author_rbanffy","story_15417019"],"author":"rbanffy","children":[15417285,15417218,15418103,15417121,15417538,15418945,15418105,15417867,15417243,15417294,15418359,15418030,15419450,15417280,15417514,15417211,15417194,15417645,15417225,15417487,15417763,15417262,15419849,15420504,15419071,15417192,15417593,15420178,15417376,15424783,15418999,15417344,15418914,15417780,15448293,15422433,15417252,15417158,15422543,15419081,15417528,15417945,15420562,15423493,15420225,15420486,15420548,15418804,15419186,15417214,15419801,15424087,15418894,15417907,15421155,15417254,15428061,15419917,15421314,15418380,15417195,15418054,15419751,15424325,15417206,15418356,15418340,15417468,15420152,15419096,15417386,15417325,15419920],"created_at":"2017-10-06T14:27:50Z","created_at_i":1507300070,"num_comments":330,"objectID":"15417019","points":543,"story_id":15417019,"title":"AIM
+        will shut down after 20 years","updated_at":"2026-02-06T02:44:19Z","url":"https://www.theverge.com/2017/10/6/16435690/aim-shutting-down-after-20-years-aol-instant-messenger"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"schakraberty"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"He
+        pivoted thrice, and almost <em>shut down</em>, before Singapore\u2019s Goldbell
+        backed him"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.techinasia.com/he-pivoted-thrice-before-goldbell-backed-pitstop"}},"_tags":["story","author_schakraberty","story_15376023"],"author":"schakraberty","created_at":"2017-10-01T02:13:37Z","created_at_i":1506824017,"num_comments":0,"objectID":"15376023","points":1,"story_id":15376023,"title":"He
+        pivoted thrice, and almost shut down, before Singapore\u2019s Goldbell backed
+        him","updated_at":"2024-09-20T01:28:52Z","url":"https://www.techinasia.com/he-pivoted-thrice-before-goldbell-backed-pitstop"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"tbatchelli"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Catalonia
+        independence vote IT systems ''<em>shut down''</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://news.sky.com/story/catalonia-independence-vote-it-systems-<em>shut-down</em>-11060561"}},"_tags":["story","author_tbatchelli","story_15375416"],"author":"tbatchelli","created_at":"2017-09-30T22:57:33Z","created_at_i":1506812253,"num_comments":0,"objectID":"15375416","points":6,"story_id":15375416,"title":"Catalonia
+        independence vote IT systems ''shut down''","updated_at":"2024-09-20T01:28:47Z","url":"http://news.sky.com/story/catalonia-independence-vote-it-systems-shut-down-11060561"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"markwaldron"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"China
+        to <em>shut down</em> North Korean companies"},"url":{"matchLevel":"none","matchedWords":[],"value":"http://www.bbc.com/news/world-asia-41431057"}},"_tags":["story","author_markwaldron","story_15357702"],"author":"markwaldron","created_at":"2017-09-28T15:19:14Z","created_at_i":1506611954,"num_comments":0,"objectID":"15357702","points":2,"story_id":15357702,"title":"China
+        to shut down North Korean companies","updated_at":"2024-09-20T01:26:55Z","url":"http://www.bbc.com/news/world-asia-41431057"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"el_duderino"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Uber
+        will <em>shut down</em> US car-leasing business"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.cnbc.com/2017/09/27/uber-shuts-down-car-leasing-program.html"}},"_tags":["story","author_el_duderino","story_15351099"],"author":"el_duderino","created_at":"2017-09-27T18:55:03Z","created_at_i":1506538503,"num_comments":0,"objectID":"15351099","points":1,"story_id":15351099,"title":"Uber
+        will shut down US car-leasing business","updated_at":"2024-09-20T01:26:14Z","url":"https://www.cnbc.com/2017/09/27/uber-shuts-down-car-leasing-program.html"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"chewz"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Johor
+        sultan orders Muslim-only launderette to open to all or <em>shut down</em>"},"url":{"matchLevel":"none","matchedWords":[],"value":"http://www.freemalaysiatoday.com/category/nation/2017/09/27/johor-sultan-orders-laundrette-to-cease-muslims-only-policy/"}},"_tags":["story","author_chewz","story_15344755"],"author":"chewz","created_at":"2017-09-27T03:42:26Z","created_at_i":1506483746,"num_comments":0,"objectID":"15344755","points":2,"story_id":15344755,"title":"Johor
+        sultan orders Muslim-only launderette to open to all or shut down","updated_at":"2024-09-20T01:25:19Z","url":"http://www.freemalaysiatoday.com/category/nation/2017/09/27/johor-sultan-orders-laundrette-to-cease-muslims-only-policy/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"mb53"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Atlus
+        U.S.A. attempts to <em>shut down</em> Patreon of open source emulator RPCS3"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.reddit.com/r/emulation/comments/72lo12/statement_atlus_usa_attempts_to_<em>shut_down</em>/"}},"_tags":["story","author_mb53","story_15342449"],"author":"mb53","created_at":"2017-09-26T20:57:45Z","created_at_i":1506459465,"num_comments":0,"objectID":"15342449","points":3,"story_id":15342449,"title":"Atlus
+        U.S.A. attempts to shut down Patreon of open source emulator RPCS3","updated_at":"2024-09-20T01:25:07Z","url":"https://www.reddit.com/r/emulation/comments/72lo12/statement_atlus_usa_attempts_to_shut_down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"scdoshi"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Stranger
+        Things pop-up bar asked to <em>shut down</em> with humorous cease-and-desist"},"url":{"matchLevel":"none","matchedWords":[],"value":"http://www.businessinsider.com/netflix-stranger-things-pop-up-bar-funny-cease-and-desist-letter-2017-9"}},"_tags":["story","author_scdoshi","story_15327295"],"author":"scdoshi","created_at":"2017-09-25T00:37:37Z","created_at_i":1506299857,"num_comments":0,"objectID":"15327295","points":2,"story_id":15327295,"title":"Stranger
+        Things pop-up bar asked to shut down with humorous cease-and-desist","updated_at":"2024-09-20T01:23:36Z","url":"http://www.businessinsider.com/netflix-stranger-things-pop-up-bar-funny-cease-and-desist-letter-2017-9"}],"hitsPerPage":30,"nbHits":232,"nbPages":8,"page":1,"params":"query=%22shut+down%22&tags=story&page=1&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799&advancedSyntax=true&analyticsTags=backend","processingTimeMS":9,"processingTimingsMS":{"_request":{"roundTrip":19},"afterFetch":{"format":{"total":1},"merge":{"mergeLoop":{"prepareNextHit":6,"total":6},"total":6},"total":6},"fetch":{"query":1,"total":2},"total":9},"query":"\"shut
+        down\"","serverTimeMS":11}
+
+        '
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000
+      Content-Length:
+      - '37943'
+      access-control-allow-origin:
+      - '*'
+      content-type:
+      - application/json
+      date:
+      - Thu, 07 May 2026 02:41:31 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 378576b149c345af88f58e3b0e7f704e
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - hn.algolia.com
+      User-Agent:
+      - slopmortem/0.1.0 (+https://github.com/vaporif/slopmortem)
+    method: GET
+    uri: https://hn.algolia.com/api/v1/search_by_date?query=%22shut+down%22&tags=story&page=2&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799
+  response:
+    body:
+      string: '{"exhaustive":{"nbHits":true,"typo":true},"exhaustiveNbHits":true,"exhaustiveTypo":true,"hits":[{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"MuyoSan"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        <em>shut down</em> my Y Combinator-backed African startup after 2 years. Here\u2019s
+        why"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techpoint.ng/2017/09/22/afrostream-<em>shut-down</em>/"}},"_tags":["story","author_MuyoSan","story_15316698"],"author":"MuyoSan","created_at":"2017-09-22T23:00:23Z","created_at_i":1506121223,"num_comments":0,"objectID":"15316698","points":3,"story_id":15316698,"title":"I
+        shut down my Y Combinator-backed African startup after 2 years. Here\u2019s
+        why","updated_at":"2024-09-20T01:22:28Z","url":"https://techpoint.ng/2017/09/22/afrostream-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rinchik"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"This
+        is a re-post of this question: https://news.ycombinator.com/item?id=15261955
+        Which I submitted this past Saturday, it got 8 up-votes but unfortunately
+        no comments. Since it was Saturday, I figured most of the techies most likely
+        enjoying their weekends outside of the HN feed, will try to give this question
+        one last chance:<p>I''m having a hard time finding a good basic phone (not
+        smartphone) with great battery life that is available for use in US. The kind
+        of phone that would be perfect for zombie apocalypse (battery, radio, walkie-talkie
+        mode, radio etc) and for 2factor text-base auth.<p>Great battery life is a
+        major factor (4.5Ah and up with at least 1 month stand-by).<p>Another factor
+        that goes hand-to-hand with battery is security and control, should be &quot;hackable&quot;
+        and powered by an OS other than Android (iOS is obviously out of the question).<p>My
+        search started a couple months ago with Nokia 3310 relaunch, which I think
+        is just ideal basic phone i would buy immediately if it were available in
+        US (1 month battery in stand-by is priceless!)<p>There is a limited selection
+        of some very great looking options (Cectdigi T19 and Easyfone No.1 on Amazon
+        for example) but unfortunately all those as well as new Nokia 3310, mentioned
+        above, are not compatible with US carriers, these are bound to 2G which is
+        non-existent in US (AT&amp;T <em>shut down</em> 2G in Jan 2017 and T-mobile
+        is shutting it down by the end of 2020)<p>Any advice? Thoughts?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: What are the best basic phones for hckrs in US? Which phone do you use?"}},"_tags":["story","author_rinchik","story_15278703","ask_hn"],"author":"rinchik","children":[15318721],"created_at":"2017-09-18T19:21:22Z","created_at_i":1505762482,"num_comments":1,"objectID":"15278703","points":1,"story_id":15278703,"story_text":"This
+        is a re-post of this question: https:&#x2F;&#x2F;news.ycombinator.com&#x2F;item?id=15261955
+        Which I submitted this past Saturday, it got 8 up-votes but unfortunately
+        no comments. Since it was Saturday, I figured most of the techies most likely
+        enjoying their weekends outside of the HN feed, will try to give this question
+        one last chance:<p>I&#x27;m having a hard time finding a good basic phone
+        (not smartphone) with great battery life that is available for use in US.
+        The kind of phone that would be perfect for zombie apocalypse (battery, radio,
+        walkie-talkie mode, radio etc) and for 2factor text-base auth.<p>Great battery
+        life is a major factor (4.5Ah and up with at least 1 month stand-by).<p>Another
+        factor that goes hand-to-hand with battery is security and control, should
+        be &quot;hackable&quot; and powered by an OS other than Android (iOS is obviously
+        out of the question).<p>My search started a couple months ago with Nokia 3310
+        relaunch, which I think is just ideal basic phone i would buy immediately
+        if it were available in US (1 month battery in stand-by is priceless!)<p>There
+        is a limited selection of some very great looking options (Cectdigi T19 and
+        Easyfone No.1 on Amazon for example) but unfortunately all those as well as
+        new Nokia 3310, mentioned above, are not compatible with US carriers, these
+        are bound to 2G which is non-existent in US (AT&amp;T shut down 2G in Jan
+        2017 and T-mobile is shutting it down by the end of 2020)<p>Any advice? Thoughts?","title":"Ask
+        HN: What are the best basic phones for hckrs in US? Which phone do you use?","updated_at":"2024-09-20T01:23:04Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"setzer22"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Catalan
+        Independence Referendum Website <em>Shut Down</em> by Barcelona Court''s Order"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://sputniknews.com/europe/201709141057375519-catalonia-website-referendum-blocked/"}},"_tags":["story","author_setzer22","story_15268884"],"author":"setzer22","children":[15268954],"created_at":"2017-09-17T09:35:22Z","created_at_i":1505640922,"num_comments":2,"objectID":"15268884","points":4,"story_id":15268884,"title":"Catalan
+        Independence Referendum Website Shut Down by Barcelona Court''s Order","updated_at":"2024-09-20T01:22:12Z","url":"https://sputniknews.com/europe/201709141057375519-catalonia-website-referendum-blocked/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rinchik"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Not
+        sure if it''s the right place for this kind of question, but anyways, there
+        you go:<p>I''m having a hard time finding a good basic phone (not smartphone)
+        with great battery life that is available for use in US. The kind of phone
+        that would be perfect for zombie apocalypse (battery, radio, walkie-talkie
+        mode, radio etc) and for 2factor text-base auth.<p>Great battery life is a
+        major factor (4.5Ah and up with at least 1 month stand-by).<p>Another factor
+        that goes hand-to-hand with battery is security and control, should be &quot;hackable&quot;
+        and powered by an OS other than Android (iOS is obviously out of the question).<p>My
+        search started a couple months ago with Nokia 3310 relaunch, which I think
+        is just ideal basic phone i would buy immediately if it were available in
+        US (1 month battery in stand-by is priceless!)<p>There is a limited selection
+        of some very great looking options (Cectdigi T19 and Easyfone No.1 on Amazon
+        for example) but unfortunately all those as well as new Nokia 3310, mentioned
+        above, are not compatible with US carriers, these are bound to 2G which is
+        non-existent in US (AT&amp;T <em>shut down</em> 2G in Jan 2017 and T-mobile
+        is shutting it down by the end of 2020)<p>Any advice? Thoughts?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: What are the best basic phones for hckrs in US? Which phone do you use?"}},"_tags":["story","author_rinchik","story_15261955","ask_hn"],"author":"rinchik","created_at":"2017-09-16T00:21:36Z","created_at_i":1505521296,"num_comments":0,"objectID":"15261955","points":8,"story_id":15261955,"story_text":"Not
+        sure if it&#x27;s the right place for this kind of question, but anyways,
+        there you go:<p>I&#x27;m having a hard time finding a good basic phone (not
+        smartphone) with great battery life that is available for use in US. The kind
+        of phone that would be perfect for zombie apocalypse (battery, radio, walkie-talkie
+        mode, radio etc) and for 2factor text-base auth.<p>Great battery life is a
+        major factor (4.5Ah and up with at least 1 month stand-by).<p>Another factor
+        that goes hand-to-hand with battery is security and control, should be &quot;hackable&quot;
+        and powered by an OS other than Android (iOS is obviously out of the question).<p>My
+        search started a couple months ago with Nokia 3310 relaunch, which I think
+        is just ideal basic phone i would buy immediately if it were available in
+        US (1 month battery in stand-by is priceless!)<p>There is a limited selection
+        of some very great looking options (Cectdigi T19 and Easyfone No.1 on Amazon
+        for example) but unfortunately all those as well as new Nokia 3310, mentioned
+        above, are not compatible with US carriers, these are bound to 2G which is
+        non-existent in US (AT&amp;T shut down 2G in Jan 2017 and T-mobile is shutting
+        it down by the end of 2020)<p>Any advice? Thoughts?","title":"Ask HN: What
+        are the best basic phones for hckrs in US? Which phone do you use?","updated_at":"2024-09-20T01:21:34Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"rvschuilenburg"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Catalan
+        Independence Referendum Website <em>Shut Down</em> by Barcelona Court''s Order"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://sputniknews.com/europe/201709141057375519-catalonia-website-referendum-blocked/"}},"_tags":["story","author_rvschuilenburg","story_15246887"],"author":"rvschuilenburg","created_at":"2017-09-14T11:36:25Z","created_at_i":1505388985,"num_comments":0,"objectID":"15246887","points":2,"story_id":15246887,"title":"Catalan
+        Independence Referendum Website Shut Down by Barcelona Court''s Order","updated_at":"2024-09-20T01:20:09Z","url":"https://sputniknews.com/europe/201709141057375519-catalonia-website-referendum-blocked/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"huntermeyer"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"China
+        Plans to <em>Shut Down</em> Bitcoin Exchanges"},"url":{"matchLevel":"none","matchedWords":[],"value":"http://www.motherjones.com/kevin-drum/2017/09/china-plans-to-chut-down-bitcoin-exchanges/"}},"_tags":["story","author_huntermeyer","story_15221140"],"author":"huntermeyer","children":[15221456],"created_at":"2017-09-11T18:55:34Z","created_at_i":1505156134,"num_comments":1,"objectID":"15221140","points":1,"story_id":15221140,"title":"China
+        Plans to Shut Down Bitcoin Exchanges","updated_at":"2024-09-20T01:17:50Z","url":"http://www.motherjones.com/kevin-drum/2017/09/china-plans-to-chut-down-bitcoin-exchanges/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"hysan"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"I
+        was a user of the photo journaling app HeyDay since it was released. It was
+        shutdown this past year (last year perhaps) without notice to any of the users.
+        I was lucky enough that I never fully trusted their cloud syncing service
+        and kept copies of my photos on my computer. Others were not so lucky:<p>https://j9sopinion.com/2016/05/09/heyday-photo-app-review/<p>Efforts
+        to contact the developer appear to have fallen on deaf ears, and I''ve all
+        but given up hope that any data would be recovered. For me, that just means
+        journal entries and location data for the past couple of years is now stranded
+        in the app unless I can find a way to extract that data. For others, far more
+        is lost.<p>With so many apps trying to implement syncing to the cloud, what
+        recourse is there for users if the developer/company decides to just <em>shut
+        down</em> business without warning? Is the lesson to be learned from this
+        that no cloud service, even paid ones, are trustworthy? What does this say
+        about the ever increasing movement to the cloud &amp; subscription models?"},"title":{"matchLevel":"none","matchedWords":[],"value":"Ask
+        HN: What do you do when an app with cloud sync shuts down without notice?"}},"_tags":["story","author_hysan","story_15209591","ask_hn"],"author":"hysan","created_at":"2017-09-09T23:05:32Z","created_at_i":1504998332,"num_comments":0,"objectID":"15209591","points":3,"story_id":15209591,"story_text":"I
+        was a user of the photo journaling app HeyDay since it was released. It was
+        shutdown this past year (last year perhaps) without notice to any of the users.
+        I was lucky enough that I never fully trusted their cloud syncing service
+        and kept copies of my photos on my computer. Others were not so lucky:<p>https:&#x2F;&#x2F;j9sopinion.com&#x2F;2016&#x2F;05&#x2F;09&#x2F;heyday-photo-app-review&#x2F;<p>Efforts
+        to contact the developer appear to have fallen on deaf ears, and I&#x27;ve
+        all but given up hope that any data would be recovered. For me, that just
+        means journal entries and location data for the past couple of years is now
+        stranded in the app unless I can find a way to extract that data. For others,
+        far more is lost.<p>With so many apps trying to implement syncing to the cloud,
+        what recourse is there for users if the developer&#x2F;company decides to
+        just shut down business without warning? Is the lesson to be learned from
+        this that no cloud service, even paid ones, are trustworthy? What does this
+        say about the ever increasing movement to the cloud &amp; subscription models?","title":"Ask
+        HN: What do you do when an app with cloud sync shuts down without notice?","updated_at":"2024-09-20T01:16:35Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"cnst"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Why
+        Britain\u2019s attempt to <em>shut down</em> RT makes people \u2018question
+        more\u2019"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://theduran.com/why-britains-attempt-to-<em>shut-down</em>-rt-makes-people-question-more/"}},"_tags":["story","author_cnst","story_15205750"],"author":"cnst","created_at":"2017-09-09T05:54:52Z","created_at_i":1504936492,"num_comments":0,"objectID":"15205750","points":1,"story_id":15205750,"title":"Why
+        Britain\u2019s attempt to shut down RT makes people \u2018question more\u2019","updated_at":"2024-09-20T01:16:11Z","url":"http://theduran.com/why-britains-attempt-to-shut-down-rt-makes-people-question-more/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"stoev"},"title":{"matchLevel":"none","matchedWords":[],"value":"China
+        is considering shutting down local cryptocurrency exchanges"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/09/08/bitcoin-price-drops-following-report-that-china-is-going-to-<em>shut-down</em>-local-exchanges/?utm_source=tcfbpage&sr_share=facebook"}},"_tags":["story","author_stoev","story_15201511"],"author":"stoev","children":[15202820,15202459,15202198,15203586,15203799,15204141,15206135,15202277],"created_at":"2017-09-08T16:18:20Z","created_at_i":1504887500,"num_comments":32,"objectID":"15201511","points":88,"story_id":15201511,"title":"China
+        is considering shutting down local cryptocurrency exchanges","updated_at":"2024-09-20T01:15:40Z","url":"https://techcrunch.com/2017/09/08/bitcoin-price-drops-following-report-that-china-is-going-to-shut-down-local-exchanges/?utm_source=tcfbpage&sr_share=facebook"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"sndean"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"The
+        Google Drive app for PC and Mac is being <em>shut down</em> in March"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.theverge.com/2017/9/7/16267624/google-drive-desktop-app-shutdown"}},"_tags":["story","author_sndean","story_15194178"],"author":"sndean","children":[15194485,15194478,15195707],"created_at":"2017-09-07T17:54:28Z","created_at_i":1504806868,"num_comments":5,"objectID":"15194178","points":19,"story_id":15194178,"title":"The
+        Google Drive app for PC and Mac is being shut down in March","updated_at":"2024-09-20T01:23:53Z","url":"https://www.theverge.com/2017/9/7/16267624/google-drive-desktop-app-shutdown"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"ebagpictures"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Hi,
+        I am a filmmaker with only a rudimentary understanding of cybersecurity, and
+        I have an unusual technical question for some research I am doing for a script.\nI
+        apologise in advance if I sound like a complete newbie...<p>Is there a line
+        of code (say 8 numerical digits or so) that could, in theory, cause significant
+        damage to a government or military infrastructure?<p>For example, a line of
+        code or a passkey that could disable a fighter jet, cause a military satellite
+        blackout, <em>shut-down</em> powerplants, etc.<p>I am working on a project
+        that deals with a cyber vulnerability being leaked in a line of code, but
+        I would like to have something that\u2019s at least semi-realistic and not
+        yet-another \u2018Hollywood hacker\u2019 cliche.<p>What is actually \u2018theoretically\u2019
+        possible in a line of digits?<p>Open to all suggestions! Thanks"},"title":{"matchLevel":"none","matchedWords":[],"value":"Film
+        Question: Cyber-Attack in 1 line of code?"}},"_tags":["story","author_ebagpictures","story_15186160","ask_hn"],"author":"ebagpictures","children":[15186239,15186265],"created_at":"2017-09-06T18:53:19Z","created_at_i":1504723999,"num_comments":3,"objectID":"15186160","points":1,"story_id":15186160,"story_text":"Hi,
+        I am a filmmaker with only a rudimentary understanding of cybersecurity, and
+        I have an unusual technical question for some research I am doing for a script.\nI
+        apologise in advance if I sound like a complete newbie...<p>Is there a line
+        of code (say 8 numerical digits or so) that could, in theory, cause significant
+        damage to a government or military infrastructure?<p>For example, a line of
+        code or a passkey that could disable a fighter jet, cause a military satellite
+        blackout, shut-down powerplants, etc.<p>I am working on a project that deals
+        with a cyber vulnerability being leaked in a line of code, but I would like
+        to have something that\u2019s at least semi-realistic and not yet-another
+        \u2018Hollywood hacker\u2019 cliche.<p>What is actually \u2018theoretically\u2019
+        possible in a line of digits?<p>Open to all suggestions! Thanks","title":"Film
+        Question: Cyber-Attack in 1 line of code?","updated_at":"2024-09-20T01:23:05Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"simias"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"YouTube-MP3
+        Settles with RIAA, Site Will <em>Shut Down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://torrentfreak.com/youtube-mp3-settles-with-riaa-site-will-<em>shut-down</em>-170904/"}},"_tags":["story","author_simias","story_15181992"],"author":"simias","children":[15184452],"created_at":"2017-09-06T08:17:17Z","created_at_i":1504685837,"num_comments":1,"objectID":"15181992","points":3,"story_id":15181992,"title":"YouTube-MP3
+        Settles with RIAA, Site Will Shut Down","updated_at":"2024-09-20T01:22:39Z","url":"https://torrentfreak.com/youtube-mp3-settles-with-riaa-site-will-shut-down-170904/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"walterbell"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"YouTube-mp3
+        agrees to <em>shut down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://www.completemusicupdate.com/article/youtube-mp3-agrees-to-<em>shut-down</em>/"}},"_tags":["story","author_walterbell","story_15174753"],"author":"walterbell","children":[15175408,15175162,15175067,15175263,15175291,15176569,15175842,15175426,15175039,15176546,15176478,15178552,15175106,15175107,15176270,15177206,15175050,15178500,15175334,15246811,15178616,15176469],"created_at":"2017-09-05T13:14:32Z","created_at_i":1504617272,"num_comments":141,"objectID":"15174753","points":121,"story_id":15174753,"title":"YouTube-mp3
+        agrees to shut down","updated_at":"2024-09-20T01:21:59Z","url":"http://www.completemusicupdate.com/article/youtube-mp3-agrees-to-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"williswee"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"China''s
+        sharing startups could be <em>shut down</em> at any time"},"url":{"matchLevel":"none","matchedWords":[],"value":"https://www.techinasia.com/china-bike-share-startups-banned-and-banned-again"}},"_tags":["story","author_williswee","story_15173993"],"author":"williswee","created_at":"2017-09-05T10:57:22Z","created_at_i":1504609042,"num_comments":0,"objectID":"15173993","points":1,"story_id":15173993,"title":"China''s
+        sharing startups could be shut down at any time","updated_at":"2024-09-20T01:21:53Z","url":"https://www.techinasia.com/china-bike-share-startups-banned-and-banned-again"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"ifemide06"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"So
+        we recently concluded YC Startup School where we got some GCP credits. Just
+        2 months after, Google decided to close our billing account, at this time
+        we had just over $2,400 remaining.<p>On reaching out to the Google Billing
+        Team, they came up with several excuses including us using one of their top
+        infrastructure which took all our credits. Of course that was a lie, we showed
+        them our dashboard and services we had running. They then admitted it was
+        an issue at their end.<p>Even till now, we only have 2 Compute Instances and
+        2 SQL instances.<p>After reaching out to the team severally to no avail, one
+        eventually came back and claimed their Support Manager says they have to close
+        the case as there''s nothing they could further do on the matter. I asked,
+        tell us what happened to the remaining credits, why was the account closed?
+        Why was all our servers <em>shut down</em>?<p>All these questions and many
+        others were not answered by the Team. Its over a month, they still can''t
+        figure our how Account got closed and what to do in our case.<p>We reached
+        out to the GCP Slack group where we met this very helpful guy from Google.
+        See his comment:<p>&quot;Couldn\u2019t agree more.  Not just worrying, it\u2019s
+        unacceptable.  The underlying issue is making sure that you are the real owner
+        of the account, which is challenging when the account was deleted.  The people
+        who can confirm it have been unresponsive.  I\u2019m trying to figure out
+        who they are exactly to message them personally (not through a ticketing system)
+        and see if I can get an answer.\nI would be frustrated, too.  We are failing
+        you on this one, big time&quot;<p>I implore you to take care when using GCP.
+        Its clearly not mature and support has been really horrible. We have all communications
+        archived and would be more than happy to share with anyone.<p>Anyone had a
+        similar experience, please share! Don''t be evil indeed!"},"title":{"matchLevel":"none","matchedWords":[],"value":"Google
+        Cloud Platforms \u2013 Shameful"}},"_tags":["story","author_ifemide06","story_15173014","ask_hn"],"author":"ifemide06","children":[15176899,15176153,15178251,15179115,15174385,15178109,15188216,15180951,15179248],"created_at":"2017-09-05T06:48:07Z","created_at_i":1504594087,"num_comments":15,"objectID":"15173014","points":86,"story_id":15173014,"story_text":"So
+        we recently concluded YC Startup School where we got some GCP credits. Just
+        2 months after, Google decided to close our billing account, at this time
+        we had just over $2,400 remaining.<p>On reaching out to the Google Billing
+        Team, they came up with several excuses including us using one of their top
+        infrastructure which took all our credits. Of course that was a lie, we showed
+        them our dashboard and services we had running. They then admitted it was
+        an issue at their end.<p>Even till now, we only have 2 Compute Instances and
+        2 SQL instances.<p>After reaching out to the team severally to no avail, one
+        eventually came back and claimed their Support Manager says they have to close
+        the case as there&#x27;s nothing they could further do on the matter. I asked,
+        tell us what happened to the remaining credits, why was the account closed?
+        Why was all our servers shut down?<p>All these questions and many others were
+        not answered by the Team. Its over a month, they still can&#x27;t figure our
+        how Account got closed and what to do in our case.<p>We reached out to the
+        GCP Slack group where we met this very helpful guy from Google. See his comment:<p>&quot;Couldn\u2019t
+        agree more.  Not just worrying, it\u2019s unacceptable.  The underlying issue
+        is making sure that you are the real owner of the account, which is challenging
+        when the account was deleted.  The people who can confirm it have been unresponsive.  I\u2019m
+        trying to figure out who they are exactly to message them personally (not
+        through a ticketing system) and see if I can get an answer.\nI would be frustrated,
+        too.  We are failing you on this one, big time&quot;<p>I implore you to take
+        care when using GCP. Its clearly not mature and support has been really horrible.
+        We have all communications archived and would be more than happy to share
+        with anyone.<p>Anyone had a similar experience, please share! Don&#x27;t be
+        evil indeed!","title":"Google Cloud Platforms \u2013 Shameful","updated_at":"2024-09-20T01:21:53Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"snake117"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Major
+        YouTube audio-ripping site agrees to <em>shut down</em> after getting sued"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.theverge.com/tech/2017/9/4/16252348/youtube-mp3-org-<em>shut-down</em>"}},"_tags":["story","author_snake117","story_15170677"],"author":"snake117","created_at":"2017-09-04T20:29:51Z","created_at_i":1504556991,"num_comments":0,"objectID":"15170677","points":1,"story_id":15170677,"title":"Major
+        YouTube audio-ripping site agrees to shut down after getting sued","updated_at":"2024-09-20T01:21:35Z","url":"https://www.theverge.com/tech/2017/9/4/16252348/youtube-mp3-org-shut-down"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"evolve2k"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Will
+        Google Fonts Ever Be <em>Shut Down</em>? (2014)"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.typewolf.com/blog/will-google-fonts-ever-be-<em>shut-down</em>"}},"_tags":["story","author_evolve2k","story_15164809"],"author":"evolve2k","created_at":"2017-09-04T00:36:20Z","created_at_i":1504485380,"num_comments":0,"objectID":"15164809","points":3,"story_id":15164809,"title":"Will
+        Google Fonts Ever Be Shut Down? (2014)","updated_at":"2024-09-20T01:20:58Z","url":"https://www.typewolf.com/blog/will-google-fonts-ever-be-shut-down"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"SirLJ"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"The
+        tech startup that made a $700 juicing machine has <em>shut down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.cnbc.com/2017/09/01/the-tech-start-up-that-made-a-700-juicing-machine-has-<em>shut-down</em>.html"}},"_tags":["story","author_SirLJ","story_15152215"],"author":"SirLJ","children":[15152540],"created_at":"2017-09-01T20:40:20Z","created_at_i":1504298420,"num_comments":1,"objectID":"15152215","points":2,"story_id":15152215,"title":"The
+        tech startup that made a $700 juicing machine has shut down","updated_at":"2024-09-20T01:19:46Z","url":"https://www.cnbc.com/2017/09/01/the-tech-start-up-that-made-a-700-juicing-machine-has-shut-down.html"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"bmahmood"},"title":{"matchLevel":"none","matchedWords":[],"value":"Juicero,
+        maker of the doomed $400 internet-connected juicer, is shutting down"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.theverge.com/2017/9/1/16243356/juicero-<em>shut-down</em>-lay-off-refund"}},"_tags":["story","author_bmahmood","story_15152040"],"author":"bmahmood","created_at":"2017-09-01T20:14:51Z","created_at_i":1504296891,"num_comments":0,"objectID":"15152040","points":4,"story_id":15152040,"title":"Juicero,
+        maker of the doomed $400 internet-connected juicer, is shutting down","updated_at":"2024-09-20T01:19:46Z","url":"https://www.theverge.com/2017/9/1/16243356/juicero-shut-down-lay-off-refund"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"PyPi"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"S.C.A.R.L.E.T
+        (Sorta Crappy Assistant Robot Lazily Engineered Today) To be honest making
+        up that acronym was easier than making this virtual assistant.''She'' obeys
+        some of the following commands:search + (what you want to search for),email-opens
+        Gmail.What time is it?What date is it?Youtube-opens Youtube,<em>shut down</em>,Scarlet
+        (check for responsiveness).This virtual assistant is very far from perfect
+        but I hope to improve it as I continue to learn the deeper workings of the
+        Python programming language. I could use some help with her later versions...\nhttps://github.com/PyPiPie/Scarlet-1.0-Virtual-Assistant-Made-With-Python/"},"title":{"matchLevel":"none","matchedWords":[],"value":"Scarlet-1.0
+        Virtual Assistant Made-With Python"}},"_tags":["story","author_PyPi","story_15137617","ask_hn"],"author":"PyPi","created_at":"2017-08-31T02:04:21Z","created_at_i":1504145061,"num_comments":0,"objectID":"15137617","points":2,"story_id":15137617,"story_text":"S.C.A.R.L.E.T
+        (Sorta Crappy Assistant Robot Lazily Engineered Today) To be honest making
+        up that acronym was easier than making this virtual assistant.&#x27;She&#x27;
+        obeys some of the following commands:search + (what you want to search for),email-opens
+        Gmail.What time is it?What date is it?Youtube-opens Youtube,shut down,Scarlet
+        (check for responsiveness).This virtual assistant is very far from perfect
+        but I hope to improve it as I continue to learn the deeper workings of the
+        Python programming language. I could use some help with her later versions...\nhttps:&#x2F;&#x2F;github.com&#x2F;PyPiPie&#x2F;Scarlet-1.0-Virtual-Assistant-Made-With-Python&#x2F;","title":"Scarlet-1.0
+        Virtual Assistant Made-With Python","updated_at":"2024-09-20T01:18:17Z"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"dmitri1981"},"title":{"matchLevel":"none","matchedWords":[],"value":"Galvanize
+        staff fired as coding school industry cracks further"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.thememo.com/2017/08/30/galvanize-fires-staff-coding-school-closure-<em>shut-down</em>/"}},"_tags":["story","author_dmitri1981","story_15132507"],"author":"dmitri1981","created_at":"2017-08-30T14:46:13Z","created_at_i":1504104373,"num_comments":0,"objectID":"15132507","points":1,"story_id":15132507,"title":"Galvanize
+        staff fired as coding school industry cracks further","updated_at":"2024-09-20T01:17:45Z","url":"https://www.thememo.com/2017/08/30/galvanize-fires-staff-coding-school-closure-shut-down/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"featherverse"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Another
+        neo-Nazi site, Stormfront, is <em>shut down</em>"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/08/28/another-neo-nazi-site-stormfront-is-<em>shut-down</em>/?ncid=rss&utm_source=feedburner&utm_medium=feed&utm_campaign=Feed%3A+Techcrunch+%28TechCrunch%29"}},"_tags":["story","author_featherverse","story_15122066"],"author":"featherverse","children":[15122311,15122292,15122213,15122340,15122452,15122234,15122353,15124986,15124361,15122083,15122343,15128895,15122363,15122410],"created_at":"2017-08-29T04:23:56Z","created_at_i":1503980636,"num_comments":79,"objectID":"15122066","points":51,"story_id":15122066,"title":"Another
+        neo-Nazi site, Stormfront, is shut down","updated_at":"2024-09-20T01:16:42Z","url":"https://techcrunch.com/2017/08/28/another-neo-nazi-site-stormfront-is-shut-down/?ncid=rss&utm_source=feedburner&utm_medium=feed&utm_campaign=Feed%3A+Techcrunch+%28TechCrunch%29"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"JumpCrisscross"},"title":{"matchLevel":"none","matchedWords":[],"value":"Facebook
+        shuts down anonymous employee group due to harassment"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://uk.businessinsider.com/facebook-<em>shut-down</em>-anonymous-chat-group-for-employees-2017-8"}},"_tags":["story","author_JumpCrisscross","story_15041928"],"author":"JumpCrisscross","created_at":"2017-08-17T23:12:49Z","created_at_i":1503011569,"num_comments":0,"objectID":"15041928","points":3,"story_id":15041928,"title":"Facebook
+        shuts down anonymous employee group due to harassment","updated_at":"2024-09-20T01:13:49Z","url":"http://uk.businessinsider.com/facebook-shut-down-anonymous-chat-group-for-employees-2017-8"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"CodeLikeAGirl"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"No,
+        Facebook\u2019s AI wasn\u2019t <em>shut down</em> because it got out of hand"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://code.likeagirl.io/no-facebooks-ai-wasn-t-<em>shut-down</em>-because-it-got-out-of-hand-c81da870e910"}},"_tags":["story","author_CodeLikeAGirl","story_15040039"],"author":"CodeLikeAGirl","children":[15040996],"created_at":"2017-08-17T19:31:06Z","created_at_i":1502998266,"num_comments":1,"objectID":"15040039","points":11,"story_id":15040039,"title":"No,
+        Facebook\u2019s AI wasn\u2019t shut down because it got out of hand","updated_at":"2024-09-20T01:13:43Z","url":"https://code.likeagirl.io/no-facebooks-ai-wasn-t-shut-down-because-it-got-out-of-hand-c81da870e910"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"HNNoLikey"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Facebook
+        <em>shut down</em> right-leaning employee chat room"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://www.businessinsider.com/facebook-<em>shut-down</em>-anonymous-chat-group-for-employees-2017-8"}},"_tags":["story","author_HNNoLikey","story_15036233"],"author":"HNNoLikey","created_at":"2017-08-17T12:49:17Z","created_at_i":1502974157,"num_comments":0,"objectID":"15036233","points":3,"story_id":15036233,"title":"Facebook
+        shut down right-leaning employee chat room","updated_at":"2024-09-20T01:13:20Z","url":"http://www.businessinsider.com/facebook-shut-down-anonymous-chat-group-for-employees-2017-8"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"wan23"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Facebook
+        <em>Shut Down</em> Employee Chat Room Over Harassing Messages"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.wsj.com/articles/facebook-<em>shut-down</em>-employee-chat-room-over-harassing-messages-1502929455"}},"_tags":["story","author_wan23","story_15034468"],"author":"wan23","created_at":"2017-08-17T07:21:44Z","created_at_i":1502954504,"num_comments":0,"objectID":"15034468","points":1,"story_id":15034468,"title":"Facebook
+        Shut Down Employee Chat Room Over Harassing Messages","updated_at":"2024-09-20T01:13:09Z","url":"https://www.wsj.com/articles/facebook-shut-down-employee-chat-room-over-harassing-messages-1502929455"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"WhiteSource1"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"A
+        deep flaw in your car lets hackers <em>shut down</em> safety features"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://www.wired.com/story/car-hack-<em>shut-down</em>-safety-features/"}},"_tags":["story","author_WhiteSource1","story_15034375"],"author":"WhiteSource1","created_at":"2017-08-17T06:59:30Z","created_at_i":1502953170,"num_comments":0,"objectID":"15034375","points":1,"story_id":15034375,"title":"A
+        deep flaw in your car lets hackers shut down safety features","updated_at":"2024-09-20T01:13:09Z","url":"https://www.wired.com/story/car-hack-shut-down-safety-features/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"coloneltcb"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Facebook
+        <em>shut down</em> anonymous chat group for Trump-supporting employees"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"http://www.businessinsider.com/facebook-<em>shut-down</em>-anonymous-chat-group-for-employees-2017-8"}},"_tags":["story","author_coloneltcb","story_15031508"],"author":"coloneltcb","created_at":"2017-08-16T21:25:28Z","created_at_i":1502918728,"num_comments":0,"objectID":"15031508","points":7,"story_id":15031508,"title":"Facebook
+        shut down anonymous chat group for Trump-supporting employees","updated_at":"2024-09-20T01:12:53Z","url":"http://www.businessinsider.com/facebook-shut-down-anonymous-chat-group-for-employees-2017-8"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"mcone"},"title":{"matchLevel":"none","matchedWords":[],"value":"SoundCloud
+        faces do-or-die vote by investors"},"url":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"https://techcrunch.com/2017/08/10/soundcloud-<em>shut-down</em>-possible/"}},"_tags":["story","author_mcone","story_14981931"],"author":"mcone","children":[14983665,14983353,14987589,14982914,14982894,14983230,14983011,14986959,14983309,14983206,14983489,14983640,14988317,14983119,14983081,14983265,14990057,14983010],"created_at":"2017-08-10T17:23:59Z","created_at_i":1502385839,"num_comments":119,"objectID":"14981931","points":124,"story_id":14981931,"title":"SoundCloud
+        faces do-or-die vote by investors","updated_at":"2024-09-20T01:13:16Z","url":"https://techcrunch.com/2017/08/10/soundcloud-shut-down-possible/"},{"_highlightResult":{"author":{"matchLevel":"none","matchedWords":[],"value":"QandAStartup"},"story_text":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Has
+        anyone taken money from investors (small seed rounds to institutional VCs)
+        and decided to <em>shut down</em>? Is it ever possible to keep the business
+        operating or does the entire site have to <em>shut down</em>? What was the
+        process like for considering shutting down and ultimately doing so?"},"title":{"fullyHighlighted":false,"matchLevel":"full","matchedWords":["shut","down"],"value":"Ask
+        HN: Have you <em>shut down</em> a company before?"}},"_tags":["story","author_QandAStartup","story_14962278","ask_hn"],"author":"QandAStartup","created_at":"2017-08-08T20:31:48Z","created_at_i":1502224308,"num_comments":0,"objectID":"14962278","points":3,"story_id":14962278,"story_text":"Has
+        anyone taken money from investors (small seed rounds to institutional VCs)
+        and decided to shut down? Is it ever possible to keep the business operating
+        or does the entire site have to shut down? What was the process like for considering
+        shutting down and ultimately doing so?","title":"Ask HN: Have you shut down
+        a company before?","updated_at":"2024-09-20T01:11:29Z"}],"hitsPerPage":30,"nbHits":232,"nbPages":8,"page":2,"params":"query=%22shut+down%22&tags=story&page=2&hitsPerPage=30&numericFilters=created_at_i%3E%3D1483228800%2Ccreated_at_i%3C1514764799&advancedSyntax=true&analyticsTags=backend","processingTimeMS":18,"processingTimingsMS":{"_request":{"roundTrip":18},"afterFetch":{"format":{"highlighting":1,"total":1},"merge":{"mergeLoop":{"prepareNextHit":11,"total":11},"total":11},"total":11},"fetch":{"query":1,"total":2},"getIdx":{"load":{"gens":2,"total":3},"total":3},"total":18},"query":"\"shut
+        down\"","serverTimeMS":20}
+
+        '
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000
+      Content-Length:
+      - '40514'
+      access-control-allow-origin:
+      - '*'
+      content-type:
+      - application/json
+      date:
+      - Thu, 07 May 2026 02:41:31 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - b6888d6b14965795154a5ca3c134d7d1
+    status:
+      code: 200
+      message: OK
+version: 1

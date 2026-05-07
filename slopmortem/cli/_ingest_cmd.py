@@ -314,7 +314,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
 
     sources: list[Source] = [
         CuratedSource(yaml_path=_default_curated_yaml(), rps=3.0),
-        HNAlgoliaSource(query="post-mortem", rps=5.0),
+        HNAlgoliaSource(queries_yaml_path=_default_hn_queries_yaml(), rps=5.0),
     ]
     if crunchbase_csv is not None:
         sources.append(CrunchbaseCsvSource(csv_path=crunchbase_csv))
@@ -402,6 +402,10 @@ _SOURCE_REGISTRY: dict[str, _SourceSpec] = {
 
 def _default_curated_yaml() -> Path:
     return Path(__file__).parent.parent / "corpus" / "sources" / "curated" / "post_mortems_v0.yml"
+
+
+def _default_hn_queries_yaml() -> Path:
+    return Path(__file__).parent.parent / "corpus" / "sources" / "hn_queries.yaml"
 
 
 async def _build_journal(config: Config, post_mortems_root: Path) -> MergeJournal:
