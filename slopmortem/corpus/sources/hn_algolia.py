@@ -86,15 +86,7 @@ def _year_windows(
     start_dt = (
         datetime.fromtimestamp(date_from_epoch, tz=UTC)
         if date_from_epoch is not None
-        else end_dt.replace(
-            year=end_dt.year - DEFAULT_LOOKBACK_YEARS,
-            month=1,
-            day=1,
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
+        else datetime(end_dt.year - DEFAULT_LOOKBACK_YEARS, 1, 1, tzinfo=UTC)
     )
 
     windows: list[tuple[int, int]] = []
