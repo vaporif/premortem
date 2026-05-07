@@ -101,9 +101,7 @@ def test_ingest_default_auto_enables_enrichers_for_hn_algolia(
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["ingest", "--dry-run", "--post-mortems-root", str(tmp_path)]
-    )
+    result = runner.invoke(app, ["ingest", "--dry-run", "--post-mortems-root", str(tmp_path)])
     assert result.exit_code == 0, result.output
     enrichers = captured["enrichers"]
     assert isinstance(enrichers, list)

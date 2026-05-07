@@ -12,8 +12,10 @@ from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Final, Literal, cast
 from urllib.parse import urlencode
 
+import anyio
 import httpx
 
+from slopmortem.concurrency import gather_resilient
 from slopmortem.corpus.sources._names import SOURCE_DEFILLAMA
 from slopmortem.corpus.sources._throttle import (
     HTTP_BAD_REQUEST,
@@ -38,6 +40,19 @@ DEFAULT_PEAK_FLOOR_USD: Final = 1_000_000.0
 DEFAULT_MIN_DAYS_SINCE_PEAK: Final = 180
 DEFAULT_SHORTLIST_TVL_CEILING_USD: Final = 100_000.0
 DEFAULT_MAX_EMIT: Final = 500
+# DefiLlama publishes no rate limit and the bulk endpoint is unrestricted; 5 RPS
+# stays conservative while letting the per-host throttle remain the only governor.
+DEFAULT_RPS: Final = 5.0
+DEFAULT_CONCURRENCY: Final = 10
+# Wayback rejects parallel TCP opens past a small per-IP cap; keep this low even
+# when the detail-fetch concurrency is high. ConnectError observed at 10.
+DEFAULT_WAYBACK_CONCURRENCY: Final = 1
+# Wayback's 30s default x ~20 timeouts/run = 10 min of pure wait. Past 10s the
+# CDX query is almost always going to never come back; cap and move on.
+WAYBACK_CDX_TIMEOUT_S: Final = 10.0
+# Overshoot factor on max_emit: process more candidates than needed so that
+# classify-failures and Wayback-misses don't starve the yield cap.
+MAX_EMIT_OVERSHOOT: Final = 3
 
 WAYBACK_WINDOW_NARROW_DAYS: Final = 30
 WAYBACK_WINDOW_WIDE_DAYS: Final = 180
@@ -137,8 +152,14 @@ async def wayback_snapshot_near(
     target_date: date,
     *,
     user_agent: str = USER_AGENT,
+    limiter: anyio.CapacityLimiter | None = None,
 ) -> str | None:
-    """Resolve ``url`` to a status-200 Wayback snapshot near ``target_date`` (±30d, then ±180d)."""
+    """Resolve ``url`` to a status-200 Wayback snapshot near ``target_date`` (±30d, then ±180d).
+
+    Pass ``limiter`` to bound concurrent CDX TCP opens — Wayback rejects bursts
+    with ``ConnectError`` past a small per-IP cap. Held only around the actual
+    fetch, so per-window ``throttle_for`` and robots checks don't queue behind it.
+    """
     for window_days in (WAYBACK_WINDOW_NARROW_DAYS, WAYBACK_WINDOW_WIDE_DAYS):
         from_d = (target_date - timedelta(days=window_days)).strftime("%Y%m%d")
         to_d = (target_date + timedelta(days=window_days)).strftime("%Y%m%d")
@@ -149,7 +170,11 @@ async def wayback_snapshot_near(
             return None
         await throttle_for(cdx_url, rps=2.0)
         try:
-            resp = await safe_get(cdx_url)
+            if limiter is None:
+                resp = await safe_get(cdx_url, timeout=WAYBACK_CDX_TIMEOUT_S)
+            else:
+                async with limiter:
+                    resp = await safe_get(cdx_url, timeout=WAYBACK_CDX_TIMEOUT_S)
         except (SSRFBlockedError, httpx.HTTPError) as exc:
             logger.warning("defillama: wayback fetch failed for %s: %r", url, exc)
             continue
@@ -184,18 +209,28 @@ class DefiLlamaSource:
         dead_threshold_pct: float = DEFAULT_DEAD_THRESHOLD_PCT,
         peak_floor_usd: float = DEFAULT_PEAK_FLOOR_USD,
         min_days_since_peak: int = DEFAULT_MIN_DAYS_SINCE_PEAK,
-        shortlist_tvl_ceiling_usd: float = DEFAULT_SHORTLIST_TVL_CEILING_USD,
-        max_emit: int = DEFAULT_MAX_EMIT,
+        shortlist_tvl_ceiling_usd: float | None = None,
+        max_emit: int | None = None,
         user_agent: str = USER_AGENT,
-        rps: float = 1.0,
+        rps: float | None = None,
+        concurrency: int | None = None,
+        wayback_concurrency: int | None = None,
     ) -> None:
         self.dead_threshold_pct = dead_threshold_pct
         self.peak_floor_usd = peak_floor_usd
         self.min_days_since_peak = min_days_since_peak
-        self.shortlist_tvl_ceiling_usd = shortlist_tvl_ceiling_usd
-        self.max_emit = max_emit
+        self.shortlist_tvl_ceiling_usd = (
+            shortlist_tvl_ceiling_usd
+            if shortlist_tvl_ceiling_usd is not None
+            else DEFAULT_SHORTLIST_TVL_CEILING_USD
+        )
+        self.max_emit = max_emit if max_emit is not None else DEFAULT_MAX_EMIT
         self.user_agent = user_agent
-        self.rps = rps
+        self.rps = rps if rps is not None else DEFAULT_RPS
+        self.concurrency = concurrency if concurrency is not None else DEFAULT_CONCURRENCY
+        self.wayback_concurrency = (
+            wayback_concurrency if wayback_concurrency is not None else DEFAULT_WAYBACK_CONCURRENCY
+        )
 
     async def _fetch_json(self, url: str) -> object | None:
         if not await respect_robots(url, user_agent=self.user_agent):
@@ -216,7 +251,12 @@ class DefiLlamaSource:
             logger.warning("defillama: non-JSON response for %s: %r", url, exc)
             return None
 
-    async def _classify_candidate(self, slug: str, live_url: str) -> str | None:
+    async def _classify_candidate(
+        self,
+        slug: str,
+        live_url: str,
+        wayback_limiter: anyio.CapacityLimiter,
+    ) -> str | None:
         """Fetch detail, classify, anchor to Wayback. Return the snapshot URL or None.
 
         Body intentionally left empty — `TavilyEnricher` populates `markdown_text` from
@@ -244,7 +284,10 @@ class DefiLlamaSource:
             return None
 
         snapshot_url = await wayback_snapshot_near(
-            live_url, verdict.peak_date, user_agent=self.user_agent
+            live_url,
+            verdict.peak_date,
+            user_agent=self.user_agent,
+            limiter=wayback_limiter,
         )
         if snapshot_url is None:
             logger.info("defillama: %s no wayback coverage near %s", slug, verdict.peak_date)
@@ -264,40 +307,9 @@ class DefiLlamaSource:
         )
         return snapshot_url
 
-    async def _process_candidate(self, row: dict[str, object]) -> RawEntry | None:
-        slug: object = row.get("slug")
-        live_url: object = row.get("url")
-        if not isinstance(slug, str) or not slug:
-            return None
-        if not isinstance(live_url, str) or not live_url:
-            logger.info("defillama: %s missing url, skipping", slug)
-            return None
-
-        snapshot_url = await self._classify_candidate(slug, live_url)
-        if snapshot_url is None:
-            return None
-
-        return RawEntry(
-            source=SOURCE_DEFILLAMA,
-            source_id=slug,
-            url=snapshot_url,
-            raw_html=None,
-            markdown_text=None,
-            fetched_at=datetime.now(UTC),
-        )
-
-    async def fetch(self) -> AsyncIterator[RawEntry]:
-        bulk_payload = await self._fetch_json(BULK_ENDPOINT)
-        if not isinstance(bulk_payload, list):
-            logger.warning("defillama: unexpected /protocols payload type")
-            return
-        rows = cast("list[object]", bulk_payload)
-
-        emitted = 0
+    def _shortlist(self, rows: list[object]) -> list[tuple[str, str]]:
+        candidates: list[tuple[str, str]] = []
         for raw in rows:
-            if emitted >= self.max_emit:
-                logger.info("defillama: max_emit=%d reached, stopping", self.max_emit)
-                return
             if not isinstance(raw, dict):
                 continue
             row = cast("dict[str, object]", raw)
@@ -307,7 +319,57 @@ class DefiLlamaSource:
             tvl_value = float(tvl_field)
             if tvl_value <= 0 or tvl_value >= self.shortlist_tvl_ceiling_usd:
                 continue
-            entry = await self._process_candidate(row)
-            if entry is not None:
-                yield entry
-                emitted += 1
+            slug: object = row.get("slug")
+            live_url: object = row.get("url")
+            if not isinstance(slug, str) or not slug:
+                continue
+            if not isinstance(live_url, str) or not live_url:
+                logger.info("defillama: %s missing url, skipping", slug)
+                continue
+            candidates.append((slug, live_url))
+        return candidates
+
+    async def fetch(self) -> AsyncIterator[RawEntry]:
+        bulk_payload = await self._fetch_json(BULK_ENDPOINT)
+        if not isinstance(bulk_payload, list):
+            logger.warning("defillama: unexpected /protocols payload type")
+            return
+        rows = cast("list[object]", bulk_payload)
+        candidates = self._shortlist(rows)
+
+        # Cap how much we fan out: classify/Wayback misses are common, so
+        # process more candidates than max_emit but not the full ~1.6k shortlist.
+        selected = candidates[: self.max_emit * MAX_EMIT_OVERSHOOT]
+
+        limiter = anyio.CapacityLimiter(self.concurrency)
+        wayback_limiter = anyio.CapacityLimiter(self.wayback_concurrency)
+
+        async def _one(slug: str, live_url: str) -> RawEntry | None:
+            async with limiter:
+                snapshot_url = await self._classify_candidate(slug, live_url, wayback_limiter)
+            if snapshot_url is None:
+                return None
+            return RawEntry(
+                source=SOURCE_DEFILLAMA,
+                source_id=slug,
+                url=snapshot_url,
+                raw_html=None,
+                markdown_text=None,
+                fetched_at=datetime.now(UTC),
+            )
+
+        results = await gather_resilient(*(_one(s, u) for s, u in selected))
+
+        emitted = 0
+        for (slug, _live_url), result in zip(selected, results, strict=True):
+            if emitted >= self.max_emit:
+                break
+            if isinstance(result, Exception):
+                logger.warning("defillama: unhandled exception for %s: %r", slug, result)
+                continue
+            if result is None:
+                continue
+            yield result
+            emitted += 1
+        if emitted >= self.max_emit:
+            logger.info("defillama: max_emit=%d reached, stopping", self.max_emit)

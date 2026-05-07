@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
+import anyio
 import httpx
 import pytest
 
@@ -407,6 +408,144 @@ async def test_cdx_httpx_error_drops_candidate_not_source(
     entries = [e async for e in src.fetch()]
     assert len(entries) == 1
     assert entries[0].source_id == "healthy"
+
+
+async def test_fetch_runs_candidates_concurrently(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fan-out: peak in-flight ``safe_get`` calls > 1 across the candidate set.
+
+    With sequential iteration peak would be 1; the limiter caps it at concurrency.
+    The test only asserts ``>= 2`` so it stays robust to scheduler quirks.
+    """
+    bulk = [
+        {
+            "id": str(i),
+            "name": f"D{i}",
+            "slug": f"d{i}",
+            "url": f"https://d{i}.example",
+            "tvl": 50_000.0,
+        }
+        for i in range(5)
+    ]
+
+    def make_detail(slug: str) -> dict[str, object]:
+        return {
+            "name": slug,
+            "url": f"https://{slug}.example",
+            "chainTvls": {
+                "Ethereum": _series([("2022-01-01", 5_000_000.0), ("2025-01-01", 0.0)]),
+            },
+        }
+
+    cdx_ok = [
+        _CDX_HEADER,
+        ["example,d)/", "20220601000000", "https://d.example/", "text/html", "200", "X", "1"],
+    ]
+
+    in_flight = 0
+    peak = 0
+    state_lock = anyio.Lock()
+
+    async def slow_get(url: str, **_: object) -> _FakeResp:
+        nonlocal in_flight, peak
+        if url.endswith("/protocols"):
+            return _FakeResp(bulk)
+        async with state_lock:
+            in_flight += 1
+            peak = max(peak, in_flight)
+        try:
+            await anyio.sleep(0.05)
+        finally:
+            async with state_lock:
+                in_flight -= 1
+        if "/protocol/" in url:
+            slug = url.rsplit("/", 1)[-1]
+            return _FakeResp(make_detail(slug))
+        return _FakeResp(cdx_ok)
+
+    monkeypatch.setattr(
+        "slopmortem.corpus.sources.defillama.safe_get", AsyncMock(side_effect=slow_get)
+    )
+    _setup_throttle(monkeypatch)
+
+    src = DefiLlamaSource(shortlist_tvl_ceiling_usd=100_000.0, concurrency=3, max_emit=5)
+    with anyio.fail_after(5):
+        entries = [e async for e in src.fetch()]
+    assert len(entries) == 5
+    assert peak >= 2
+
+
+async def test_wayback_concurrency_bounds_cdx_fanout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Wayback CDX peak in-flight ≤ wayback_concurrency, regardless of detail-fetch concurrency.
+
+    Detail-fetch and CDX share no slot pool — Wayback rejects parallel TCP opens
+    past a small per-IP cap, so the wayback limiter must isolate it from the
+    higher detail-fetch concurrency.
+    """
+    bulk = [
+        {
+            "id": str(i),
+            "name": f"D{i}",
+            "slug": f"d{i}",
+            "url": f"https://d{i}.example",
+            "tvl": 50_000.0,
+        }
+        for i in range(8)
+    ]
+
+    def make_detail(slug: str) -> dict[str, object]:
+        return {
+            "name": slug,
+            "url": f"https://{slug}.example",
+            "chainTvls": {
+                "Ethereum": _series([("2022-01-01", 5_000_000.0), ("2025-01-01", 0.0)]),
+            },
+        }
+
+    cdx_ok = [
+        _CDX_HEADER,
+        ["example,d)/", "20220601000000", "https://d.example/", "text/html", "200", "X", "1"],
+    ]
+
+    cdx_in_flight = 0
+    cdx_peak = 0
+    state_lock = anyio.Lock()
+
+    async def slow_get(url: str, **_: object) -> _FakeResp:
+        nonlocal cdx_in_flight, cdx_peak
+        if url.endswith("/protocols"):
+            return _FakeResp(bulk)
+        if "web.archive.org/cdx" in url:
+            async with state_lock:
+                cdx_in_flight += 1
+                cdx_peak = max(cdx_peak, cdx_in_flight)
+            try:
+                await anyio.sleep(0.05)
+            finally:
+                async with state_lock:
+                    cdx_in_flight -= 1
+            return _FakeResp(cdx_ok)
+        # protocol detail — fast, doesn't count toward CDX peak
+        slug = url.rsplit("/", 1)[-1]
+        return _FakeResp(make_detail(slug))
+
+    monkeypatch.setattr(
+        "slopmortem.corpus.sources.defillama.safe_get", AsyncMock(side_effect=slow_get)
+    )
+    _setup_throttle(monkeypatch)
+
+    # High detail-fetch concurrency, low wayback concurrency — verifies the
+    # decoupling holds.
+    src = DefiLlamaSource(
+        shortlist_tvl_ceiling_usd=100_000.0,
+        concurrency=8,
+        wayback_concurrency=2,
+        max_emit=8,
+    )
+    with anyio.fail_after(5):
+        entries = [e async for e in src.fetch()]
+    assert len(entries) == 8
+    assert cdx_peak <= 2
+    assert cdx_peak >= 1
 
 
 @pytest.mark.vcr

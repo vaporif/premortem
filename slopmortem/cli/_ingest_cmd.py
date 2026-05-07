@@ -122,6 +122,54 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             ),
         ),
     ] = False,
+    defillama_rps: Annotated[
+        float | None,
+        typer.Option(
+            "--defillama-rps",
+            help=(
+                "Override DefiLlama per-host request rate. "
+                "Only takes effect when defillama is enabled."
+            ),
+        ),
+    ] = None,
+    defillama_concurrency: Annotated[
+        int | None,
+        typer.Option(
+            "--defillama-concurrency",
+            help=(
+                "Override DefiLlama fan-out concurrency. "
+                "Only takes effect when defillama is enabled."
+            ),
+        ),
+    ] = None,
+    defillama_wayback_concurrency: Annotated[
+        int | None,
+        typer.Option(
+            "--defillama-wayback-concurrency",
+            help=(
+                "Override Wayback CDX fan-out concurrency. Wayback rejects parallel "
+                "TCP opens past a small per-IP cap. "
+                "Only takes effect when defillama is enabled."
+            ),
+        ),
+    ] = None,
+    defillama_max_emit: Annotated[
+        int | None,
+        typer.Option(
+            "--defillama-max-emit",
+            help=("Override DefiLlama max_emit cap. Only takes effect when defillama is enabled."),
+        ),
+    ] = None,
+    defillama_shortlist_ceiling_usd: Annotated[
+        float | None,
+        typer.Option(
+            "--defillama-shortlist-ceiling-usd",
+            help=(
+                "Override DefiLlama shortlist TVL ceiling (USD). "
+                "Only takes effect when defillama is enabled."
+            ),
+        ),
+    ] = None,
     enable_tavily_news: Annotated[
         bool,
         typer.Option(
@@ -207,6 +255,11 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             enrich_wayback=enrich_wayback,
             tavily_enrich=tavily_enrich,
             enable_defillama=enable_defillama,
+            defillama_rps=defillama_rps,
+            defillama_concurrency=defillama_concurrency,
+            defillama_wayback_concurrency=defillama_wayback_concurrency,
+            defillama_max_emit=defillama_max_emit,
+            defillama_shortlist_ceiling_usd=defillama_shortlist_ceiling_usd,
             enable_tavily_news=enable_tavily_news,
             tavily_news_start_year=tavily_news_start_year,
             tavily_news_end_year=tavily_news_end_year,
@@ -273,6 +326,11 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     enrich_wayback: bool,
     tavily_enrich: bool,
     enable_defillama: bool,
+    defillama_rps: float | None,
+    defillama_concurrency: int | None,
+    defillama_wayback_concurrency: int | None,
+    defillama_max_emit: int | None,
+    defillama_shortlist_ceiling_usd: float | None,
     enable_tavily_news: bool,
     tavily_news_start_year: int | None,
     tavily_news_end_year: int | None,
@@ -359,7 +417,15 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     if crunchbase_csv is not None:
         sources.append(CrunchbaseCsvSource(csv_path=crunchbase_csv))
     if enable_defillama:
-        sources.append(DefiLlamaSource())
+        sources.append(
+            DefiLlamaSource(
+                rps=defillama_rps,
+                concurrency=defillama_concurrency,
+                wayback_concurrency=defillama_wayback_concurrency,
+                max_emit=defillama_max_emit,
+                shortlist_tvl_ceiling_usd=defillama_shortlist_ceiling_usd,
+            )
+        )
     if enable_tavily_news:
         sources.append(
             TavilyNewsSource(
