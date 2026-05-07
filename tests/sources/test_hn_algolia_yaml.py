@@ -366,6 +366,34 @@ async def test_skips_hits_missing_url(tmp_path: Path, monkeypatch: pytest.Monkey
     assert entries[0].source_id == "ok"
 
 
+def test_rejects_non_int_pages_per_window(tmp_path: Path) -> None:
+    yaml_path = _yaml(
+        tmp_path,
+        """
+        defaults:
+          pages_per_window: "three"
+        phrases:
+          - "shutting down"
+        """,
+    )
+    with pytest.raises(TypeError, match="pages_per_window"):
+        HNAlgoliaSource(queries_yaml_path=yaml_path)
+
+
+def test_rejects_bool_hits_per_page(tmp_path: Path) -> None:
+    yaml_path = _yaml(
+        tmp_path,
+        """
+        defaults:
+          hits_per_page: true
+        phrases:
+          - "shutting down"
+        """,
+    )
+    with pytest.raises(TypeError, match="hits_per_page"):
+        HNAlgoliaSource(queries_yaml_path=yaml_path)
+
+
 @pytest.mark.vcr
 async def test_round_trip(tmp_path: Path) -> None:
     """Live cassette: single year-window covering 2017 so the Mattermark

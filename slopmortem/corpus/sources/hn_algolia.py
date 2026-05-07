@@ -52,6 +52,20 @@ def _epoch(date_str: str) -> int | None:
     return int(datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC).timestamp())
 
 
+def _coerce_int(name: str, raw: object, default: int) -> int:
+    # bool is an int subclass in Python; reject it explicitly so
+    # ``pages_per_window: true`` doesn't silently become ``1``.
+    if isinstance(raw, bool):
+        msg = f"hn_queries.yaml: 'defaults.{name}' must be an integer, got bool"
+        raise TypeError(msg)
+    if isinstance(raw, int):
+        return raw
+    if raw is None:
+        return default
+    msg = f"hn_queries.yaml: 'defaults.{name}' must be an integer, got {type(raw).__name__}"
+    raise TypeError(msg)
+
+
 def _year_windows(
     date_from_epoch: int | None,
     date_to_epoch: int | None,
@@ -134,12 +148,16 @@ class HNAlgoliaSource:
 
         self.date_from_epoch: int | None = _epoch(str(defaults.get("date_from") or ""))
         self.date_to_epoch: int | None = _epoch(str(defaults.get("date_to") or ""))
-        pages_raw: object = defaults.get("pages_per_window", DEFAULT_PAGES_PER_WINDOW)
-        hits_raw: object = defaults.get("hits_per_page", DEFAULT_HITS_PER_PAGE)
-        self.pages_per_window: int = (
-            pages_raw if isinstance(pages_raw, int) else DEFAULT_PAGES_PER_WINDOW
+        self.pages_per_window: int = _coerce_int(
+            "pages_per_window",
+            defaults.get("pages_per_window"),
+            DEFAULT_PAGES_PER_WINDOW,
         )
-        self.hits_per_page: int = hits_raw if isinstance(hits_raw, int) else DEFAULT_HITS_PER_PAGE
+        self.hits_per_page: int = _coerce_int(
+            "hits_per_page",
+            defaults.get("hits_per_page"),
+            DEFAULT_HITS_PER_PAGE,
+        )
         self.user_agent = user_agent
         self.rps = rps
 
