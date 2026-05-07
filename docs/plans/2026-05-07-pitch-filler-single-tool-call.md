@@ -676,12 +676,12 @@ This task verifies against the live OpenRouter + Tavily APIs that the new flag r
 
 If you do not have keys configured, skip this task and ask the user to run it.
 
-- [ ] **Step 5.1: Confirm keys are present**
+- [x] **Step 5.1: Confirm keys are present**
 
 Run: `grep -E '^(OPENROUTER_API_KEY|TAVILY_API_KEY)=' .env`
 Expected: both keys present and non-empty. If missing, stop and surface to the user.
 
-- [ ] **Step 5.2: Run the probe**
+- [x] **Step 5.2: Run the probe**
 
 Run: `uv run python scripts/probe_pitch_filler_haiku.py`
 Expected output sketch:
@@ -708,7 +708,7 @@ Pass criteria:
 - No `JSONDecodeError` in the logs.
 - Budget spent is non-zero and well below $0.05 (one tool call + one synthesis turn).
 
-- [ ] **Step 5.3: If the probe succeeds, mark this step done**
+- [x] **Step 5.3: If the probe succeeds, mark this step done**
 
 No artifact to commit; the probe script is unchanged.
 
