@@ -62,38 +62,14 @@ def test_ingest_dry_run_dispatches_to_orchestrator(
     assert kwargs["post_mortems_root"] == tmp_path
 
 
-def test_ingest_tavily_enrich_appends_enricher(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """--tavily-enrich now wires a real TavilyEnricher into the enrichers list."""
-    captured: dict[str, object] = {}
-
-    async def fake_ingest(**kwargs: object) -> object:
-        captured["enrichers"] = kwargs["enrichers"]
-        return MagicMock(dry_run=True, processed=0)
-
-    monkeypatch.setattr("slopmortem.cli._ingest_cmd.ingest", fake_ingest)
-    monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
-    runner = CliRunner()
-    result = runner.invoke(
-        app,
-        ["ingest", "--dry-run", "--tavily-enrich", "--post-mortems-root", str(tmp_path)],
-    )
-    assert result.exit_code == 0, result.output
-    enrichers = captured["enrichers"]
-    assert isinstance(enrichers, list)
-    enricher_classnames = [type(e).__name__ for e in enrichers]
-    assert "TavilyEnricher" in enricher_classnames
-
-
 def test_ingest_default_auto_enables_pitch_filler_for_hn_algolia(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """HNAlgoliaSource emits URL-only stubs, so the LLM pitch filler runs by default.
 
-    Wayback and Tavily-extract are no longer auto-enabled — the cheap fetch chain
-    is opt-in (--enrich-wayback / --tavily-enrich) since 2026-05-07.
+    The cheap fetch chain (WaybackEnricher / TavilyEnricher) is currently disabled —
+    Wayback rate-limits aggressively and Tavily /extract is paid-only — so the
+    pitch filler is the sole body-recovery path.
     """
     captured: dict[str, object] = {}
 
@@ -214,16 +190,6 @@ def test_enable_tavily_news_without_api_key_fails(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     runner = CliRunner()
     result = runner.invoke(app, ["ingest", "--enable-tavily-news", "--dry-run"])
-    assert result.exit_code != 0, result.output
-    combined = result.output + (result.stderr or "")
-    assert "TAVILY_API_KEY" in combined
-
-
-def test_enable_defillama_without_tavily_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
-    runner = CliRunner()
-    result = runner.invoke(app, ["ingest", "--enable-defillama", "--dry-run"])
     assert result.exit_code != 0, result.output
     combined = result.output + (result.stderr or "")
     assert "TAVILY_API_KEY" in combined

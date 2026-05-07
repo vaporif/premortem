@@ -40,9 +40,7 @@ from slopmortem.corpus.sources import (
     CuratedSource,
     DefiLlamaSource,
     HNAlgoliaSource,
-    TavilyEnricher,
     TavilyNewsSource,
-    WaybackEnricher,
 )
 from slopmortem.ingest import INGEST_PHASE_LABELS, IngestPhase, IngestResult, ingest
 from slopmortem.llm import OpenRouterClient, make_embedder
@@ -95,23 +93,6 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             help="Path to a Crunchbase CSV; enables the Crunchbase adapter for this run.",
         ),
     ] = None,
-    enrich_wayback: Annotated[
-        bool,
-        typer.Option(
-            "--enrich-wayback",
-            help="Enable the Wayback enricher (cheap fetch path; opt-in).",
-        ),
-    ] = False,
-    tavily_enrich: Annotated[
-        bool,
-        typer.Option(
-            "--tavily-enrich",
-            help=(
-                "Enable the Tavily /extract enricher (cheap fetch path; opt-in). "
-                "Auto-enabled when defillama is in the source list."
-            ),
-        ),
-    ] = False,
     enable_pitch_filler: Annotated[
         bool,
         typer.Option(
@@ -129,7 +110,8 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             "--enable-defillama",
             help=(
                 "Enable the DefiLlama dead-protocol source. "
-                "Implies --tavily-enrich; requires TAVILY_API_KEY."
+                "Bodies are not currently fetched (Tavily /extract enricher disabled), "
+                "so emitted entries will be dropped at the empty-body check."
             ),
         ),
     ] = False,
@@ -263,8 +245,6 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             reclassify=reclassify,
             list_review=list_review,
             crunchbase_csv=crunchbase_csv,
-            enrich_wayback=enrich_wayback,
-            tavily_enrich=tavily_enrich,
             enable_pitch_filler=enable_pitch_filler,
             enable_defillama=enable_defillama,
             defillama_rps=defillama_rps,
@@ -335,8 +315,6 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     list_review: bool,
     limit: int | None,
     crunchbase_csv: Path | None,
-    enrich_wayback: bool,
-    tavily_enrich: bool,
     enable_pitch_filler: bool,
     enable_defillama: bool,
     defillama_rps: float | None,
@@ -404,18 +382,6 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         )
         raise typer.BadParameter(msg)
 
-    if enable_defillama:
-        if not os.environ.get("TAVILY_API_KEY"):
-            msg = (
-                "--enable-defillama requires TAVILY_API_KEY: the DefiLlama source "
-                "anchors entries to Wayback snapshots whose bodies are extracted "
-                "by the Tavily enricher. Set TAVILY_API_KEY in .env or unset "
-                "--enable-defillama."
-            )
-            raise typer.BadParameter(msg)
-        # Implication: TavilyEnricher must run for DefiLlama entries to have a body.
-        tavily_enrich = True
-
     llm, embedder, corpus, budget, journal, classifier = await _build_ingest_deps(
         config, post_mortems_root, dry_run=dry_run
     )
@@ -477,14 +443,14 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         enable_pitch_filler = True
 
     enrichers: list[Enricher] = []
-    if enrich_wayback:
-        enrichers.append(WaybackEnricher(rps=5.0))
-    if tavily_enrich:
-        enrichers.append(TavilyEnricher())
+    # Cheap fetch-chain enrichers temporarily disabled:
+    #   - WaybackEnricher: needs a rate-limit hack (Wayback throttles HEAD/GET
+    #     spreads aggressively from a single IP).
+    #   - TavilyEnricher (/extract): not available on the Tavily free plan.
+    # Re-enable by reinstating the WaybackEnricher / TavilyEnricher imports
+    # plus their CLI flags (--enrich-wayback / --tavily-enrich) and the
+    # corresponding enrichers.append(...) calls here.
     if enable_pitch_filler:
-        # Append last so cheap fetchers (Wayback, Tavily-extract) get a chance
-        # first when also enabled — the filler's skip-guards short-circuit on
-        # any pre-filled body.
         from slopmortem.ingest import HaikuPitchFiller  # noqa: PLC0415
 
         enrichers.append(
