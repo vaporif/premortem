@@ -242,7 +242,7 @@ Expected: clean.
 - Modify: `slopmortem/ingest/__init__.py`
 - Test: `tests/ingest/test_title_pre_filter.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/ingest/test_title_pre_filter.py`:
 
@@ -398,12 +398,12 @@ async def test_budget_exceeded_propagates() -> None:
         await _filter(llm=llm).enrich(_make_entry())
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/ingest/test_title_pre_filter.py -v`
 Expected: FAIL — `cannot import name 'HaikuTitlePreFilter'`.
 
-- [ ] **Step 3: Implement the enricher**
+- [x] **Step 3: Implement the enricher**
 
 Create `slopmortem/ingest/_title_pre_filter.py`:
 
@@ -537,7 +537,7 @@ class HaikuTitlePreFilter:
         return entry
 ```
 
-- [ ] **Step 4: Re-export from `slopmortem.ingest`**
+- [x] **Step 4: Re-export from `slopmortem.ingest`**
 
 In `slopmortem/ingest/__init__.py`, add the import directly after the existing `HaikuPitchFiller` re-export:
 
@@ -547,17 +547,17 @@ from slopmortem.ingest._title_pre_filter import HaikuTitlePreFilter as HaikuTitl
 
 …and insert `"HaikuTitlePreFilter"` into `__all__` in alphabetical order (between `HaikuSlopClassifier` and `InMemoryCorpus` — note the existing list keeps the underscore-prefixed `_Point` last, so do not append at the end).
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `uv run pytest tests/ingest/test_title_pre_filter.py -v`
 Expected: all PASS.
 
-- [ ] **Step 6: Lint + typecheck**
+- [x] **Step 6: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 `git add slopmortem/ingest/_title_pre_filter.py slopmortem/ingest/__init__.py tests/ingest/test_title_pre_filter.py && git commit -m "title pre-filter: HaikuTitlePreFilter enricher"`
 
