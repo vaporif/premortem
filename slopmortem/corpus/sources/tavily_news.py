@@ -168,6 +168,9 @@ def _drop_mirror_hosts(
 def _dedup_keep_highest_score(
     rows: Iterable[dict[str, object]],
 ) -> list[dict[str, object]]:
+    # Rows reaching this point already passed _filter_and_canonicalise, so
+    # canonical_url is a str and score is a float. Keep narrowing checks just
+    # for the type checker; the runtime branches are unreachable.
     best: dict[str, dict[str, object]] = {}
     for row in rows:
         url = row.get("canonical_url")
@@ -175,10 +178,11 @@ def _dedup_keep_highest_score(
         if not isinstance(url, str) or not isinstance(score, (int, float)):
             continue
         existing = best.get(url)
-        existing_score = existing["score"] if existing is not None else None
-        if existing is None or (
-            isinstance(existing_score, (int, float)) and float(score) > float(existing_score)
-        ):
+        if existing is None:
+            best[url] = row
+            continue
+        existing_score = existing.get("score")
+        if isinstance(existing_score, (int, float)) and float(score) > float(existing_score):
             best[url] = row
     return list(best.values())
 
@@ -190,19 +194,17 @@ def _build_call_descriptors(
     end_year: int,
 ) -> list[dict[str, object]]:
     """Cross-product (query, year, quarter) → list of call payload dicts."""
-    out: list[dict[str, object]] = []
-    for query in queries:
-        for year in range(start_year, end_year + 1):
-            for q_start, q_end in _QUARTERS:
-                out.append(
-                    {
-                        "query": query,
-                        "year": year,
-                        "start_date": f"{year}-{q_start}",
-                        "end_date": f"{year}-{q_end}",
-                    }
-                )
-    return out
+    return [
+        {
+            "query": query,
+            "year": year,
+            "start_date": f"{year}-{q_start}",
+            "end_date": f"{year}-{q_end}",
+        }
+        for query in queries
+        for year in range(start_year, end_year + 1)
+        for q_start, q_end in _QUARTERS
+    ]
 
 
 def _pick_int(override: int | None, yaml_val: object, fallback: int) -> int:
@@ -443,11 +445,10 @@ class TavilyNewsSource:
 
         kept.sort(key=_sort_key)
 
-        emitted = 0
-        for row in kept:
-            if emitted >= self.max_emit:
-                logger.info("tavily_news: max_emit=%d reached, stopping", self.max_emit)
-                break
+        capped = kept[: self.max_emit]
+        if len(kept) > self.max_emit:
+            logger.info("tavily_news: max_emit=%d reached, stopping", self.max_emit)
+        for row in capped:
             yield RawEntry(
                 source=SOURCE_TAVILY_NEWS,
                 source_id=cast("str", row["canonical_url"]),
@@ -456,9 +457,8 @@ class TavilyNewsSource:
                 markdown_text=cast("str", row["raw_content"]),
                 fetched_at=datetime.now(UTC),
             )
-            emitted += 1
 
-        if emitted == 0:
+        if not capped:
             logger.warning(
                 "tavily_news: 0 entries after dedup (calls=%d, failures=%d)",
                 len(specs),
