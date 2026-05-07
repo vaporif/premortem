@@ -139,9 +139,7 @@ class HNAlgoliaSource:
         self.pages_per_window: int = (
             pages_raw if isinstance(pages_raw, int) else DEFAULT_PAGES_PER_WINDOW
         )
-        self.hits_per_page: int = (
-            hits_raw if isinstance(hits_raw, int) else DEFAULT_HITS_PER_PAGE
-        )
+        self.hits_per_page: int = hits_raw if isinstance(hits_raw, int) else DEFAULT_HITS_PER_PAGE
         self.user_agent = user_agent
         self.rps = rps
 
