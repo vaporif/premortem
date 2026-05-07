@@ -588,7 +588,7 @@ git commit -m "pitch filler prompt: drop tool-budget block, tool_choice enforces
 
 This is the smallest change in the chain: a one-keyword addition to the `llm.complete(...)` call inside `enrich()`, plus one new assertion test.
 
-- [ ] **Step 4.1: Write failing test — filler passes `single_tool_call=True`**
+- [x] **Step 4.1: Write failing test — filler passes `single_tool_call=True`**
 
 Append to `tests/ingest/test_pitch_filler.py`:
 
@@ -601,12 +601,12 @@ async def test_passes_single_tool_call_true() -> None:
     assert llm.calls[0]["single_tool_call"] is True
 ```
 
-- [ ] **Step 4.2: Run the failing test**
+- [x] **Step 4.2: Run the failing test**
 
 Run: `uv run pytest tests/ingest/test_pitch_filler.py::test_passes_single_tool_call_true -v`
 Expected: FAIL — the filler does not yet pass `single_tool_call=True`, so the recorded value is `False` and the assertion fails.
 
-- [ ] **Step 4.3: Update `_pitch_filler.py:109-125`**
+- [x] **Step 4.3: Update `_pitch_filler.py:109-125`**
 
 Edit `slopmortem/ingest/_pitch_filler.py`. In the `llm.complete(...)` call inside `enrich()`, add `single_tool_call=True` as the last kwarg:
 
@@ -631,32 +631,32 @@ try:
     )
 ```
 
-- [ ] **Step 4.4: Run the test — pass**
+- [x] **Step 4.4: Run the test — pass**
 
 Run: `uv run pytest tests/ingest/test_pitch_filler.py::test_passes_single_tool_call_true -v`
 Expected: PASS.
 
-- [ ] **Step 4.5: Run the full filler test file**
+- [x] **Step 4.5: Run the full filler test file**
 
 Run: `uv run pytest tests/ingest/test_pitch_filler.py -v`
 Expected: all pass. The existing tests use `_StubLLM` which short-circuits to `stop` on the first call; they do not exercise the OpenRouter loop and so are unaffected by the new flag.
 
-- [ ] **Step 4.6: Run the full test suite**
+- [x] **Step 4.6: Run the full test suite**
 
 Run: `just test`
 Expected: pass.
 
-- [ ] **Step 4.7: Run typecheck**
+- [x] **Step 4.7: Run typecheck**
 
 Run: `just typecheck`
 Expected: clean.
 
-- [ ] **Step 4.8: Run lint**
+- [x] **Step 4.8: Run lint**
 
 Run: `just lint`
 Expected: clean.
 
-- [ ] **Step 4.9: Commit**
+- [x] **Step 4.9: Commit**
 
 Run:
 

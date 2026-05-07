@@ -122,6 +122,7 @@ class HaikuPitchFiller:
                 },
                 extra_body={"prompt_template_sha": prompt_template_sha("pitch_filler")},
                 max_tokens=self.max_tokens,
+                single_tool_call=True,
             )
         except BudgetExceededError:
             # Fatal: let the orchestrator short-circuit the run.

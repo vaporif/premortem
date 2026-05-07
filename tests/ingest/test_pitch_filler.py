@@ -238,3 +238,11 @@ def test_filler_construction_does_not_render_prompt() -> None:
         model=_TEST_MODEL,
         budget=Budget(cap_usd=1.0),
     )
+
+
+@pytest.mark.anyio
+async def test_passes_single_tool_call_true() -> None:
+    """The filler must opt into single-tool-call enforcement to avoid loop-bound failures."""
+    llm = _StubLLM(text=_high_response())
+    await _filler(llm=llm).enrich(_make_entry())
+    assert llm.calls[0]["single_tool_call"] is True
