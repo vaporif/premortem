@@ -26,9 +26,6 @@ def _ok_resp(payload: object) -> httpx.Response:
     return httpx.Response(200, json=payload)
 
 
-# ---- _canonicalize_url -------------------------------------------------------
-
-
 def test_canonicalize_strips_utm_and_lowercases_host() -> None:
     raw = (
         "HTTPS://Example.COM/Path/?utm_source=newsletter&utm_medium=email"
@@ -92,9 +89,6 @@ def test_parse_published_returns_none_on_garbage() -> None:
     assert _parse_published_date("") is None
 
 
-# ---- _build_call_descriptors -------------------------------------------------
-
-
 def test_build_call_descriptors_quarterly_windows() -> None:
     calls = _build_call_descriptors(
         queries=["q1", "q2"], start_year=2024, end_year=2024, today=date(2025, 1, 1)
@@ -125,9 +119,6 @@ def test_build_call_descriptors_skips_when_start_year_in_future() -> None:
         queries=["q"], start_year=2027, end_year=2027, today=date(2026, 5, 7)
     )
     assert calls == []
-
-
-# ---- TavilyNewsSource.fetch integration --------------------------------------
 
 
 def _result(

@@ -112,5 +112,6 @@ slopmortem.local.toml
 tests/fixtures/cassettes/*.live.yaml
 post_mortems/
 journal.sqlite
+backups/
 
 .tldextract-cache/

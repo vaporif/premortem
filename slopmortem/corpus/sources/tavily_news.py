@@ -80,9 +80,6 @@ _QUARTERS: Final[tuple[tuple[str, str], ...]] = (
 )
 
 
-# ---- YAML loading ------------------------------------------------------------
-
-
 def _load_yaml(package: str, filename: str) -> object:
     text = resources.files(package).joinpath(filename).read_text(encoding="utf-8")
     # PyYAML's stub types safe_load as Any; downstream callers narrow with isinstance.
@@ -105,9 +102,6 @@ def _load_mirror_domains() -> frozenset[str]:
         return frozenset()
     rows = cast("list[object]", payload)
     return frozenset(r.lower() for r in rows if isinstance(r, str) and r)
-
-
-# ---- pure helpers ------------------------------------------------------------
 
 
 def _canonicalize_url(url: str) -> str:
@@ -231,9 +225,6 @@ def _pick_str(override: str | None, yaml_val: object, fallback: str) -> str:
     if isinstance(yaml_val, str) and yaml_val:
         return yaml_val
     return fallback
-
-
-# ---- TavilyNewsSource --------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -434,7 +425,6 @@ class TavilyNewsSource:
         kept = _drop_mirror_hosts(kept, mirrors=self._mirrors)
         kept = _dedup_keep_highest_score(kept)
 
-        # Sort key: score desc, published desc, canonical URL asc.
         # Missing/unparseable published_date sinks to the bottom of its score tier
         # via a 1900-01-01 sentinel — RFC 1123 dates always beat that.
         _date_sentinel = datetime(1900, 1, 1, tzinfo=UTC)
