@@ -181,30 +181,22 @@ class HNAlgoliaSource:
     def _hit_to_entry(hit: dict[str, object]) -> RawEntry | None:
         object_id = hit.get("objectID")
         url = hit.get("url")
-        title = hit.get("title") or ""
-        created_at = hit.get("created_at") or ""
-        points = hit.get("points")
-        num_comments = hit.get("num_comments")
         if not isinstance(object_id, str) or not object_id:
             return None
         if not isinstance(url, str) or not url:
-            # Ask-HN / Show-HN self-posts have no external URL; the Tavily
-            # enricher would have nothing to fetch.
+            # Ask-HN / Show-HN self-posts have no external URL; nothing for
+            # the enricher chain to fetch.
             return None
-        title_str = title if isinstance(title, str) else str(title)
-        markdown = (
-            f"# {title_str}\n\n"
-            f"hn_object_id: {object_id}\n"
-            f"created_at: {created_at}\n"
-            f"points: {points}\n"
-            f"num_comments: {num_comments}\n"
-        ).strip()
+        # markdown_text=None on purpose: TavilyEnricher / WaybackEnricher both
+        # short-circuit on a populated body, so emitting a title-stub here
+        # blocks them from fetching the linked article. Title and HN metadata
+        # aren't read downstream; the real body comes from the URL fetch.
         return RawEntry(
             source=SOURCE_HN_ALGOLIA,
             source_id=object_id,
             url=url,
             raw_html=None,
-            markdown_text=markdown,
+            markdown_text=None,
             fetched_at=datetime.now(UTC),
         )
 

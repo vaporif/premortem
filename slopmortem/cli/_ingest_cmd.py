@@ -96,10 +96,21 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
         ),
     ] = None,
     enrich_wayback: Annotated[
-        bool, typer.Option("--enrich-wayback", help="Enable the Wayback enricher.")
+        bool,
+        typer.Option(
+            "--enrich-wayback",
+            help="Enable the Wayback enricher. Auto-enabled when hn_algolia is in the source list.",
+        ),
     ] = False,
     tavily_enrich: Annotated[
-        bool, typer.Option("--tavily-enrich", help="Enable the Tavily enricher.")
+        bool,
+        typer.Option(
+            "--tavily-enrich",
+            help=(
+                "Enable the Tavily enricher. Auto-enabled when hn_algolia or "
+                "defillama is in the source list."
+            ),
+        ),
     ] = False,
     enable_defillama: Annotated[
         bool,
@@ -367,6 +378,21 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
                 "check that its prerequisites (e.g. --crunchbase-csv path) are present."
             )
             raise typer.BadParameter(msg)
+
+    # HN Algolia emits URL-only stubs (sources/hn_algolia.py:_hit_to_entry).
+    # Without enrichers their bodies stay empty and the entry is skipped at
+    # classify, so force both on whenever the source is in the resolved set.
+    if any(isinstance(s, HNAlgoliaSource) for s in sources):
+        if not os.environ.get("TAVILY_API_KEY"):
+            msg = (
+                "hn_algolia source requires TAVILY_API_KEY: HN entries are URL-only "
+                "stubs whose bodies must be extracted by the Tavily enricher. Set "
+                "TAVILY_API_KEY in .env, or use --only-source on a source whose "
+                "entries already carry their body (e.g. crunchbase_csv)."
+            )
+            raise typer.BadParameter(msg)
+        enrich_wayback = True
+        tavily_enrich = True
 
     enrichers: list[Enricher] = []
     if enrich_wayback:
