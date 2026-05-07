@@ -129,8 +129,8 @@ class OpenRouterClient:
             base_kw["max_tokens"] = max_tokens
 
         try:
-            # Two turns under single_tool_call: one forced tool call, then one
-            # synthesis turn with tools disabled. Anything more is a misuse.
+            # Under single_tool_call: turn 0 forces the tool call, turn 1
+            # synthesizes with tools disabled. No third turn is reachable.
             effective_max_turns = 2 if single_tool_call else self._max_tool_turns
             for turn in range(effective_max_turns):
                 per_turn_kw: dict[str, Any] = base_kw.copy()  # pyright: ignore[reportExplicitAny]
