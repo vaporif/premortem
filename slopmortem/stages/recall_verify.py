@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Final, Literal
 
@@ -90,24 +89,16 @@ _DEATH_KEYWORDS: Final[frozenset[str]] = frozenset(
 type VerificationTier = Literal["wayback_anchored", "evidence_only"]
 
 
-_SLUG_RE: Final = re.compile(r"[^a-z0-9]+")
-
-
-def _slugify(name: str) -> str:
-    return _SLUG_RE.sub("-", name.lower()).strip("-")
-
-
 def _recall_source_id(suggestion: RecallSuggestion) -> str:
-    """Stable id keyed on (name, evidence_url).
+    """Stable id keyed on (name, homepage_url) per the plan.
 
-    Two suggestions for the same company citing the same article collapse to
-    one ``source_id``; differing citations stay distinct. The 12-char hash
-    suffix is plenty for collision avoidance at the recall stage's per-pitch
-    cap (~8 suggestions). Slug prefix keeps journal rows greppable.
+    Two suggestions for the same vendor (same homepage) collapse to one
+    ``source_id`` regardless of which article cited them; a different
+    homepage diverges. 16 hex chars is enough for the recall stage's
+    per-pitch cap (~8 suggestions).
     """
-    fingerprint = f"{suggestion.name.lower()}|{suggestion.evidence_url}"
-    digest = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:12]
-    return f"{_slugify(suggestion.name)}-{digest}"
+    fingerprint = f"{suggestion.name}|{suggestion.homepage_url}"
+    return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]
 
 
 def _body_anchors_name_and_death(name: str, body: str) -> bool:
@@ -117,9 +108,6 @@ def _body_anchors_name_and_death(name: str, body: str) -> bool:
     return any(kw in haystack for kw in _DEATH_KEYWORDS)
 
 
-# Drop suggestion bodies and URLs from span attrs: CLAUDE.md forbids
-# prompt/response bodies in tracing, and the evidence body can be sizeable.
-@observe(name="stage.recall_verify", ignore_inputs=["suggestion"], ignore_output=True)
 async def verify_suggestion(
     suggestion: RecallSuggestion,
     *,
@@ -188,6 +176,16 @@ async def verify_suggestion(
     return final, tier
 
 
+# Decorator lives at the fan-out level so the trace gets one
+# ``stage.recall_verify`` parent with N child spans, not N siblings with no
+# parent. Suggestions, persist, and wayback handles never go to span attrs:
+# CLAUDE.md forbids prompt/response bodies in tracing, and the evidence body
+# can be sizeable.
+@observe(
+    name="stage.recall_verify",
+    ignore_inputs=["suggestions", "persist", "wayback"],
+    ignore_output=True,
+)
 async def verify_and_persist_all(
     suggestions: list[RecallSuggestion],
     *,

@@ -424,10 +424,47 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
     assert entry.url == str(sug.homepage_url)
     assert isinstance(entry.fetched_at, datetime)
     assert entry.fetched_at.tzinfo == UTC
-    # Evidence URL travels through ``source_id`` so the persistence layer can
-    # surface the citation; exact shape is the implementation's call but it
-    # should be stable per (name, evidence_url).
-    other = _suggestion()
-    out2 = await verify_suggestion(other, wayback=wb)
-    assert out2 is not None
-    assert out2[0].source_id == entry.source_id
+
+
+async def test_recall_source_id_collapses_on_same_homepage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same (name, homepage_url) collapses to one source_id; different homepage diverges.
+
+    Mirrors the Task 5 contract in the plan: the recall persist path keys
+    on the vendor (homepage), not the citing article, so two articles
+    about the same dead vendor produce one qdrant point.
+    """
+    sug = _suggestion()
+    body = "Hexagate ceased operations in 2024."
+    # Same name + same homepage but a *different* evidence article.
+    same_vendor_other_citation = sug.model_copy(
+        update={"evidence_url": "https://other-news.example.com/hexagate-update"},
+    )
+    diff_vendor = sug.model_copy(
+        update={"homepage_url": "https://hexagate.different-tld.example.org/"},
+    )
+    _patch_http(
+        monkeypatch,
+        head_responses={
+            str(sug.homepage_url): _FakeResp(status=200),
+            str(sug.evidence_url): _FakeResp(status=200),
+            str(same_vendor_other_citation.evidence_url): _FakeResp(status=200),
+            str(diff_vendor.homepage_url): _FakeResp(status=200),
+            str(diff_vendor.evidence_url): _FakeResp(status=200),
+        },
+        get_responses={
+            str(sug.evidence_url): _FakeResp(status=200, text=body),
+            str(same_vendor_other_citation.evidence_url): _FakeResp(status=200, text=body),
+            str(diff_vendor.evidence_url): _FakeResp(status=200, text=body),
+        },
+    )
+    wb = _FakeWayback()
+    first = await verify_suggestion(sug, wayback=wb)
+    second = await verify_suggestion(same_vendor_other_citation, wayback=wb)
+    third = await verify_suggestion(diff_vendor, wayback=wb)
+    assert first is not None
+    assert second is not None
+    assert third is not None
+    assert first[0].source_id == second[0].source_id
+    assert first[0].source_id != third[0].source_id
