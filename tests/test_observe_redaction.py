@@ -225,6 +225,8 @@ class _FakeCorpus:
         cutoff_iso: str | None,
         strict_deaths: bool,
         k_retrieve: int,
+        strict_sector_filter: bool = False,
+        strict_sector_filter_excludes_other: bool = False,
     ) -> list[Candidate]:
         self.queries.append(
             {
@@ -234,6 +236,8 @@ class _FakeCorpus:
                 "cutoff_iso": cutoff_iso,
                 "strict_deaths": strict_deaths,
                 "k_retrieve": k_retrieve,
+                "strict_sector_filter": strict_sector_filter,
+                "strict_sector_filter_excludes_other": strict_sector_filter_excludes_other,
             }
         )
         return list(self.candidates[:k_retrieve])

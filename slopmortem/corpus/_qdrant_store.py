@@ -18,6 +18,7 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     FilterSelector,
+    MatchAny,
     MatchValue,
     Modifier,
     SparseIndexParams,
@@ -117,6 +118,8 @@ class QdrantCorpus:
         cutoff_iso: str | None,
         strict_deaths: bool,
         k_retrieve: int,
+        strict_sector_filter: bool = False,
+        strict_sector_filter_excludes_other: bool = False,
     ) -> list[Candidate]:
         """Hybrid retrieve top-K candidates with FormulaQuery facet boost.
 
@@ -173,9 +176,13 @@ class QdrantCorpus:
             formula_terms.append(MultExpression(mult=[self._facet_boost, Filter(must=boost_must)]))
         formula = FormulaQuery(formula=SumExpression(sum=formula_terms))
 
-        query_filter = _build_recency_filter(
-            cutoff_iso=cutoff_iso,
-            strict_deaths=strict_deaths,
+        query_filter = _and_filters(
+            _build_recency_filter(cutoff_iso=cutoff_iso, strict_deaths=strict_deaths),
+            _build_sector_filter(
+                sector=facets.sector,
+                strict=strict_sector_filter,
+                exclude_other=strict_sector_filter_excludes_other,
+            ),
         )
 
         # TODO(prod): chunk over-fetch may under-fill long post-mortems (#25).
@@ -337,6 +344,47 @@ class QdrantCorpus:
 def canonical_path_for(post_mortems_root: Path, canonical_id: str) -> Path:
     text_id = hashlib.sha256(canonical_id.encode("utf-8")).hexdigest()[:16]
     return safe_path(post_mortems_root, kind="canonical", text_id=text_id)
+
+
+def _and_filters(*filters: Filter | None) -> Filter | None:
+    """AND-combine zero or more optional ``Filter``s, dropping ``None``s.
+
+    Nests (``Filter(must=[a, b])``) instead of merging ``must`` lists because
+    ``_build_recency_filter`` returns ``Filter(should=[…])`` when
+    ``strict_deaths=False`` — its ``must`` is ``None`` and clause-merging
+    would silently drop the ``should`` branches. The outer ``must=[…]``
+    wrapper AND-combines correctly regardless of clause shape.
+    """
+    present = [f for f in filters if f is not None]
+    if not present:
+        return None
+    if len(present) == 1:
+        return present[0]
+    return Filter(must=list(present))
+
+
+def _build_sector_filter(*, sector: str, strict: bool, exclude_other: bool) -> Filter | None:
+    """Hard payload filter on ``facets.sector``. ``None`` = no narrowing.
+
+    The current behaviour (no filter; sector participates only as a soft boost)
+    is the ``strict=False`` branch. ``strict=True`` enforces the pitch's sector
+    at retrieve time. ``exclude_other=True`` further drops the ``"other"``
+    safety valve — only set if the corpus's ``"other"`` bucket has been
+    audited and intentional misclassifications have been reclassified.
+
+    Returns ``None`` when ``pitch.sector == "other"`` regardless of the flags:
+    the pitch sector is uninformative, and filtering on ``"other"`` would
+    either match misclassification noise or (with ``exclude_other=True``)
+    return nothing.
+    """
+    if not strict or sector == "other":
+        return None
+
+    if exclude_other:
+        cond = FieldCondition(key="facets.sector", match=MatchValue(value=sector))
+    else:
+        cond = FieldCondition(key="facets.sector", match=MatchAny(any=[sector, "other"]))
+    return Filter(must=[cond])
 
 
 def _build_recency_filter(*, cutoff_iso: str | None, strict_deaths: bool) -> Any:  # pyright: ignore[reportExplicitAny]
