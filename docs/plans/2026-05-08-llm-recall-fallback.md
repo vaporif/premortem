@@ -473,7 +473,7 @@ from slopmortem.stages.llm_recall import detect_coverage_gap as detect_coverage_
 - New: `tests/stages/test_llm_recall.py`
 - New cassette: `tests/fixtures/cassettes/recall/llm_recall_hacken.yaml`
 
-- [ ] **Step 1: Add `RecallSuggestion` + `RecallSuggestionList` models**
+- [x] **Step 1: Add `RecallSuggestion` + `RecallSuggestionList` models**
 
 In `slopmortem/models.py`:
 
@@ -499,7 +499,7 @@ class RecallSuggestionList(BaseModel):
     suggestions: list[RecallSuggestion]
 ```
 
-- [ ] **Step 2: Add config keys**
+- [x] **Step 2: Add config keys**
 
 In `slopmortem/config.py`:
 
@@ -513,13 +513,13 @@ In `slopmortem/config.py`:
 
 `force_llm_recall=True` fires recall on every query regardless of `enable_llm_recall` and the unified trigger. Use case: cassette recording, eval calibration, thin/new corpora where the trigger would always fire anyway. Spend is gated by the pipeline-level `Budget` shared across every LLM call — there is no per-stage cap.
 
-- [ ] **Step 3: Write the prompt template**
+- [x] **Step 3: Write the prompt template**
 
 `slopmortem/llm/prompts/llm_recall.j2` — Opus prompt: pitch + facets + current top-N → JSON list of `RecallSuggestion`-shaped objects with `[]` on uncertainty. Use the same Jinja `{% block system %}` / `{% block user %}` shape as `title_pre_filter.j2`.
 
 The verifier (Task 4) now anchors on `evidence_url` body, so the prompt must tell Opus that **`evidence_url` is the citation that proves the company failed/struggled — a news article, blog post, court filing, or obituary URL whose body contains the company name AND words describing the failure (shutdown, acquired, layoffs, etc.)**. A homepage or LinkedIn URL is *not* acceptable as `evidence_url`. If Opus cannot produce such a URL, it must omit the suggestion. This is critical: a hallucinated `evidence_url` (or one that just points to a marketing page) means the suggestion will fail L3 silently, wasting an Opus call.
 
-- [ ] **Step 4: Write the failing tests**
+- [x] **Step 4: Write the failing tests**
 
 `tests/stages/test_llm_recall.py`:
 
@@ -557,11 +557,11 @@ async def test_recall_cassette_round_trip() -> None:
     ...
 ```
 
-- [ ] **Step 5: Run tests to verify failure**
+- [x] **Step 5: Run tests to verify failure**
 
 `uv run pytest tests/stages/test_llm_recall.py -v`
 
-- [ ] **Step 6: Implement `llm_recall()`**
+- [x] **Step 6: Implement `llm_recall()`**
 
 Add to `slopmortem/stages/llm_recall.py`:
 
@@ -604,11 +604,11 @@ async def llm_recall(
     return wrapper.suggestions[:cap]
 ```
 
-- [ ] **Step 7: Run tests to confirm pass**
+- [x] **Step 7: Run tests to confirm pass**
 
 `uv run pytest tests/stages/test_llm_recall.py -v` (cassette tests skipped without `RECORD=1`).
 
-- [ ] **Step 8: Record the cassette (manual, costs ~$0.05)**
+- [x] **Step 8: Record the cassette (manual, costs ~$0.05)** — deferred to operator; verified the cassette test skips cleanly without `RECORD=1`.
 
 ```
 RECORD=1 OPENROUTER_API_KEY=<key> uv run pytest \
@@ -617,11 +617,11 @@ RECORD=1 OPENROUTER_API_KEY=<key> uv run pytest \
 
 Inspect the recorded `tests/fixtures/cassettes/recall/llm_recall_hacken.yaml` for the actual Opus output. Verify it includes recognisable Web3 security firms (Hexagate, CipherTrace, Coinfirm, Halborn, Forta, etc.) — if Opus refused with `[]`, the prompt needs strengthening before this lands.
 
-- [ ] **Step 9: Lint + typecheck**
+- [x] **Step 9: Lint + typecheck**
 
 `just lint && just typecheck`
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 `git add slopmortem/models.py slopmortem/config.py slopmortem/llm/prompts/llm_recall.j2 slopmortem/stages/llm_recall.py tests/stages/test_llm_recall.py tests/fixtures/cassettes/recall/ && git commit -m "stages: llm_recall + RecallSuggestion + Opus cassette"`
 

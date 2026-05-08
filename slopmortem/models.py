@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 # Closed-enum facet fields whose values MUST be in taxonomy.yml. Free-form
 # fields like sub_sector, product_type, price_point, founding_year, and
@@ -236,6 +236,29 @@ class LlmRerankResult(BaseModel):
     """Wrapper for the rerank stage's array output, so the schema is a single object."""
 
     ranked: list[ScoredCandidate]
+
+
+class RecallSuggestion(BaseModel):
+    """One LLM-recalled comparable: company name plus the citation that proves failure."""
+
+    name: str
+    category: str
+    status: Literal["dead", "absorbed", "struggling", "bruised"]
+    homepage_url: HttpUrl
+    failure_year: int = Field(ge=1990, le=2030)
+    evidence_url: HttpUrl
+    one_liner: str
+
+
+class RecallSuggestionList(BaseModel):
+    """Wrapper for the recall stage's array output, so the schema is a single object.
+
+    Mirrors ``LlmRerankResult``: OpenRouter strict ``json_schema`` mode rejects
+    array roots. Wrap the list under ``suggestions`` so ``to_strict_response_schema``
+    emits an object schema the API will accept.
+    """
+
+    suggestions: list[RecallSuggestion]
 
 
 class MergeState(StrEnum):
