@@ -98,3 +98,48 @@ async def test_pending_idempotent_upsert(journal):
     await journal.upsert_pending(canonical_id="a.com", source="hn", source_id="1")
     rows = await journal.fetch_pending()
     assert len(rows) == 1
+
+
+async def test_is_terminal_returns_false_when_unseen(journal):
+    assert await journal.is_terminal("hn", "999") is False
+
+
+async def test_is_terminal_true_for_complete_row(journal):
+    await journal.upsert_pending(canonical_id="acme.com", source="hn", source_id="1")
+    # pending alone must NOT count as terminal — a crashed prior run should re-run.
+    assert await journal.is_terminal("hn", "1") is False
+    await journal.mark_complete(
+        canonical_id="acme.com",
+        source="hn",
+        source_id="1",
+        skip_key="k1",
+        merged_at="2026-05-08T00:00:00Z",
+    )
+    assert await journal.is_terminal("hn", "1") is True
+
+
+async def test_is_terminal_true_for_quarantined_row(journal):
+    await journal.write_quarantine(
+        content_sha256="0" * 64,
+        source="hn",
+        source_id="2",
+        reason="slop",
+        slop_score=0.92,
+    )
+    assert await journal.is_terminal("hn", "2") is True
+
+
+async def test_is_terminal_false_for_alias_blocked(journal):
+    # alias_blocked / resolver_flipped are mid-flight entity-resolution decisions,
+    # not terminal — re-run is expected when the alias graph is edited.
+    edge = AliasEdge(
+        canonical_id="a.com",
+        alias_kind="rebranded_to",
+        target_canonical_id="b.com",
+        evidence_source_id="hn:3",
+        confidence=0.9,
+    )
+    await journal.upsert_alias_blocked(
+        canonical_id="a.com", source="hn", source_id="3", alias_edge=edge
+    )
+    assert await journal.is_terminal("hn", "3") is False
