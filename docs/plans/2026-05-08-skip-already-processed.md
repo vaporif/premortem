@@ -162,7 +162,7 @@ Expected: all PASS, including the four new `is_terminal` tests and all existing 
 Run: `just lint && just typecheck`
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 `git add slopmortem/corpus/_merge.py tests/corpus/test_merge_journal.py && git commit -m "journal: is_terminal lookup for complete + quarantine"`
 
