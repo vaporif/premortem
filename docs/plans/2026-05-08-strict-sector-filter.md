@@ -519,7 +519,7 @@ git commit -m "retrieve: live qdrant test for strict sector filter"
 
 ### Polish
 
-- [ ] **Step 1: Run `post-implementation-polish` over the diff**
+- [x] **Step 1: Run `post-implementation-polish` over the diff**
 
 Use the `post-implementation-polish` skill on the touched files:
 
@@ -539,7 +539,7 @@ tests/test_synthesis_tools.py
 
 Apply review-round fixes, then idiomatic pass, then `/cleanup` over the diff, then strip AI comments.
 
-- [ ] **Step 2: Full lint + typecheck + test sweep**
+- [x] **Step 2: Full lint + typecheck + test sweep**
 
 Run: `just lint && just typecheck && just test`
 Expected: clean.
@@ -555,7 +555,7 @@ Expected: rendered report shows only `crypto_web3` (or `"other"`) sector entries
 
 Roll back the `slopmortem.local.toml` edit before committing.
 
-- [ ] **Step 4: Final commit (if any polish edits)**
+- [x] **Step 4: Final commit (if any polish edits)**
 
 Only if polish produced edits. Otherwise skip.
 
