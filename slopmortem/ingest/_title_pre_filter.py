@@ -1,11 +1,11 @@
 """Cheap title-only Haiku gate that runs before the pitch filler.
 
-Most HN-Algolia hits the phrase search returns are not actually startup
-death narratives — denials, listicles, generic essays, Show HN posts.
-Asking Haiku a yes/no question on the title alone (no body, no Tavily)
-cuts pitch-filler invocations and Tavily credit burn substantially.
-Rejected entries get ``title_pre_filter_rejected=True``; downstream
-enrichers and the ingest classify loop short-circuit on the flag.
+Most HN-Algolia phrase-search hits aren't startup death narratives —
+denials, listicles, generic essays, Show HN posts. A yes/no question on
+the title alone (no body, no Tavily) cuts pitch-filler invocations and
+Tavily credit burn substantially. Rejected entries get
+``title_pre_filter_rejected=True``; downstream enrichers and the ingest
+classify loop short-circuit on the flag.
 
 Per-entry isolation contract: log and return the entry unchanged on every
 recoverable failure (HTTP, JSON parse, schema mismatch).
