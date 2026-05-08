@@ -568,7 +568,7 @@ Expected: clean commit recording two deletions plus this plan's progress edits.
 
 Final gate. Runs the project's standard checks across the whole tree to make sure no defillama-shaped hole has shifted load to a place we did not anticipate.
 
-- [ ] **Step 1: Run lint**
+- [x] **Step 1: Run lint**
 
 Run:
 
@@ -578,7 +578,7 @@ just lint
 
 Expected: clean.
 
-- [ ] **Step 2: Run typecheck**
+- [x] **Step 2: Run typecheck**
 
 Run:
 
@@ -588,7 +588,7 @@ just typecheck
 
 Expected: clean.
 
-- [ ] **Step 3: Run the full test suite**
+- [x] **Step 3: Run the full test suite**
 
 Run:
 
@@ -598,7 +598,7 @@ just test
 
 Expected: full suite passes. No `test_defillama` collected. No collection errors. Skipped tests for `requires_qdrant` / `slow` are fine — they are unrelated to this change.
 
-- [ ] **Step 4: Final defillama sweep**
+- [x] **Step 4: Final defillama sweep**
 
 Run:
 
@@ -608,7 +608,7 @@ grep -rln -i "defillama\|defi_llama\|DefiLlama" slopmortem/ tests/ justfile slop
 
 Expected: zero output. (Mentions in `docs/` are allowed — those are historical plan/spec artifacts that mention defillama in passing while documenting other features.)
 
-- [ ] **Step 5: Show the branch summary**
+- [x] **Step 5: Show the branch summary**
 
 Run:
 
