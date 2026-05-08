@@ -11,6 +11,13 @@ N_synthesize = 5
 # the report renders an empty-state banner.
 min_similarity_score = 4.0
 
+# Hard filter on `facets.sector` at retrieve time. Off by default — the
+# soft sector boost is unchanged. Turn on to prevent wrong-vertical
+# entries from reaching the rerank stage. The "other" bucket stays
+# reachable unless `strict_sector_filter_excludes_other` is also set.
+# strict_sector_filter = false
+# strict_sector_filter_excludes_other = false
+
 # Cap on parallel ingest workers (facet + summarize + slop_judge fan-out).
 # Anyio CapacityLimiter; raise for faster ingest, lower if OpenRouter rate-limits you.
 ingest_concurrency = 20

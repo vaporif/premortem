@@ -922,3 +922,42 @@ async def test_pipeline_logs_drops_at_info(
         )
 
     assert any("min_similarity dropped" in r.message for r in caplog.records)
+
+
+async def test_strict_sector_filter_flows_from_config_to_corpus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Config flags `strict_sector_filter` and `_excludes_other` reach `Corpus.query`."""
+    candidates = [_candidate(f"cand-{i}") for i in range(6)]
+    cfg = _build_config(k_retrieve=6, n_synthesize=3).model_copy(
+        update={
+            "strict_sector_filter": True,
+            "strict_sector_filter_excludes_other": True,
+        }
+    )
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    canned = _build_canned(
+        retrieved=candidates[: cfg.K_retrieve],
+        top_n=candidates[: cfg.N_synthesize],
+        ctx=ctx,
+    )
+    fake_llm = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    fake_embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    fake_corpus = _FakeCorpus(candidates=candidates)
+    budget = Budget(cap_usd=2.0)
+
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _no_op_sparse_encoder)
+
+    _ = await run_query(
+        ctx,
+        llm=fake_llm,
+        embedding_client=fake_embed,
+        corpus=fake_corpus,
+        config=cfg,
+        budget=budget,
+    )
+
+    assert len(fake_corpus.queries) == 1
+    q = fake_corpus.queries[0]
+    assert q["strict_sector_filter"] is True
+    assert q["strict_sector_filter_excludes_other"] is True

@@ -297,7 +297,7 @@ git commit -m "retrieve: hard sector filter (corpus protocol + qdrant impl)"
 - Modify: `slopmortem/pipeline.py` (`:156-165`) — pass `config.strict_sector_filter`, `config.strict_sector_filter_excludes_other` into `retrieve()`.
 - Test: `tests/test_pipeline_e2e.py` (append) — assert the flag flows from config to `_FakeCorpus.query`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/test_pipeline_e2e.py`:
 
@@ -311,12 +311,12 @@ async def test_strict_sector_filter_flows_from_config_to_corpus(...):
 
 (Mirror the existing happy-path E2E fixture; no need to invent a new corpus.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_pipeline_e2e.py -v -k strict_sector`
 Expected: FAIL — config keys don't exist yet, OR the kwarg never reaches the fake's recorded `queries` dict.
 
-- [ ] **Step 3: Add the config keys**
+- [x] **Step 3: Add the config keys**
 
 Edit `slopmortem/config.py` — add near the existing retrieval knobs:
 
@@ -325,7 +325,7 @@ strict_sector_filter: bool = False
 strict_sector_filter_excludes_other: bool = False
 ```
 
-- [ ] **Step 4: Document in `slopmortem.toml`**
+- [x] **Step 4: Document in `slopmortem.toml`**
 
 Append commented-out defaults in the retrieval section:
 
@@ -338,14 +338,14 @@ Append commented-out defaults in the retrieval section:
 # strict_sector_filter_excludes_other = false
 ```
 
-- [ ] **Step 5: Thread through `retrieve.py`**
+- [x] **Step 5: Thread through `retrieve.py`**
 
 Edit `slopmortem/stages/retrieve.py`:
 
 1. Add the two kwargs to the `retrieve` function signature with defaults `False`.
 2. Pass them through to `corpus.query(…)`.
 
-- [ ] **Step 6: Wire `pipeline.py` call site**
+- [x] **Step 6: Wire `pipeline.py` call site**
 
 Edit `slopmortem/pipeline.py:156-165`:
 
@@ -364,22 +364,22 @@ retrieved = await retrieve(
 )
 ```
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 Run: `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_pipeline_e2e.py -v -k strict_sector`
 Expected: PASS.
 
-- [ ] **Step 8: Run the full suite**
+- [x] **Step 8: Run the full suite**
 
 Run: `UV_CACHE_DIR=/tmp/uv-cache uv run pytest -n auto -m "not requires_qdrant and not slow"`
 Expected: all PASS.
 
-- [ ] **Step 9: Lint + typecheck**
+- [x] **Step 9: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```
 git add slopmortem/config.py slopmortem.toml \

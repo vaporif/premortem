@@ -30,6 +30,8 @@ class Config(BaseSettings):
     K_retrieve: int = Field(default=30, ge=1)
     N_synthesize: int = Field(default=5, ge=1)
     min_similarity_score: float = Field(default=4.0, ge=0.0, le=10.0)
+    strict_sector_filter: bool = False
+    strict_sector_filter_excludes_other: bool = False
     ingest_concurrency: int = Field(default=20, ge=1)
     facet_boost: float = Field(default=0.01, ge=0.0)
     rrf_k: int = Field(default=60, ge=1)

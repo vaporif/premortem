@@ -162,6 +162,8 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
             strict_deaths=config.strict_deaths,
             k_retrieve=config.K_retrieve,
             sparse_encoder=sparse_encoder,
+            strict_sector_filter=config.strict_sector_filter,
+            strict_sector_filter_excludes_other=config.strict_sector_filter_excludes_other,
         )
         progress.advance_phase(QueryPhase.RETRIEVE)
         progress.end_phase(QueryPhase.RETRIEVE)
