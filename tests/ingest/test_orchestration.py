@@ -852,7 +852,6 @@ async def test_already_processed_entry_skipped_before_enrichers_run(tmp_path):
 
     classifier_calls: list[str] = []
 
-    @dataclass
     class _RecordingClassifier:
         async def score(self, text: str) -> float:
             classifier_calls.append(text[:16])
