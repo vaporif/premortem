@@ -162,9 +162,17 @@ class OpenRouterClient:
                     )
 
                 if fr == "tool_calls":
-                    self._assert_tool_allowlist(choice.message.tool_calls, registered)
+                    tcs = choice.message.tool_calls
+                    if not tcs:
+                        # Some providers return finish_reason="tool_calls" with a
+                        # null/empty tool_calls list. Surface as RuntimeError so
+                        # callers' existing ``except RuntimeError`` paths handle
+                        # it the same way as "hard stop: length".
+                        msg = "tool_calls finish reason but no tool_calls in message"
+                        raise RuntimeError(msg)
+                    self._assert_tool_allowlist(tcs, registered)
                     messages.append(_assistant_with_tools(choice.message))
-                    for tc in choice.message.tool_calls:
+                    for tc in tcs:
                         name = _tc_name(tc)
                         args_raw = _tc_arguments(tc)
                         args = json.loads(args_raw)

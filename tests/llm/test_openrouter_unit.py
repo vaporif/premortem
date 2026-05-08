@@ -106,6 +106,29 @@ async def test_finish_reason_content_filter_raises(fake_sdk):
         await c.complete("hi")
 
 
+async def test_tool_calls_finish_reason_with_null_tool_calls_raises(fake_sdk):
+    """Provider quirk: ``finish_reason='tool_calls'`` with ``tool_calls=None``.
+
+    Surfaces as ``RuntimeError`` so callers' existing ``except RuntimeError``
+    paths (pitch filler, title pre-filter) degrade like ``hard stop: length``
+    instead of crashing with ``TypeError: 'NoneType' object is not iterable``.
+    """
+    resp = _stub_response(finish_reason="tool_calls", usage=_stub_usage())
+    resp.choices[0].message.tool_calls = None
+    fake_sdk.chat.completions.create.return_value = resp
+
+    class Args(BaseModel):
+        x: int
+
+    async def fn(x: int) -> str:
+        return f"got {x}"
+
+    tool = ToolSpec(name="t", description="", args_model=Args, fn=fn)
+    c = OpenRouterClient(sdk=fake_sdk, budget=Budget(2.0))
+    with pytest.raises(RuntimeError, match="no tool_calls"):
+        await c.complete("hi", tools=[tool])
+
+
 async def test_mid_stream_error_finish_reason_retries(fake_sdk):
     fake_sdk.chat.completions.create.side_effect = [
         _stub_response(
