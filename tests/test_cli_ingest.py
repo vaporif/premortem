@@ -91,6 +91,37 @@ def test_ingest_default_auto_enables_pitch_filler_for_hn_algolia(
     assert "TavilyEnricher" not in enricher_classnames
 
 
+def test_ingest_default_auto_enables_title_pre_filter_for_hn_algolia(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """HNAlgoliaSource auto-enables the title pre-filter, and it lands ahead of the pitch filler.
+
+    Ordering is load-bearing: rejected entries must short-circuit before the
+    pitch filler issues its tavily_search call.
+    """
+    captured: dict[str, object] = {}
+
+    async def fake_ingest(**kwargs: object) -> object:
+        captured["enrichers"] = kwargs["enrichers"]
+        return MagicMock(dry_run=True, processed=0)
+
+    monkeypatch.setattr("slopmortem.cli._ingest_cmd.ingest", fake_ingest)
+    monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
+    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
+    runner = CliRunner()
+    result = runner.invoke(app, ["ingest", "--dry-run", "--post-mortems-root", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    enrichers = captured["enrichers"]
+    assert isinstance(enrichers, list)
+    enricher_classnames = [type(e).__name__ for e in enrichers]
+    assert "HaikuTitlePreFilter" in enricher_classnames
+    assert "HaikuPitchFiller" in enricher_classnames
+    # Pre-filter must run before the pitch filler.
+    assert enricher_classnames.index("HaikuTitlePreFilter") < enricher_classnames.index(
+        "HaikuPitchFiller"
+    )
+
+
 def test_ingest_default_without_tavily_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default sources include hn_algolia → pitch filler requires TAVILY_API_KEY."""
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)

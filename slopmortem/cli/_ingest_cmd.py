@@ -100,7 +100,21 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             help=(
                 "Enable the LLM-driven pitch filler that synthesizes bodies for "
                 "URL-only stubs via tavily_search. Auto-enabled when hn_algolia is "
-                "in the source list."
+                "in the source list. The title pre-filter (auto-enabled too) "
+                "drops most non-death titles before this stage runs, so Tavily "
+                "credit burn is roughly proportional to the title-pass rate."
+            ),
+        ),
+    ] = False,
+    enable_title_pre_filter: Annotated[
+        bool,
+        typer.Option(
+            "--enable-title-pre-filter/--no-title-pre-filter",
+            help=(
+                "Enable the cheap title-only Haiku gate that rejects HN entries "
+                "whose titles aren't startup-death narratives. Saves Tavily credits "
+                "by short-circuiting before the pitch filler. Auto-enabled when "
+                "hn_algolia is in the source list."
             ),
         ),
     ] = False,
@@ -246,6 +260,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             list_review=list_review,
             crunchbase_csv=crunchbase_csv,
             enable_pitch_filler=enable_pitch_filler,
+            enable_title_pre_filter=enable_title_pre_filter,
             enable_defillama=enable_defillama,
             defillama_rps=defillama_rps,
             defillama_concurrency=defillama_concurrency,
@@ -316,6 +331,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     limit: int | None,
     crunchbase_csv: Path | None,
     enable_pitch_filler: bool,
+    enable_title_pre_filter: bool,
     enable_defillama: bool,
     defillama_rps: float | None,
     defillama_concurrency: int | None,
@@ -441,8 +457,23 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             )
             raise typer.BadParameter(msg)
         enable_pitch_filler = True
+        enable_title_pre_filter = True
 
     enrichers: list[Enricher] = []
+    # Ordering is load-bearing: the title pre-filter must run before the pitch
+    # filler so rejected entries skip the pitch filler's Haiku call and its
+    # tavily_search tool invocation.
+    if enable_title_pre_filter:
+        from slopmortem.ingest import HaikuTitlePreFilter  # noqa: PLC0415
+
+        enrichers.append(
+            HaikuTitlePreFilter(
+                llm=llm,
+                model=config.model_title_pre_filter,
+                budget=budget,
+                max_tokens=config.max_tokens_title_pre_filter,
+            )
+        )
     # Cheap fetch-chain enrichers temporarily disabled:
     #   - WaybackEnricher: needs a rate-limit hack (Wayback throttles HEAD/GET
     #     spreads aggressively from a single IP).
