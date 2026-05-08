@@ -18,6 +18,8 @@ Refusal:
 - When you cannot confidently attribute results to {{ domain }}, return `confidence: "low"` and an empty `pitch_markdown`. False positives — a pitch attributed to the wrong entity — are corpus poison; false negatives are recoverable by a future re-run. When in doubt, refuse.
 - Empty `pitch_markdown` is allowed and expected when `confidence` is `"low"`.
 
+Length: keep `pitch_markdown` under 800 words. Cause-of-death narrative is the priority; trim background, marketing copy, and quotes that don't bear on the failure. The full JSON response (including `pitch_markdown`) must fit within 1500 output tokens — overruns are dropped.
+
 Output schema (return a single JSON object, no prose outside it):
 {
   "pitch_markdown": str,            # the synthesized pitch + cause-of-death narrative as markdown; empty string when confidence=low
