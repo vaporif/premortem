@@ -815,3 +815,124 @@ async def test_ingest_skips_title_pre_filter_rejected_before_slop_classify(tmp_p
     assert result.errors == 0
     assert corpus.points == []
     assert SpanEvent.SLOP_QUARANTINED.value not in result.span_events
+
+
+async def test_already_processed_entry_skipped_before_enrichers_run(tmp_path):
+    """Pre-enrich gate: a complete-in-journal entry must not invoke any enricher.
+
+    ``source="hn"`` (not in ``_PRE_VETTED_SOURCES``) so the classifier_calls
+    assertion is meaningful — without the gate, ``classify_one`` would invoke
+    ``slop_classifier.score`` for non-pre-vetted entries.
+    """
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    # Pre-seed the journal as if a prior run already completed this entry.
+    await journal.upsert_pending(canonical_id="acme.com", source="hn", source_id="acme")
+    await journal.mark_complete(
+        canonical_id="acme.com",
+        source="hn",
+        source_id="acme",
+        skip_key="prior",
+        merged_at="2026-05-07T00:00:00Z",
+    )
+
+    class _OneShotSource:
+        async def fetch(self):
+            yield RawEntry(
+                source="hn",
+                source_id="acme",
+                url="https://acme.com",
+                raw_html=None,
+                markdown_text="prior body",
+                fetched_at=datetime(2026, 5, 8, tzinfo=UTC),
+            )
+
+    enricher_calls: list[str] = []
+
+    class _RecordingEnricher:
+        async def enrich(self, entry):
+            enricher_calls.append(entry.source_id)
+            return entry
+
+    classifier_calls: list[str] = []
+
+    class _RecordingClassifier:
+        async def score(self, text: str) -> float:
+            classifier_calls.append(text[:16])
+            return 0.0
+
+    config = Config()
+    result = await ingest(
+        sources=[_OneShotSource()],
+        enrichers=[_RecordingEnricher()],
+        journal=journal,
+        corpus=InMemoryCorpus(),
+        llm=FakeLLMClient(canned={}, default_model=_HAIKU),
+        embed_client=FakeEmbeddingClient(model=config.embed_model_id),
+        budget=Budget(cap_usd=1.0),
+        slop_classifier=_RecordingClassifier(),
+        config=config,
+        post_mortems_root=tmp_path / "pm",
+        sparse_encoder=lambda _t: {0: 1.0},
+    )
+    assert result.skipped == 1
+    assert result.processed == 0
+    assert enricher_calls == [], "pre-enrich gate must short-circuit BEFORE the enricher runs"
+    assert classifier_calls == [], "pre-enrich gate must short-circuit BEFORE the classifier runs"
+
+
+async def test_force_bypasses_already_processed_skip(tmp_path):
+    """--force re-runs an already-complete entry through the enricher chain.
+
+    ``FakeSlopClassifier(default_score=0.9)`` quarantines the entry post-enrich
+    (0.9 > default ``slop_threshold=0.7``), so ``keepers`` stays empty and
+    ``ingest`` returns before any LLM-backed stage runs.
+    """
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    await journal.upsert_pending(canonical_id="acme.com", source="hn", source_id="acme")
+    await journal.mark_complete(
+        canonical_id="acme.com",
+        source="hn",
+        source_id="acme",
+        skip_key="prior",
+        merged_at="2026-05-07T00:00:00Z",
+    )
+
+    class _OneShotSource:
+        async def fetch(self):
+            yield RawEntry(
+                source="hn",
+                source_id="acme",
+                url="https://acme.com",
+                raw_html=None,
+                markdown_text="prior body",
+                fetched_at=datetime(2026, 5, 8, tzinfo=UTC),
+            )
+
+    enricher_calls: list[str] = []
+
+    class _RecordingEnricher:
+        async def enrich(self, entry):
+            enricher_calls.append(entry.source_id)
+            return entry
+
+    config = Config()
+    result = await ingest(
+        sources=[_OneShotSource()],
+        enrichers=[_RecordingEnricher()],
+        journal=journal,
+        corpus=InMemoryCorpus(),
+        llm=FakeLLMClient(canned={}, default_model=_HAIKU),
+        embed_client=FakeEmbeddingClient(model=config.embed_model_id),
+        budget=Budget(cap_usd=1.0),
+        slop_classifier=FakeSlopClassifier(default_score=0.9),
+        config=config,
+        post_mortems_root=tmp_path / "pm",
+        force=True,
+        sparse_encoder=lambda _t: {0: 1.0},
+    )
+    assert enricher_calls == ["acme"], "--force must bypass the pre-enrich skip"
+    assert result.quarantined == 1, (
+        "non-curated source with score=0.9 should quarantine post-enrich"
+    )

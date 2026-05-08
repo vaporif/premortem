@@ -110,7 +110,7 @@ def _record_entry_failure(  # noqa: PLR0913 - one seam, every dep
     result.span_events.append(SpanEvent.INGEST_ENTRY_FAILED.value)
 
 
-async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
+async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branch at this seam
     entries: Sequence[RawEntry],
     *,
     enrichers: Sequence[Enricher],
@@ -119,6 +119,7 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
     config: Config,
     post_mortems_root: Path,
     dry_run: bool,
+    force: bool,
     progress: IngestProgress,
     result: IngestResult,
 ) -> list[tuple[RawEntry, str]]:
@@ -138,6 +139,15 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
 
     async def _one(entry: RawEntry) -> tuple[RawEntry, str] | None:
         async with limiter:
+            if not force and await journal.is_terminal(entry.source, entry.source_id):
+                logger.info(
+                    "ingest: skipped %s:%s — already processed (use --force to re-run)",
+                    entry.source,
+                    entry.source_id,
+                )
+                result.skipped += 1
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
             result.seen += 1
             try:
                 enriched = await _enrich_pipeline(entry, enrichers)
@@ -407,6 +417,7 @@ async def ingest(  # noqa: PLR0913 - orchestration takes every dependency.
         config=config,
         post_mortems_root=post_mortems_root,
         dry_run=dry_run,
+        force=force,
         progress=progress,
         result=result,
     )
