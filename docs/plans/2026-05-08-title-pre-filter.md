@@ -648,7 +648,7 @@ Expected: clean.
 - Modify: `slopmortem/cli/_ingest_cmd.py:115-125,477,479-498`
 - Test: `tests/test_cli.py` (or `tests/cli/test_ingest_cmd.py` — match existing pattern)
 
-- [ ] **Step 1: Add the Typer flag**
+- [x] **Step 1: Add the Typer flag**
 
 In `slopmortem/cli/_ingest_cmd.py` directly after the existing `enable_pitch_filler` Typer option (currently `:96-106`), add:
 
@@ -669,11 +669,11 @@ In `slopmortem/cli/_ingest_cmd.py` directly after the existing `enable_pitch_fil
 
 Thread it through `_run_ingest`'s parameter list (the kwargs block currently around `:309-332`) and through the `functools.partial(_run_ingest, ...)` call site (currently `:240-263`).
 
-- [ ] **Step 2: Auto-enable for `hn_algolia`**
+- [x] **Step 2: Auto-enable for `hn_algolia`**
 
 In the existing `if any(isinstance(s, HNAlgoliaSource) for s in sources):` block (currently `_ingest_cmd.py:433-443`, ending with `enable_pitch_filler = True`), add `enable_title_pre_filter = True` next to the `enable_pitch_filler = True` assignment.
 
-- [ ] **Step 3: Prepend the enricher**
+- [x] **Step 3: Prepend the enricher**
 
 In the `enrichers: list[Enricher] = []` block (currently `_ingest_cmd.py:445-464`), insert the title pre-filter **before** the existing `if enable_pitch_filler:` block. The current code shape is:
 
@@ -710,11 +710,11 @@ Insert the new gate above it:
 
 Ordering is load-bearing: the title pre-filter must run before the pitch filler, because the pitch filler is the stage that issues the `tavily_search` tool call (~2 Tavily credits/entry). `TavilyEnricher` (the `/extract`-based body fetcher) is currently disabled, but Tavily search is still reachable via the pitch filler tool, so the gate has real cost-saving value.
 
-- [ ] **Step 4: Update help text on `--enable-pitch-filler`**
+- [x] **Step 4: Update help text on `--enable-pitch-filler`**
 
 The existing help (currently `_ingest_cmd.py:101-104`) says "Auto-enabled when hn_algolia is in the source list." Append: "Title pre-filter (auto-enabled too) drops most non-death titles before this stage runs, so Tavily credit burn is roughly proportional to the title-pass rate."
 
-- [ ] **Step 5: Add a CLI auto-enable test**
+- [x] **Step 5: Add a CLI auto-enable test**
 
 `tests/test_cli_ingest.py` does not currently assert on the `enable_pitch_filler` auto-enable wiring, so there is no precedent to copy — pick the lightest path that proves the auto-enable fired.
 
@@ -736,12 +736,12 @@ def test_hn_algolia_auto_enables_title_pre_filter() -> None:
 
 If the worker decides the extraction is too invasive, fall back to a smoke test that calls the Typer command via `CliRunner` with `--dry-run --only-source hn_algolia`, `TAVILY_API_KEY=stub` set, and asserts the run exits 0 — this only proves nothing crashes, not that the flag flipped, but it's better than no test.
 
-- [ ] **Step 6: Run the full test suite**
+- [x] **Step 6: Run the full test suite**
 
 Run: `just test`
 Expected: all PASS.
 
-- [ ] **Step 7: Lint + typecheck**
+- [x] **Step 7: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
@@ -757,7 +757,7 @@ TAVILY_API_KEY=<your-key> uv run slopmortem ingest \
 
 Watch the log for `title pre-filter: rejected …` lines on titles that aren't death narratives, and confirm those entries never trigger a `pitch filler tavily_search` line.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 `git add slopmortem/cli/_ingest_cmd.py tests/ && git commit -m "cli: wire title pre-filter, auto-enable for hn_algolia"`
 
