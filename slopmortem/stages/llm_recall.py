@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import httpx
+from lmnr import observe
 from pydantic import ValidationError
 
 from slopmortem.llm import render_blocks, to_strict_response_schema
@@ -55,6 +56,10 @@ def detect_coverage_gap(
     return qualifying < n_synthesize
 
 
+# Drop user pitch, candidate payloads, and rerank rationales from span attrs:
+# CLAUDE.md forbids prompt/response bodies in tracing. Candidate id/score still
+# show up via the ``stage.llm_rerank`` upstream span.
+@observe(name="stage.llm_recall", ignore_inputs=["pitch", "facets", "current_top_n"])
 async def llm_recall(  # noqa: PLR0913 - every dependency is required at the call site
     *,
     pitch: str,
@@ -93,6 +98,10 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
             },
             max_tokens=max_tokens,
         )
+    # RuntimeError covers OpenRouter's hard-stop / null-tool-calls / unknown
+    # finish-reason failures (slopmortem/llm/openrouter.py raises plain
+    # RuntimeError on those). BudgetExceededError extends Exception directly,
+    # not RuntimeError, so budget exhaustion still propagates up.
     except (httpx.HTTPError, RuntimeError) as exc:
         logger.warning("llm_recall: call failed: %r", exc)
         return []

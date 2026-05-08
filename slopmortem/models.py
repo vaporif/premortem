@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, model_validator
 
 # Closed-enum facet fields whose values MUST be in taxonomy.yml. Free-form
 # fields like sub_sector, product_type, price_point, founding_year, and
@@ -238,16 +238,34 @@ class LlmRerankResult(BaseModel):
     ranked: list[ScoredCandidate]
 
 
+_HTTP_URL_ADAPTER: TypeAdapter[HttpUrl] = TypeAdapter(HttpUrl)
+
+
 class RecallSuggestion(BaseModel):
-    """One LLM-recalled comparable: company name plus the citation that proves failure."""
+    """One LLM-recalled comparable: company name plus the citation that proves failure.
+
+    URL fields are typed ``str`` (not ``HttpUrl``) on purpose: ``HttpUrl`` emits
+    ``format: "uri"`` plus ``minLength``/``maxLength`` in JSON Schema, all of
+    which OpenAI's strict ``response_format`` mode rejects. Parse-equivalent
+    validation runs in ``_validate_urls`` below, so the wire contract stays
+    "well-formed http(s) URL" even though the schema sent upstream is just
+    ``"type": "string"``.
+    """
 
     name: str
     category: str
     status: Literal["dead", "absorbed", "struggling", "bruised"]
-    homepage_url: HttpUrl
+    homepage_url: str
     failure_year: int = Field(ge=1990, le=2030)
-    evidence_url: HttpUrl
+    evidence_url: str
     one_liner: str
+
+    @model_validator(mode="after")
+    def _validate_urls(self) -> RecallSuggestion:
+        # Same shape ``HttpUrl`` would have enforced on the field directly.
+        _HTTP_URL_ADAPTER.validate_python(self.homepage_url)
+        _HTTP_URL_ADAPTER.validate_python(self.evidence_url)
+        return self
 
 
 class RecallSuggestionList(BaseModel):

@@ -13,8 +13,8 @@ import pytest
 from openai import AsyncOpenAI
 
 from slopmortem.budget import Budget
-from slopmortem.llm import CompletionResult, OpenRouterClient
-from slopmortem.models import Facets
+from slopmortem.llm import CompletionResult, LLMClient, OpenRouterClient
+from slopmortem.models import Facets, PerspectiveScore, ScoredCandidate, SimilarityScores
 from slopmortem.stages.llm_recall import llm_recall
 
 CASSETTE_FILE = (
@@ -22,6 +22,7 @@ CASSETTE_FILE = (
 )
 
 _RECALL_MODEL = "anthropic/claude-opus-4-7"
+_MAX_TOKENS = 4096
 
 
 def _facets() -> Facets:
@@ -74,6 +75,30 @@ class _StubLLM:
         return CompletionResult(text=self.text, stop_reason="stop")
 
 
+def _assert_matches_protocol(_: LLMClient) -> None:
+    # Static-only check: drift in ``LLMClient.complete`` (added required kwarg,
+    # renamed param) fails basedpyright at the ``_assert_matches_protocol``
+    # call below instead of silently letting the stub diverge.
+    return
+
+
+_assert_matches_protocol(_StubLLM())
+
+
+def _scored(candidate_id: str, *, score: float = 8.0, rationale: str = "stub") -> ScoredCandidate:
+    perspective = PerspectiveScore(score=score, rationale=rationale)
+    return ScoredCandidate(
+        candidate_id=candidate_id,
+        perspective_scores=SimilarityScores(
+            business_model=perspective,
+            market=perspective,
+            gtm=perspective,
+            stage_scale=perspective,
+        ),
+        rationale=rationale,
+    )
+
+
 def _suggestion_json(name: str, *, year: int = 2023) -> dict[str, Any]:
     return {
         "name": name,
@@ -96,7 +121,7 @@ async def test_recall_returns_empty_on_uncertain_llm() -> None:
         current_top_n=[],
         llm=llm,
         model=_RECALL_MODEL,
-        max_tokens=4096,
+        max_tokens=_MAX_TOKENS,
         cap=8,
     )
 
@@ -105,6 +130,33 @@ async def test_recall_returns_empty_on_uncertain_llm() -> None:
     assert len(llm.calls) == 1
     assert llm.calls[0]["system"]
     assert "Hacken-style" in llm.calls[0]["prompt"]
+
+
+async def test_recall_renders_current_top_n_block() -> None:
+    # Covers the Jinja ``{% if current_top_n %}`` branch: the prior top-N
+    # gets serialized as ``- candidate_id: <id> (rationale: ...)`` so Opus
+    # avoids re-suggesting what the corpus already returned.
+    llm = _StubLLM(text='{"suggestions": []}')
+    top_n = [
+        _scored("hacken-io", rationale="prior corpus hit A"),
+        _scored("certik", rationale="prior corpus hit B"),
+    ]
+
+    out = await llm_recall(
+        pitch="Hacken-style Web3 audit firm",
+        facets=_facets(),
+        current_top_n=top_n,
+        llm=llm,
+        model=_RECALL_MODEL,
+        max_tokens=_MAX_TOKENS,
+        cap=8,
+    )
+
+    assert out == []
+    rendered = llm.calls[0]["prompt"]
+    assert "candidate_id: hacken-io" in rendered
+    assert "candidate_id: certik" in rendered
+    assert "(none — corpus returned no in-vertical matches)" not in rendered
 
 
 async def test_recall_caps_at_max() -> None:
@@ -120,7 +172,7 @@ async def test_recall_caps_at_max() -> None:
         current_top_n=[],
         llm=llm,
         model=_RECALL_MODEL,
-        max_tokens=4096,
+        max_tokens=_MAX_TOKENS,
         cap=8,
     )
 
@@ -139,7 +191,7 @@ async def test_recall_drops_invalid_response() -> None:
         current_top_n=[],
         llm=llm,
         model=_RECALL_MODEL,
-        max_tokens=4096,
+        max_tokens=_MAX_TOKENS,
         cap=8,
     )
 
@@ -170,7 +222,7 @@ async def test_recall_drops_wrapper_failing_validation() -> None:
         current_top_n=[],
         llm=llm,
         model=_RECALL_MODEL,
-        max_tokens=4096,
+        max_tokens=_MAX_TOKENS,
         cap=8,
     )
 
@@ -187,7 +239,7 @@ async def test_recall_returns_empty_on_http_error() -> None:
         current_top_n=[],
         llm=llm,
         model=_RECALL_MODEL,
-        max_tokens=4096,
+        max_tokens=_MAX_TOKENS,
         cap=8,
     )
 
@@ -216,7 +268,7 @@ async def test_recall_cassette_round_trip() -> None:
         current_top_n=[],
         llm=client,
         model=_RECALL_MODEL,
-        max_tokens=4096,
+        max_tokens=_MAX_TOKENS,
         cap=8,
     )
 
