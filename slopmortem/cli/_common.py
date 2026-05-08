@@ -42,7 +42,7 @@ def _maybe_setup_logging() -> None:
 
     Off by default so library use of the CLI module doesn't hijack the root
     logger. Set ``SLOPMORTEM_LOG=info`` (or ``debug``) to see per-entry ingest
-    progress (defillama emit lines, tavily fill lines, ingest save lines).
+    progress (tavily fill lines, ingest save lines).
     Third-party loggers (httpx, lmnr) are pinned to WARNING so the slopmortem
     signal isn't drowned out.
     """
