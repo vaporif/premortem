@@ -54,6 +54,7 @@ class HaikuTitlePreFilter:
     max_tokens: int = 16
 
     def _should_skip(self, entry: RawEntry) -> bool:
+        """Return True when the pre-filter must not call the LLM for this entry."""
         if entry.markdown_text is not None and entry.markdown_text.strip():
             return True
         if entry.raw_html is not None and entry.raw_html.strip():

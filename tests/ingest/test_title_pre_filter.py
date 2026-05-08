@@ -59,6 +59,7 @@ def _make_entry(
     title: str | None = "Lytro is shutting down",
     url: str | None = "https://blog.lytro.com/farewell",
     markdown_text: str | None = None,
+    raw_html: str | None = None,
 ) -> RawEntry:
     return RawEntry(
         source="hn_algolia",
@@ -66,6 +67,7 @@ def _make_entry(
         url=url,
         title=title,
         markdown_text=markdown_text,
+        raw_html=raw_html,
         fetched_at=datetime.now(UTC),
     )
 
@@ -99,6 +101,15 @@ async def test_no_sets_rejected_flag() -> None:
 async def test_skips_when_body_pre_filled() -> None:
     llm = _StubLLM(text=json.dumps({"decision": "no"}))
     out = await _filter(llm=llm).enrich(_make_entry(markdown_text="already enriched"))
+    assert out.title_pre_filter_rejected is False
+    assert len(llm.calls) == 0
+
+
+@pytest.mark.anyio
+async def test_skips_when_raw_html_pre_filled() -> None:
+    """A populated raw_html means a body fetcher already ran; don't re-gate."""
+    llm = _StubLLM(text=json.dumps({"decision": "no"}))
+    out = await _filter(llm=llm).enrich(_make_entry(raw_html="<p>already fetched</p>"))
     assert out.title_pre_filter_rejected is False
     assert len(llm.calls) == 0
 
