@@ -38,7 +38,6 @@ from slopmortem.corpus import (
 from slopmortem.corpus.sources import (
     CrunchbaseCsvSource,
     CuratedSource,
-    DefiLlamaSource,
     HNAlgoliaSource,
     TavilyNewsSource,
 )
@@ -118,65 +117,6 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             ),
         ),
     ] = False,
-    enable_defillama: Annotated[
-        bool,
-        typer.Option(
-            "--enable-defillama",
-            help=(
-                "Enable the DefiLlama dead-protocol source. "
-                "Bodies are not currently fetched (Tavily /extract enricher disabled), "
-                "so emitted entries will be dropped at the empty-body check."
-            ),
-        ),
-    ] = False,
-    defillama_rps: Annotated[
-        float | None,
-        typer.Option(
-            "--defillama-rps",
-            help=(
-                "Override DefiLlama per-host request rate. "
-                "Only takes effect when defillama is enabled."
-            ),
-        ),
-    ] = None,
-    defillama_concurrency: Annotated[
-        int | None,
-        typer.Option(
-            "--defillama-concurrency",
-            help=(
-                "Override DefiLlama fan-out concurrency. "
-                "Only takes effect when defillama is enabled."
-            ),
-        ),
-    ] = None,
-    defillama_wayback_concurrency: Annotated[
-        int | None,
-        typer.Option(
-            "--defillama-wayback-concurrency",
-            help=(
-                "Override Wayback CDX fan-out concurrency. Wayback rejects parallel "
-                "TCP opens past a small per-IP cap. "
-                "Only takes effect when defillama is enabled."
-            ),
-        ),
-    ] = None,
-    defillama_max_emit: Annotated[
-        int | None,
-        typer.Option(
-            "--defillama-max-emit",
-            help=("Override DefiLlama max_emit cap. Only takes effect when defillama is enabled."),
-        ),
-    ] = None,
-    defillama_shortlist_ceiling_usd: Annotated[
-        float | None,
-        typer.Option(
-            "--defillama-shortlist-ceiling-usd",
-            help=(
-                "Override DefiLlama shortlist TVL ceiling (USD). "
-                "Only takes effect when defillama is enabled."
-            ),
-        ),
-    ] = None,
     enable_tavily_news: Annotated[
         bool,
         typer.Option(
@@ -226,7 +166,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             help=(
                 "Run only the named source, auto-enabling its --enable-* flag if any. "
                 "Accepts source identifiers (curated, hn_algolia, crunchbase_csv, "
-                "defillama, tavily_news)."
+                "tavily_news)."
             ),
         ),
     ] = None,
@@ -243,7 +183,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             "--limit",
             help=(
                 "Process only the first N entries after gathering from all sources. "
-                "Source order is curated -> HN -> Crunchbase -> DefiLlama -> TavilyNews. "
+                "Source order is curated -> HN -> Crunchbase -> TavilyNews. "
                 "Useful for cheap live smoke tests; cost scales with N."
             ),
         ),
@@ -261,12 +201,6 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             crunchbase_csv=crunchbase_csv,
             enable_pitch_filler=enable_pitch_filler,
             enable_title_pre_filter=enable_title_pre_filter,
-            enable_defillama=enable_defillama,
-            defillama_rps=defillama_rps,
-            defillama_concurrency=defillama_concurrency,
-            defillama_wayback_concurrency=defillama_wayback_concurrency,
-            defillama_max_emit=defillama_max_emit,
-            defillama_shortlist_ceiling_usd=defillama_shortlist_ceiling_usd,
             enable_tavily_news=enable_tavily_news,
             tavily_news_start_year=tavily_news_start_year,
             tavily_news_end_year=tavily_news_end_year,
@@ -332,12 +266,6 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     crunchbase_csv: Path | None,
     enable_pitch_filler: bool,
     enable_title_pre_filter: bool,
-    enable_defillama: bool,
-    defillama_rps: float | None,
-    defillama_concurrency: int | None,
-    defillama_wayback_concurrency: int | None,
-    defillama_max_emit: int | None,
-    defillama_shortlist_ceiling_usd: float | None,
     enable_tavily_news: bool,
     tavily_news_start_year: int | None,
     tavily_news_end_year: int | None,
@@ -383,8 +311,6 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         # ``locals()`` tricks. Add one when introducing a new opt-in source.
         if spec.source_class is TavilyNewsSource:
             enable_tavily_news = True
-        if spec.source_class is DefiLlamaSource:
-            enable_defillama = True
         # crunchbase_csv is gated by a path argument, not a boolean — require it explicitly.
         if spec.source_class is CrunchbaseCsvSource and crunchbase_csv is None:
             msg = "--only-source crunchbase_csv requires --crunchbase-csv PATH."
@@ -411,16 +337,6 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     ]
     if crunchbase_csv is not None:
         sources.append(CrunchbaseCsvSource(csv_path=crunchbase_csv))
-    if enable_defillama:
-        sources.append(
-            DefiLlamaSource(
-                rps=defillama_rps,
-                concurrency=defillama_concurrency,
-                wayback_concurrency=defillama_wayback_concurrency,
-                max_emit=defillama_max_emit,
-                shortlist_tvl_ceiling_usd=defillama_shortlist_ceiling_usd,
-            )
-        )
     if enable_tavily_news:
         sources.append(
             TavilyNewsSource(
@@ -546,7 +462,6 @@ _SOURCE_REGISTRY: dict[str, _SourceSpec] = {
     "curated": _SourceSpec(source_class=CuratedSource),
     "hn_algolia": _SourceSpec(source_class=HNAlgoliaSource),
     "crunchbase_csv": _SourceSpec(source_class=CrunchbaseCsvSource),
-    "defillama": _SourceSpec(source_class=DefiLlamaSource),
     "tavily_news": _SourceSpec(source_class=TavilyNewsSource),
 }
 
