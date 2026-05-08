@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from slopmortem.models import (
     Candidate,
     CandidatePayload,
@@ -7,6 +9,7 @@ from slopmortem.models import (
     InputContext,
     MergeState,
     PerspectiveScore,
+    RawEntry,
     ScoredCandidate,
     SimilarityScores,
 )
@@ -114,10 +117,6 @@ def test_similarity_scores_mean_averages_four_perspectives() -> None:
 
 
 def test_raw_entry_title_pre_filter_rejected_defaults_false() -> None:
-    from datetime import UTC, datetime  # noqa: PLC0415
-
-    from slopmortem.models import RawEntry  # noqa: PLC0415
-
     e = RawEntry(
         source="hn_algolia",
         source_id="x",
@@ -128,10 +127,6 @@ def test_raw_entry_title_pre_filter_rejected_defaults_false() -> None:
 
 
 def test_raw_entry_title_pre_filter_rejected_can_be_set() -> None:
-    from datetime import UTC, datetime  # noqa: PLC0415
-
-    from slopmortem.models import RawEntry  # noqa: PLC0415
-
     e = RawEntry(
         source="hn_algolia",
         source_id="x",

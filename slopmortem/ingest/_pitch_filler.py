@@ -68,7 +68,11 @@ class HaikuPitchFiller:
         has_body = (entry.markdown_text is not None and entry.markdown_text.strip()) or (
             entry.raw_html is not None and entry.raw_html.strip()
         )
-        if entry.title_pre_filter_rejected or has_body or not entry.url:
+        # Silent skips (no log line): upstream gate already rejected, body is
+        # already populated, or there's no URL to research. Combined into one
+        # return to stay under ruff's max-returns=6 on this function.
+        silently_skip = entry.title_pre_filter_rejected or has_body or not entry.url
+        if silently_skip:
             return True
         if not entry.title:
             logger.info(
