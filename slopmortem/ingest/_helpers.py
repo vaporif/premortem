@@ -11,7 +11,6 @@ from slopmortem.corpus import extract_clean
 from slopmortem.corpus.sources._names import (
     SOURCE_CRUNCHBASE_CSV,
     SOURCE_CURATED,
-    SOURCE_DEFILLAMA,
     SOURCE_HN_ALGOLIA,
     SOURCE_TAVILY_NEWS,
 )
@@ -44,7 +43,6 @@ _RELIABILITY_RANK: Final[dict[str, int]] = {
     SOURCE_CURATED: 0,
     SOURCE_HN_ALGOLIA: 1,
     SOURCE_CRUNCHBASE_CSV: 2,
-    SOURCE_DEFILLAMA: 3,
     SOURCE_TAVILY_NEWS: 4,
 }
 
