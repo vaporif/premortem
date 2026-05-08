@@ -570,7 +570,7 @@ Expected: clean.
 - Modify: `slopmortem/ingest/_ingest.py:139-167`
 - Test: `tests/ingest/test_pitch_filler.py`, `tests/ingest/test_orchestration.py`
 
-- [ ] **Step 1: Write the failing test for pitch filler skip**
+- [x] **Step 1: Write the failing test for pitch filler skip**
 
 Append to `tests/ingest/test_pitch_filler.py`:
 
@@ -586,12 +586,12 @@ async def test_skips_when_title_pre_filter_rejected() -> None:
     assert len(llm.calls) == 0
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/ingest/test_pitch_filler.py::test_skips_when_title_pre_filter_rejected -v`
 Expected: FAIL — pitch filler still calls the LLM and populates `markdown_text`.
 
-- [ ] **Step 3: Add the skip-guard**
+- [x] **Step 3: Add the skip-guard**
 
 In `slopmortem/ingest/_pitch_filler.py`, at the top of `_should_skip` (line 66, before the existing checks):
 
@@ -600,12 +600,12 @@ In `slopmortem/ingest/_pitch_filler.py`, at the top of `_should_skip` (line 66, 
             return True
 ```
 
-- [ ] **Step 4: Run pitch-filler tests**
+- [x] **Step 4: Run pitch-filler tests**
 
 Run: `uv run pytest tests/ingest/test_pitch_filler.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Make ingest classify loop count rejected entries**
+- [x] **Step 5: Make ingest classify loop count rejected entries**
 
 Read `slopmortem/ingest/_ingest.py` around line 156–166 (the empty-body skip) to see the existing skip-counting pattern. Insert a check **before** the empty-body skip:
 
@@ -622,21 +622,21 @@ Read `slopmortem/ingest/_ingest.py` around line 156–166 (the empty-body skip) 
                 return None
 ```
 
-- [ ] **Step 6: Add an orchestration test**
+- [x] **Step 6: Add an orchestration test**
 
 Append to `tests/ingest/test_orchestration.py` a test that runs the ingest end-to-end with a `HaikuTitlePreFilter` that rejects every entry, asserts `result.skipped == N`, and asserts the slop classifier was never called. (Mirror the existing fake-classifier patterns used in that file.)
 
-- [ ] **Step 7: Run the full ingest test suite**
+- [x] **Step 7: Run the full ingest test suite**
 
 Run: `uv run pytest tests/ingest/ -v`
 Expected: all PASS.
 
-- [ ] **Step 8: Lint + typecheck**
+- [x] **Step 8: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 `git add slopmortem/ingest/_pitch_filler.py slopmortem/ingest/_ingest.py tests/ingest/ && git commit -m "ingest: honor title_pre_filter_rejected in skip-guards"`
 
