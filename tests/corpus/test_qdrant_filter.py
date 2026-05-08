@@ -6,16 +6,11 @@ The helpers are pure and table-driven; these cover every row of the spec
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
-from qdrant_client.models import FieldCondition as _FieldCondition
-from qdrant_client.models import Filter
-from qdrant_client.models import MatchValue as _MatchValue
+from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
 from slopmortem.corpus._qdrant_store import _and_filters, _build_sector_filter
-
-if TYPE_CHECKING:
-    from qdrant_client.models import FieldCondition, MatchAny, MatchValue
 
 
 def test_build_sector_filter_disabled_returns_none() -> None:
@@ -33,9 +28,8 @@ def test_build_sector_filter_strict_keeps_other() -> None:
     f = _build_sector_filter(sector="crypto_web3", strict=True, exclude_other=False)
     assert f is not None
     assert f.must is not None
-    # qdrant ``Filter.must`` is a union over many condition shapes; the helper
-    # only ever produces a single ``FieldCondition`` with a ``MatchAny`` body,
-    # so cast at the assertion boundary instead of structural pattern-matching.
+    # ``Filter.must`` is a union over many condition shapes; the helper only
+    # produces ``FieldCondition`` + ``MatchAny``, so cast at the boundary.
     [raw] = f.must
     cond = cast("FieldCondition", raw)
     match = cast("MatchAny", cond.match)
@@ -55,7 +49,7 @@ def test_build_sector_filter_strict_excludes_other() -> None:
 
 
 def _sector_eq(sector: str) -> Filter:
-    return Filter(must=[_FieldCondition(key="facets.sector", match=_MatchValue(value=sector))])
+    return Filter(must=[FieldCondition(key="facets.sector", match=MatchValue(value=sector))])
 
 
 def test_and_filters_all_none() -> None:
