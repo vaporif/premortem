@@ -817,6 +817,28 @@ async def test_ingest_skips_title_pre_filter_rejected_before_slop_classify(tmp_p
     assert SpanEvent.SLOP_QUARANTINED.value not in result.span_events
 
 
+@dataclass
+class _RecordingEnricher:
+    """Captures source_ids of entries that reached the enricher chain."""
+
+    calls: list[str]
+
+    async def enrich(self, entry: RawEntry) -> RawEntry:
+        self.calls.append(entry.source_id)
+        return entry
+
+
+async def _seed_complete(journal: MergeJournal, *, source: str, source_id: str) -> None:
+    await journal.upsert_pending(canonical_id="acme.com", source=source, source_id=source_id)
+    await journal.mark_complete(
+        canonical_id="acme.com",
+        source=source,
+        source_id=source_id,
+        skip_key="prior",
+        merged_at="2026-05-07T00:00:00Z",
+    )
+
+
 async def test_already_processed_entry_skipped_before_enrichers_run(tmp_path):
     """Pre-enrich gate: a complete-in-journal entry must not invoke any enricher.
 
@@ -826,45 +848,21 @@ async def test_already_processed_entry_skipped_before_enrichers_run(tmp_path):
     """
     journal = MergeJournal(tmp_path / "j.sqlite")
     await journal.init()
-    # Pre-seed the journal as if a prior run already completed this entry.
-    await journal.upsert_pending(canonical_id="acme.com", source="hn", source_id="acme")
-    await journal.mark_complete(
-        canonical_id="acme.com",
-        source="hn",
-        source_id="acme",
-        skip_key="prior",
-        merged_at="2026-05-07T00:00:00Z",
-    )
-
-    class _OneShotSource:
-        async def fetch(self):
-            yield RawEntry(
-                source="hn",
-                source_id="acme",
-                url="https://acme.com",
-                raw_html=None,
-                markdown_text="prior body",
-                fetched_at=datetime(2026, 5, 8, tzinfo=UTC),
-            )
-
-    enricher_calls: list[str] = []
-
-    class _RecordingEnricher:
-        async def enrich(self, entry):
-            enricher_calls.append(entry.source_id)
-            return entry
+    await _seed_complete(journal, source="hn", source_id="acme")
 
     classifier_calls: list[str] = []
 
+    @dataclass
     class _RecordingClassifier:
         async def score(self, text: str) -> float:
             classifier_calls.append(text[:16])
             return 0.0
 
+    enricher_calls: list[str] = []
     config = Config()
     result = await ingest(
-        sources=[_OneShotSource()],
-        enrichers=[_RecordingEnricher()],
+        sources=[_ListSource(entries=[_entry(source="hn", source_id="acme")])],
+        enrichers=[_RecordingEnricher(calls=enricher_calls)],
         journal=journal,
         corpus=InMemoryCorpus(),
         llm=FakeLLMClient(canned={}, default_model=_HAIKU),
@@ -873,7 +871,7 @@ async def test_already_processed_entry_skipped_before_enrichers_run(tmp_path):
         slop_classifier=_RecordingClassifier(),
         config=config,
         post_mortems_root=tmp_path / "pm",
-        sparse_encoder=lambda _t: {0: 1.0},
+        sparse_encoder=_stub_sparse,
     )
     assert result.skipped == 1
     assert result.processed == 0
@@ -890,37 +888,13 @@ async def test_force_bypasses_already_processed_skip(tmp_path):
     """
     journal = MergeJournal(tmp_path / "j.sqlite")
     await journal.init()
-    await journal.upsert_pending(canonical_id="acme.com", source="hn", source_id="acme")
-    await journal.mark_complete(
-        canonical_id="acme.com",
-        source="hn",
-        source_id="acme",
-        skip_key="prior",
-        merged_at="2026-05-07T00:00:00Z",
-    )
-
-    class _OneShotSource:
-        async def fetch(self):
-            yield RawEntry(
-                source="hn",
-                source_id="acme",
-                url="https://acme.com",
-                raw_html=None,
-                markdown_text="prior body",
-                fetched_at=datetime(2026, 5, 8, tzinfo=UTC),
-            )
+    await _seed_complete(journal, source="hn", source_id="acme")
 
     enricher_calls: list[str] = []
-
-    class _RecordingEnricher:
-        async def enrich(self, entry):
-            enricher_calls.append(entry.source_id)
-            return entry
-
     config = Config()
     result = await ingest(
-        sources=[_OneShotSource()],
-        enrichers=[_RecordingEnricher()],
+        sources=[_ListSource(entries=[_entry(source="hn", source_id="acme")])],
+        enrichers=[_RecordingEnricher(calls=enricher_calls)],
         journal=journal,
         corpus=InMemoryCorpus(),
         llm=FakeLLMClient(canned={}, default_model=_HAIKU),
@@ -930,7 +904,7 @@ async def test_force_bypasses_already_processed_skip(tmp_path):
         config=config,
         post_mortems_root=tmp_path / "pm",
         force=True,
-        sparse_encoder=lambda _t: {0: 1.0},
+        sparse_encoder=_stub_sparse,
     )
     assert enricher_calls == ["acme"], "--force must bypass the pre-enrich skip"
     assert result.quarantined == 1, (
