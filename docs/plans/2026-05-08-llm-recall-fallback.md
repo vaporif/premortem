@@ -846,7 +846,7 @@ Note: `RawEntry` itself does not carry `verification_tier`. The tier rides as a 
 
 `just lint && just typecheck`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 `git add slopmortem/http.py slopmortem/stages/recall_verify.py slopmortem/stages/__init__.py tests/test_http.py tests/stages/test_recall_verify.py && git commit -m "stages: recall_verify L1-L4 with safe_head + WaybackEnricher"`
 
