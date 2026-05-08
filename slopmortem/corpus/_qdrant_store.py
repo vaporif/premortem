@@ -366,13 +366,13 @@ def _and_filters(*filters: Filter | None) -> Filter | None:
 def _build_sector_filter(*, sector: str, strict: bool, exclude_other: bool) -> Filter | None:
     """Hard payload filter on ``facets.sector``. ``None`` = no narrowing.
 
-    The current behaviour (no filter; sector participates only as a soft boost)
-    is the ``strict=False`` branch. ``strict=True`` enforces the pitch's sector
-    at retrieve time. ``exclude_other=True`` further drops the ``"other"``
-    safety valve — only set if the corpus's ``"other"`` bucket has been
-    audited and intentional misclassifications have been reclassified.
+    ``strict=False`` is the legacy path: sector only contributes as a soft
+    boost, so this returns ``None``. ``strict=True`` pins the pitch's sector
+    at retrieve time. ``exclude_other=True`` drops the ``"other"`` safety
+    valve — only set it after auditing the corpus's ``"other"`` bucket and
+    reclassifying misclassifications.
 
-    Returns ``None`` when ``pitch.sector == "other"`` regardless of the flags:
+    Returns ``None`` when ``pitch.sector == "other"`` regardless of flags:
     the pitch sector is uninformative, and filtering on ``"other"`` would
     either match misclassification noise or (with ``exclude_other=True``)
     return nothing.
