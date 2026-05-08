@@ -1,4 +1,4 @@
-"""LLM-recall fallback: coverage-gap predicate plus (Task 3) the recall stage call."""
+"""LLM-recall fallback: coverage-gap predicate, plus the recall stage call."""
 
 from __future__ import annotations
 

@@ -109,8 +109,8 @@ def test_zero_candidates_fires() -> None:
 
 
 def test_one_in_sector_high_quality_match_fires() -> None:
-    # Strict filter cut to 1 — qualifying_count=1 < N_synthesize=5 — fire.
-    # This is the regression test for the bug the unified trigger fixes.
+    # One survivor under strict filter: 1 < N_synthesize=5, so fire. Regression
+    # for the case the unified trigger was added to catch.
     retrieved = [_candidate("only_one", "crypto_web3")]
     ranked = [_scored("only_one", 5.0)]
     assert (
@@ -159,8 +159,7 @@ def test_pitch_sector_other_skips_sector_check() -> None:
 
 
 def test_wrong_vertical_noise_fires() -> None:
-    # Five candidates with mean >= 6.0 but all in wrong sector → qualifying=0 → fire.
-    # Replaces the old vertical-axis-collapse test.
+    # Five high-mean (>=6.0) candidates but all in the wrong sector → qualifying=0 → fire.
     retrieved = [_candidate(f"c{i}", "security") for i in range(5)]
     ranked = [_scored(f"c{i}", 6.0) for i in range(5)]
     assert (
