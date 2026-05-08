@@ -11,6 +11,15 @@ from slopmortem.stages.llm_rerank import (
 from slopmortem.stages.llm_rerank import (
     select_top_n_by_similarity as select_top_n_by_similarity,
 )
+from slopmortem.stages.recall_verify import (
+    VerificationTier as VerificationTier,
+)
+from slopmortem.stages.recall_verify import (
+    verify_and_persist_all as verify_and_persist_all,
+)
+from slopmortem.stages.recall_verify import (
+    verify_suggestion as verify_suggestion,
+)
 from slopmortem.stages.retrieve import (
     SparseEncoder as SparseEncoder,
 )
@@ -32,6 +41,7 @@ from slopmortem.stages.synthesize import (
 
 __all__ = [
     "SparseEncoder",
+    "VerificationTier",
     "consolidate_risks",
     "detect_coverage_gap",
     "drop_below_min_similarity",
@@ -42,4 +52,6 @@ __all__ = [
     "synthesize",
     "synthesize_all",
     "synthesize_prompt_kwargs",
+    "verify_and_persist_all",
+    "verify_suggestion",
 ]

@@ -636,7 +636,7 @@ Inspect the recorded `tests/fixtures/cassettes/recall/llm_recall_hacken.yaml` fo
 - New: `tests/stages/test_recall_verify.py`
 - Modify: `slopmortem/stages/__init__.py` (re-export)
 
-- [ ] **Step 1: Write failing test for `safe_head`**
+- [x] **Step 1: Write failing test for `safe_head`**
 
 Append to `tests/test_http.py` (or create if absent):
 
@@ -656,15 +656,15 @@ async def test_safe_head_raises_on_404() -> None:
     ...
 ```
 
-- [ ] **Step 2: Implement `safe_head`**
+- [x] **Step 2: Implement `safe_head`**
 
 In `slopmortem/http.py`, mirror `safe_get` but use `client.head(...)`. Reuse the existing SSRF guard.
 
-- [ ] **Step 3: Run http tests**
+- [x] **Step 3: Run http tests**
 
 `uv run pytest tests/test_http.py -v`
 
-- [ ] **Step 4: Write verifier failing tests**
+- [x] **Step 4: Write verifier failing tests**
 
 `tests/stages/test_recall_verify.py`:
 
@@ -724,7 +724,7 @@ async def test_verify_all_via_gather_resilient_isolates_failures() -> None:
     ...
 ```
 
-- [ ] **Step 5: Implement `recall_verify.py`**
+- [x] **Step 5: Implement `recall_verify.py`**
 
 ```python
 _DEATH_KEYWORDS: Final[frozenset[str]] = frozenset({
@@ -838,11 +838,11 @@ async def verify_and_persist_all(
 
 Note: `RawEntry` itself does not carry `verification_tier`. The tier rides as a sibling argument into `persist_recall_entry` (Task 5), which threads it through `_write_phase` → `_process_entry` → `_build_payload` and lands on `CandidatePayload.verification_tier` — keeps `RawEntry` stable across non-recall sources, and avoids a parallel qdrant payload-merge channel.
 
-- [ ] **Step 6: Run verifier tests**
+- [x] **Step 6: Run verifier tests**
 
 `uv run pytest tests/stages/test_recall_verify.py -v`
 
-- [ ] **Step 7: Lint + typecheck**
+- [x] **Step 7: Lint + typecheck**
 
 `just lint && just typecheck`
 
