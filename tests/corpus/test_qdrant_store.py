@@ -142,11 +142,21 @@ async def test_delete_chunks_idempotent_when_no_points(
 
 
 @pytest.mark.requires_qdrant
-async def test_strict_sector_filter_default_keeps_sector_and_other(
-    qdrant_client: AsyncQdrantClient, tmp_path: Path
+@pytest.mark.parametrize(
+    ("excludes_other", "name", "expected"),
+    [
+        (False, "test_strict_sector_default", {"crypto_web3", "other"}),
+        (True, "test_strict_sector_exclude_other", {"crypto_web3"}),
+    ],
+    ids=["keeps_other", "excludes_other"],
+)
+async def test_strict_sector_filter(
+    qdrant_client: AsyncQdrantClient,
+    tmp_path: Path,
+    excludes_other: bool,  # noqa: FBT001 — pytest parametrize positional
+    name: str,
+    expected: set[str],
 ) -> None:
-    """With strict=True, exclude_other=False: keep crypto_web3 + other, drop fintech."""
-    name = "test_strict_sector_default"
     corpus = await _build_corpus(qdrant_client, tmp_path, name)
     try:
         await corpus.upsert_chunk(_make_chunk_with_sector("c:web3", 0, "crypto_web3"))
@@ -161,37 +171,9 @@ async def test_strict_sector_filter_default_keeps_sector_and_other(
             strict_deaths=False,
             k_retrieve=10,
             strict_sector_filter=True,
-            strict_sector_filter_excludes_other=False,
+            strict_sector_filter_excludes_other=excludes_other,
         )
         sectors = {c.payload.facets.sector for c in candidates}
-        assert sectors == {"crypto_web3", "other"}
-    finally:
-        await qdrant_client.delete_collection(name)
-
-
-@pytest.mark.requires_qdrant
-async def test_strict_sector_filter_excludes_other_returns_only_sector(
-    qdrant_client: AsyncQdrantClient, tmp_path: Path
-) -> None:
-    """With strict=True, exclude_other=True: keep crypto_web3 only."""
-    name = "test_strict_sector_exclude_other"
-    corpus = await _build_corpus(qdrant_client, tmp_path, name)
-    try:
-        await corpus.upsert_chunk(_make_chunk_with_sector("c:web3", 0, "crypto_web3"))
-        await corpus.upsert_chunk(_make_chunk_with_sector("c:other", 1, "other"))
-        await corpus.upsert_chunk(_make_chunk_with_sector("c:fin", 2, "fintech"))
-
-        candidates = await corpus.query(
-            dense=[0.001] * _DIM,
-            sparse={0: 1.0},
-            facets=_facets_with_sector("crypto_web3"),
-            cutoff_iso=None,
-            strict_deaths=False,
-            k_retrieve=10,
-            strict_sector_filter=True,
-            strict_sector_filter_excludes_other=True,
-        )
-        sectors = {c.payload.facets.sector for c in candidates}
-        assert sectors == {"crypto_web3"}
+        assert sectors == expected
     finally:
         await qdrant_client.delete_collection(name)

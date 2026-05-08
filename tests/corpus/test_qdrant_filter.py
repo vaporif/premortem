@@ -1,7 +1,7 @@
 """Truth-table tests for ``_build_sector_filter`` and ``_and_filters``.
 
-The helpers are pure and table-driven; these cover every row of the spec
-(see ``docs/specs/`` and the strict-sector-filter plan).
+The helpers are pure; these cover every row of the truth table in the
+strict-sector-filter plan (``docs/plans/2026-05-08-strict-sector-filter.md``).
 """
 
 from __future__ import annotations
