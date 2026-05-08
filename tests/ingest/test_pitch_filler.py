@@ -246,3 +246,14 @@ async def test_passes_single_tool_call_true() -> None:
     llm = _StubLLM(text=_high_response())
     await _filler(llm=llm).enrich(_make_entry())
     assert llm.calls[0]["single_tool_call"] is True
+
+
+@pytest.mark.anyio
+async def test_skips_when_title_pre_filter_rejected() -> None:
+    llm = _StubLLM(text=_high_response())
+    entry = _make_entry()
+    entry = entry.model_copy(update={"title_pre_filter_rejected": True})
+    out = await _filler(llm=llm).enrich(entry)
+    assert out.markdown_text is None
+    assert out.synthesized is False
+    assert len(llm.calls) == 0

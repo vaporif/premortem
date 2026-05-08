@@ -769,3 +769,49 @@ async def test_ingest_write_phase_reraises_cancelled_error(tmp_path, cfg, monkey
             post_mortems_root=tmp_path / "post_mortems",
             sparse_encoder=_stub_sparse,
         )
+
+
+async def test_ingest_skips_title_pre_filter_rejected_before_slop_classify(tmp_path, cfg):
+    """Rejected entries short-circuit before the slop classifier and never reach the corpus."""
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned={}, default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=cfg.embed_model_id)
+    budget = Budget(cap_usd=cfg.max_cost_usd_per_ingest)
+
+    @dataclass
+    class _RejectAllEnricher:
+        async def enrich(self, entry: RawEntry) -> RawEntry:
+            return entry.model_copy(update={"title_pre_filter_rejected": True})
+
+    @dataclass
+    class _NeverCalledClassifier:
+        async def score(self, text: str) -> float:
+            del text
+            msg = "slop classifier should not be called for title-pre-filter-rejected entries"
+            raise AssertionError(msg)
+
+    n = 3
+    entries = [_entry(source_id=str(i), url=f"https://e{i}.com") for i in range(n)]
+    sources = [_ListSource(entries=entries)]
+
+    result = await ingest(
+        sources=sources,
+        enrichers=[_RejectAllEnricher()],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=_NeverCalledClassifier(),
+        config=cfg,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.seen == n
+    assert result.skipped == n
+    assert result.processed == 0
+    assert result.errors == 0
+    assert corpus.points == []
+    assert SpanEvent.SLOP_QUARANTINED.value not in result.span_events

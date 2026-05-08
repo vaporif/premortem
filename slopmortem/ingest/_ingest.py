@@ -153,6 +153,17 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 progress.advance_phase(IngestPhase.CLASSIFY)
                 return None
 
+            if enriched.title_pre_filter_rejected:
+                logger.info(
+                    "ingest: title pre-filter rejected %s:%s title=%r",
+                    entry.source,
+                    entry.source_id,
+                    entry.title,
+                )
+                result.skipped += 1
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
+
             body = _entry_summary_text(enriched, max_tokens=config.max_doc_tokens)
             if not body:
                 logger.info(

@@ -65,11 +65,10 @@ class HaikuPitchFiller:
 
     def _should_skip(self, entry: RawEntry) -> bool:
         """Return True when the filler must not call the LLM for this entry."""
-        if entry.markdown_text is not None and entry.markdown_text.strip():
-            return True
-        if entry.raw_html is not None and entry.raw_html.strip():
-            return True
-        if not entry.url:
+        has_body = (entry.markdown_text is not None and entry.markdown_text.strip()) or (
+            entry.raw_html is not None and entry.raw_html.strip()
+        )
+        if entry.title_pre_filter_rejected or has_body or not entry.url:
             return True
         if not entry.title:
             logger.info(
