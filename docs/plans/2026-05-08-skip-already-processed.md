@@ -420,15 +420,15 @@ UV_CACHE_DIR=/tmp/uv-cache uv run slopmortem ingest --only-source hn_algolia --l
 
 ### Polish
 
-- [ ] **Step 1: Run post-implementation polish**
+- [x] **Step 1: Run post-implementation polish**
 
 Dispatch the `post-implementation-polish` skill on the diff produced by Tasks 1–2.
 
-- [ ] **Step 2: Address findings, recommit if needed**
+- [x] **Step 2: Address findings, recommit if needed**
 
 One commit per polish-driven fix so blame stays useful.
 
-- [ ] **Step 3: Final lint/typecheck/test sweep**
+- [x] **Step 3: Final lint/typecheck/test sweep**
 
 Run: `just lint && just typecheck && just test`
 Expected: clean.
