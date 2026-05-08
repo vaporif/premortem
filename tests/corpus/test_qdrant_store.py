@@ -10,6 +10,7 @@ import pytest
 from slopmortem.corpus import QdrantCorpus, ensure_collection
 from slopmortem.ingest import _Point
 from slopmortem.llm import EMBED_DIMS
+from slopmortem.models import Facets
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,6 +29,45 @@ def _make_chunk(canonical_id: str, idx: int) -> _Point:
         id=uuid.uuid5(uuid.NAMESPACE_URL, f"{canonical_id}:{idx}").hex,
         vector={"dense": dense, "sparse": sparse},
         payload={"canonical_id": canonical_id, "chunk_idx": idx},
+    )
+
+
+def _facets_with_sector(sector: str) -> Facets:
+    """Build ``Facets`` with the closed-set taxonomy values from ``taxonomy.yml``."""
+    return Facets(
+        sector=sector,
+        business_model="b2b_saas",
+        customer_type="enterprise",
+        geography="us",
+        monetization="subscription_recurring",
+    )
+
+
+def _make_chunk_with_sector(canonical_id: str, idx: int, sector: str) -> _Point:
+    """Like ``_make_chunk`` but with a full CandidatePayload — ``query`` validates payloads."""
+    dense = [float((idx + 1) * 0.001)] * _DIM
+    sparse: dict[int, float] = {idx: 1.0}
+    payload: dict[str, object] = {
+        "canonical_id": canonical_id,
+        "chunk_idx": idx,
+        "name": f"chunk-{canonical_id}",
+        "summary": "fixture",
+        "body": "fixture body",
+        "facets": _facets_with_sector(sector).model_dump(),
+        "founding_date": None,
+        "failure_date": None,
+        "founding_date_unknown": True,
+        "failure_date_unknown": True,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "",
+        "text_id": canonical_id.replace(":", "_"),
+    }
+    return _Point(
+        id=uuid.uuid5(uuid.NAMESPACE_URL, f"{canonical_id}:{idx}").hex,
+        vector={"dense": dense, "sparse": sparse},
+        payload=payload,
     )
 
 
@@ -97,5 +137,61 @@ async def test_delete_chunks_idempotent_when_no_points(
     try:
         # Must not raise even though no points exist for this canonical_id.
         await corpus.delete_chunks_for_canonical("nonexistent:id")
+    finally:
+        await qdrant_client.delete_collection(name)
+
+
+@pytest.mark.requires_qdrant
+async def test_strict_sector_filter_default_keeps_sector_and_other(
+    qdrant_client: AsyncQdrantClient, tmp_path: Path
+) -> None:
+    """With strict=True, exclude_other=False: keep crypto_web3 + other, drop fintech."""
+    name = "test_strict_sector_default"
+    corpus = await _build_corpus(qdrant_client, tmp_path, name)
+    try:
+        await corpus.upsert_chunk(_make_chunk_with_sector("c:web3", 0, "crypto_web3"))
+        await corpus.upsert_chunk(_make_chunk_with_sector("c:other", 1, "other"))
+        await corpus.upsert_chunk(_make_chunk_with_sector("c:fin", 2, "fintech"))
+
+        candidates = await corpus.query(
+            dense=[0.001] * _DIM,
+            sparse={0: 1.0},
+            facets=_facets_with_sector("crypto_web3"),
+            cutoff_iso=None,
+            strict_deaths=False,
+            k_retrieve=10,
+            strict_sector_filter=True,
+            strict_sector_filter_excludes_other=False,
+        )
+        sectors = {c.payload.facets.sector for c in candidates}
+        assert sectors == {"crypto_web3", "other"}
+    finally:
+        await qdrant_client.delete_collection(name)
+
+
+@pytest.mark.requires_qdrant
+async def test_strict_sector_filter_excludes_other_returns_only_sector(
+    qdrant_client: AsyncQdrantClient, tmp_path: Path
+) -> None:
+    """With strict=True, exclude_other=True: keep crypto_web3 only."""
+    name = "test_strict_sector_exclude_other"
+    corpus = await _build_corpus(qdrant_client, tmp_path, name)
+    try:
+        await corpus.upsert_chunk(_make_chunk_with_sector("c:web3", 0, "crypto_web3"))
+        await corpus.upsert_chunk(_make_chunk_with_sector("c:other", 1, "other"))
+        await corpus.upsert_chunk(_make_chunk_with_sector("c:fin", 2, "fintech"))
+
+        candidates = await corpus.query(
+            dense=[0.001] * _DIM,
+            sparse={0: 1.0},
+            facets=_facets_with_sector("crypto_web3"),
+            cutoff_iso=None,
+            strict_deaths=False,
+            k_retrieve=10,
+            strict_sector_filter=True,
+            strict_sector_filter_excludes_other=True,
+        )
+        sectors = {c.payload.facets.sector for c in candidates}
+        assert sectors == {"crypto_web3"}
     finally:
         await qdrant_client.delete_collection(name)

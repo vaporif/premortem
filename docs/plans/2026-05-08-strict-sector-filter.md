@@ -396,7 +396,7 @@ git commit -m "retrieve: thread strict_sector_filter from config through pipelin
 
 - Modify: `tests/corpus/test_qdrant_store.py` — append two `requires_qdrant` tests covering: (a) `MatchAny([sector, "other"])` default returns sector + other, drops mismatched; (b) `excludes_other=True` returns sector only.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/corpus/test_qdrant_store.py`:
 
@@ -498,17 +498,17 @@ def _facets_with_sector(sector: str) -> Facets:
     )
 ```
 
-- [ ] **Step 2: Run tests against live qdrant**
+- [x] **Step 2: Run tests against live qdrant**
 
 Run: `docker compose up -d qdrant && UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/corpus/test_qdrant_store.py -v -k strict_sector -m requires_qdrant`
 Expected: both PASS — Task 1's `_build_sector_filter` and Task 2's plumbing are already in place, so this is a confidence test against live qdrant rather than a TDD gate. If the tests fail, the most likely cause is a payload-shape mismatch in `_make_chunk_with_sector` or a misseeded collection — diagnose before assuming a filter regression.
 
-- [ ] **Step 3: Lint + typecheck**
+- [x] **Step 3: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```
 git add tests/corpus/test_qdrant_store.py && \
