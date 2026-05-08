@@ -1,0 +1,43 @@
+{
+  "pitch_sector": "crypto_web3",
+  "retrieved": [
+    {
+      "canonical_id": "celsius_network",
+      "score": 0.83,
+      "payload": {
+        "name": "Celsius Network",
+        "summary": "Crypto lending and yield platform that filed for bankruptcy in 2022.",
+        "body": "Celsius offered high-yield crypto deposit accounts to retail customers before collapsing in mid-2022.",
+        "facets": {
+          "sector": "crypto_web3",
+          "business_model": "transaction_fee",
+          "customer_type": "consumer",
+          "geography": "us",
+          "monetization": "transaction_fee"
+        },
+        "founding_date": "2017-01-01",
+        "failure_date": "2022-07-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://example.com/celsius"],
+        "provenance_id": "curated:Celsius Network",
+        "text_id": "aaaaaaaaaaaaaaaa"
+      }
+    }
+  ],
+  "ranked": [
+    {
+      "candidate_id": "celsius_network",
+      "perspective_scores": {
+        "business_model": {"score": 5.0, "rationale": "Yield-on-deposits crypto product, same recurring model logic"},
+        "market": {"score": 6.0, "rationale": "Retail crypto savings buyer overlaps the pitch's audience"},
+        "gtm": {"score": 4.0, "rationale": "Retention via yield rate; brand and APY-led acquisition"},
+        "stage_scale": {"score": 4.0, "rationale": "Comparable early-to-mid scale of the pitch"}
+      },
+      "rationale": "One real in-sector comparable survived strict filter; not enough for synthesis."
+    }
+  ],
+  "expected_gate": true
+}
