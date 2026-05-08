@@ -116,7 +116,6 @@ def test_ingest_default_auto_enables_title_pre_filter_for_hn_algolia(
     enricher_classnames = [type(e).__name__ for e in enrichers]
     assert "HaikuTitlePreFilter" in enricher_classnames
     assert "HaikuPitchFiller" in enricher_classnames
-    # Pre-filter must run before the pitch filler.
     assert enricher_classnames.index("HaikuTitlePreFilter") < enricher_classnames.index(
         "HaikuPitchFiller"
     )
