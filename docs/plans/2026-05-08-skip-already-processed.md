@@ -174,7 +174,7 @@ Expected: clean.
 - Modify: `slopmortem/ingest/_ingest.py:113-242` (the `_classify_phase` function and its inner `_one`) and `:402-412` (the `_classify_phase` call site inside `ingest()`).
 - Test: `tests/ingest/test_orchestration.py` (append).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Read `tests/ingest/test_orchestration.py` first to see the existing fake-classifier / fake-llm patterns and import them. Then append:
 
@@ -321,12 +321,12 @@ async def test_force_bypasses_already_processed_skip(tmp_path):
 
 (The first test asserts the gate fires; the second asserts `--force` bypasses it. Both tests deliberately use a non-pre-vetted source so the slop classifier is exercised, and both leave `keepers` empty so no LLM-backed stage runs — the bare `FakeLLMClient(canned={})` is intentional.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/ingest/test_orchestration.py -v -k "already_processed or force_bypasses"`
 Expected: FAIL — the recording enricher IS called because the gate doesn't exist yet (the first test fails on `enricher_calls == []`).
 
-- [ ] **Step 3: Thread `force` into `_classify_phase`**
+- [x] **Step 3: Thread `force` into `_classify_phase`**
 
 In `slopmortem/ingest/_ingest.py`, add `force: bool` to the `_classify_phase` signature (currently `:113-124`):
 
@@ -363,7 +363,7 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
     )
 ```
 
-- [ ] **Step 4: Insert the pre-enrich gate**
+- [x] **Step 4: Insert the pre-enrich gate**
 
 In `_one` (currently `:139-154`), insert this block as the very first action inside the `async with limiter:` body, before `result.seen += 1` is incremented — the gate's "we saw it but skipped" semantics match `skipped`, not `seen`:
 
@@ -387,17 +387,17 @@ In `_one` (currently `:139-154`), insert this block as the very first action ins
 
 The `result.seen` increment stays after the gate so "seen" continues to mean "entries the pipeline actually inspected" rather than "entries the source emitted".
 
-- [ ] **Step 5: Run the orchestration tests**
+- [x] **Step 5: Run the orchestration tests**
 
 Run: `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/ingest/test_orchestration.py -v`
 Expected: all PASS, including the two new tests and existing ones.
 
-- [ ] **Step 6: Run the full ingest test suite**
+- [x] **Step 6: Run the full ingest test suite**
 
 Run: `UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/ingest/ -v`
 Expected: all PASS. The existing `tests/ingest/test_idempotency.py` already tests the write-phase `skip_key` dedup; it should continue to pass because the write-phase gate still fires for entries the pre-enrich gate misses (e.g. crashed prior run with only `pending` rows).
 
-- [ ] **Step 7: Lint + typecheck**
+- [x] **Step 7: Lint + typecheck**
 
 Run: `just lint && just typecheck`
 Expected: clean.
@@ -412,7 +412,7 @@ UV_CACHE_DIR=/tmp/uv-cache uv run slopmortem ingest --only-source hn_algolia --l
 
 …and re-run the same command. The second run's log should show `ingest: skipped <src>:<id> — already processed` lines and zero `pitch filler tavily_search` calls for previously-completed entries. Add `--force` to confirm the bypass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 `git add slopmortem/ingest/_ingest.py tests/ingest/test_orchestration.py && git commit -m "ingest: skip already-processed entries before enrichers"`
 
