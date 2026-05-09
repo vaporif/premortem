@@ -183,6 +183,9 @@ class QdrantCorpus:
         # ``$score x factor`` for recall rows and ``$score`` for everything else.
         # Skipped at factor=1.0 to keep the formula identical to the pre-change
         # shape for callers that opt out.
+        # No-op in prod until Task 6 of docs/plans/2026-05-09-recall-fallback-improvements.md
+        # writes ``source`` onto CandidatePayload; tests inject ``source`` into
+        # the raw Qdrant payload to exercise the formula shape today.
         if self._recall_score_factor < 1.0:
             formula_terms.append(
                 MultExpression(
