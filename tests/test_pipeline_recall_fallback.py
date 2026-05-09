@@ -957,12 +957,11 @@ async def test_pipeline_recall_raises_when_sparse_encoder_missing(
 
 
 def _capture_laminar_events(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
-    """Force ``Laminar.is_initialized`` true and capture every emitted event.
+    """Pin ``Laminar.is_initialized`` true and capture every emitted event.
 
-    The tracer is otherwise inert in tests (``enable_tracing=False`` plus
-    ``Laminar.initialize`` never called), so the gap-score branch would never
-    fire under default fakes. Patching the import site in ``slopmortem.pipeline``
-    keeps the rest of the suite untouched.
+    The tracer is inert under default test fakes, so gap-score would never fire.
+    Patching the import site in ``slopmortem.pipeline`` keeps the rest of the
+    suite untouched.
     """
     events: list[dict[str, Any]] = []
 
@@ -975,6 +974,7 @@ def _capture_laminar_events(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, A
         def event(name: str, attributes: dict[str, str] | None = None) -> None:
             events.append({"name": name, "attributes": attributes or {}})
 
+        # run_query also calls these on the same gate; provide no-op stubs.
         @staticmethod
         def set_span_attributes(_attrs: dict[str, Any]) -> None:
             return
@@ -992,9 +992,8 @@ async def test_gap_score_event_emitted_on_every_query(
 ) -> None:
     """``recall.gap_score`` fires once per query even when the predicate is quiet.
 
-    Calibration eval needs the qualifying/required pair on every run, not just
-    fires. Reuses the healthy-corpus scenario where ``coverage_gap=False`` and
-    ``RECALL_GATE_FIRED`` is intentionally absent.
+    Calibration eval needs qualifying/required on every run, not just on fires.
+    Healthy corpus → ``coverage_gap=False`` and no ``RECALL_GATE_FIRED``.
     """
     events = _capture_laminar_events(monkeypatch)
     cfg = _build_config(k_retrieve=6, n_synthesize=3)
@@ -1026,11 +1025,10 @@ async def test_gap_score_event_emitted_on_every_query(
     gap_events = [e for e in events if e["name"] == "recall.gap_score"]
     assert len(gap_events) == 1
     attrs = gap_events[0]["attributes"]
-    # Canned rerank only ranks min(N_synthesize, K_retrieve) candidates, so
-    # qualifying tops out at N_synthesize for the healthy scenario.
+    # Canned rerank ranks at most N_synthesize candidates, so qualifying caps there.
     assert attrs["qualifying"] == str(cfg.N_synthesize)
     assert attrs["required"] == str(cfg.N_synthesize)
     assert attrs["pitch_sector"] == "fintech"
-    # Quiet predicate → gate event must not fire, and recall stays untouched.
+    # Quiet predicate: gate event must not fire and recall stays untouched.
     assert not any(e["name"] == "recall.gate_fired" for e in events)
     assert report.pipeline_meta.coverage_gap is False

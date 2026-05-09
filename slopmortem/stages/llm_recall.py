@@ -23,11 +23,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CoverageGapResult:
-    """Outcome of the coverage-gap predicate with the underlying counts.
+    """Coverage-gap counts plus the fire/don't-fire decision.
 
     The pipeline emits ``qualifying``/``required`` on every query so eval can
-    sweep predicate thresholds without re-running the corpus. ``gap`` is the
-    fire/don't-fire decision the recall branch consumes.
+    sweep predicate thresholds against historical traces.
     """
 
     qualifying: int

@@ -365,10 +365,9 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
         )
         coverage_gap = gap_result.gap
 
-        # GAP_SCORE fires unconditionally so eval can sweep predicate
-        # thresholds against historical traces. GATE_FIRED keeps its narrower
-        # semantics: predicate-driven (coverage_gap=True) only.
-        # Laminar attribute values are stringly-typed for OTLP portability.
+        # GAP_SCORE fires every query so eval can sweep predicate thresholds
+        # against historical traces. GATE_FIRED stays predicate-driven only.
+        # Attributes are stringified for OTLP.
         if Laminar.is_initialized():
             Laminar.event(
                 name=str(SpanEvent.RECALL_GAP_SCORE),
