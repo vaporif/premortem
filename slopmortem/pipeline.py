@@ -26,14 +26,14 @@ from slopmortem.stages import (
     detect_coverage_gap,
     drop_below_min_similarity,
     extract_facets,
+    llm_recall,
     llm_rerank,
+    persist_recall_entry,
     retrieve,
     select_top_n_by_similarity,
     synthesize_all,
     verify_and_persist_all,
 )
-from slopmortem.stages.llm_recall import llm_recall
-from slopmortem.stages.recall_persist import persist_recall_entry
 from slopmortem.tracing import SpanEvent, git_sha, mint_run_id
 
 if TYPE_CHECKING:

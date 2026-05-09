@@ -5,12 +5,14 @@ from __future__ import annotations
 from slopmortem.stages.consolidate_risks import consolidate_risks as consolidate_risks
 from slopmortem.stages.facet_extract import extract_facets as extract_facets
 from slopmortem.stages.llm_recall import detect_coverage_gap as detect_coverage_gap
+from slopmortem.stages.llm_recall import llm_recall as llm_recall
 from slopmortem.stages.llm_rerank import (
     llm_rerank as llm_rerank,
 )
 from slopmortem.stages.llm_rerank import (
     select_top_n_by_similarity as select_top_n_by_similarity,
 )
+from slopmortem.stages.recall_persist import persist_recall_entry as persist_recall_entry
 from slopmortem.stages.recall_verify import (
     VerificationTier as VerificationTier,
 )
@@ -46,7 +48,9 @@ __all__ = [
     "detect_coverage_gap",
     "drop_below_min_similarity",
     "extract_facets",
+    "llm_recall",
     "llm_rerank",
+    "persist_recall_entry",
     "retrieve",
     "select_top_n_by_similarity",
     "synthesize",

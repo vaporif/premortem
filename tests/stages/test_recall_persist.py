@@ -18,7 +18,7 @@ from slopmortem.ingest._helpers import _build_payload
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.models import Facets, RawEntry, RecallSuggestion
 from slopmortem.stages.recall_persist import persist_recall_entry
-from slopmortem.stages.recall_verify import _recall_source_id
+from slopmortem.stages.recall_verify import VerificationTier, _recall_source_id
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -106,7 +106,7 @@ async def _make_ctx(tmp_path: Path, cfg: Config) -> _Ctx:
     return _Ctx(journal=journal, corpus=InMemoryCorpus(), config=cfg, root=tmp_path)
 
 
-async def _persist(ctx: _Ctx, entry: RawEntry, tier: str) -> IngestResult:
+async def _persist(ctx: _Ctx, entry: RawEntry, tier: VerificationTier) -> IngestResult:
     """Wire fakes around ``persist_recall_entry`` and return the IngestResult."""
     llm = FakeLLMClient(canned=_canned(), default_model=_HAIKU)
     embed = FakeEmbeddingClient(model=ctx.config.embed_model_id)
@@ -114,7 +114,7 @@ async def _persist(ctx: _Ctx, entry: RawEntry, tier: str) -> IngestResult:
     result = IngestResult()
     await persist_recall_entry(
         entry,
-        tier,  # pyright: ignore[reportArgumentType]  -- VerificationTier is a Literal alias
+        tier,
         journal=ctx.journal,
         corpus=ctx.corpus,
         embed_client=embed,
@@ -168,7 +168,7 @@ def test_persist_deterministic_source_id() -> None:
 
 @pytest.mark.parametrize("tier", ["wayback_anchored", "evidence_only"])
 async def test_persist_writes_verification_tier_to_payload(
-    tmp_path: Path, cfg: Config, tier: str
+    tmp_path: Path, cfg: Config, tier: VerificationTier
 ) -> None:
     ctx = await _make_ctx(tmp_path, cfg)
     entry = _entry_for(_suggestion())
