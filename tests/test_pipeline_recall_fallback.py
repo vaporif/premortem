@@ -865,3 +865,83 @@ async def test_pipeline_recall_max_one_pass(
     assert report.pipeline_meta.coverage_gap is True
     assert report.pipeline_meta.recall_used is True
     assert report.pipeline_meta.recall_persisted_count == 1
+
+
+async def test_pipeline_recall_raises_when_recall_deps_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``force_llm_recall=True`` with no ``RecallDeps`` raises so misconfig surfaces.
+
+    The pipeline can't silently no-op the recall path when the operator asked
+    for it; surfacing ``RuntimeError`` at the call site beats crashing deeper
+    in the persist tail.
+    """
+    cfg = _build_config(
+        k_retrieve=6, n_synthesize=3, enable_llm_recall=False, force_llm_recall=True
+    )
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    base = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
+    corpus = _HybridCorpus(base_candidates=base)
+    canned = _build_canned(
+        retrieved=base,
+        top_n=base[: cfg.N_synthesize],
+        ctx=ctx,
+        cfg=cfg,
+    )
+    inner = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    llm = _RecallRoutingLLM(inner=inner, recall_responses=[])
+    embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    budget = Budget(cap_usd=2.0)
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
+
+    with pytest.raises(RuntimeError, match="recall enabled but RecallDeps not provided"):
+        await run_query(
+            ctx,
+            llm=llm,
+            embedding_client=embed,
+            corpus=corpus,
+            config=cfg,
+            budget=budget,
+            sparse_encoder=_stub_sparse,
+            recall_deps=None,
+        )
+
+
+async def test_pipeline_recall_raises_when_sparse_encoder_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Recall fires but ``sparse_encoder=None`` — raise rather than crash deeper.
+
+    The persist tail needs the sparse encoder to upsert the new candidate;
+    failing fast at the gate is clearer than a downstream ``TypeError``.
+    """
+    cfg = _build_config(
+        k_retrieve=6, n_synthesize=3, enable_llm_recall=False, force_llm_recall=True
+    )
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    base = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
+    corpus = _HybridCorpus(base_candidates=base)
+    canned = _build_canned(
+        retrieved=base,
+        top_n=base[: cfg.N_synthesize],
+        ctx=ctx,
+        cfg=cfg,
+    )
+    inner = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    llm = _RecallRoutingLLM(inner=inner, recall_responses=[])
+    embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    budget = Budget(cap_usd=2.0)
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
+    deps = await _make_recall_deps(tmp_path)
+
+    with pytest.raises(RuntimeError, match="recall requires sparse_encoder"):
+        await run_query(
+            ctx,
+            llm=llm,
+            embedding_client=embed,
+            corpus=corpus,
+            config=cfg,
+            budget=budget,
+            sparse_encoder=None,
+            recall_deps=deps,
+        )

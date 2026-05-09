@@ -195,6 +195,38 @@ def test_render_footer_includes_min_similarity_score() -> None:
     assert "min_similarity_score: 4.0" in md
 
 
+def test_render_footer_includes_recall_flags_when_set() -> None:
+    """``coverage_gap`` / ``recall_used`` / ``recall_persisted_count`` only render when non-default.
+
+    The footer must surface all three when set so eval and ops can attribute
+    extra cost and corpus growth to the recall path; default reports keep
+    the footer terse.
+    """
+    report = _report().model_copy(
+        update={
+            "pipeline_meta": _report().pipeline_meta.model_copy(
+                update={
+                    "coverage_gap": True,
+                    "recall_used": True,
+                    "recall_persisted_count": 2,
+                }
+            )
+        }
+    )
+    md = render(report)
+    assert "- coverage_gap: True" in md
+    assert "- recall_used: True" in md
+    assert "- recall_persisted_count: 2" in md
+
+
+def test_render_footer_omits_recall_flags_when_default() -> None:
+    """Default ``PipelineMeta`` (recall not used) keeps the three lines out of the footer."""
+    md = render(_report())
+    assert "coverage_gap" not in md
+    assert "recall_used" not in md
+    assert "recall_persisted_count" not in md
+
+
 def test_render_is_pure_no_io() -> None:
     """``render`` must not touch the filesystem.
 

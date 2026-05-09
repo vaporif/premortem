@@ -18,7 +18,7 @@ from dateutil.relativedelta import relativedelta
 from lmnr import Laminar, observe
 
 from slopmortem.budget import BudgetExceededError
-from slopmortem.corpus.sources.wayback import WaybackEnricher
+from slopmortem.corpus.sources import WaybackEnricher
 from slopmortem.ingest import IngestResult, NullProgress
 from slopmortem.models import PipelineMeta, Report, Synthesis, TopRisks
 from slopmortem.stages import (
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from slopmortem.budget import Budget
     from slopmortem.config import Config
     from slopmortem.corpus import Corpus, MergeJournal
-    from slopmortem.corpus.sources.base import Enricher
+    from slopmortem.corpus.sources import Enricher
     from slopmortem.ingest import Corpus as IngestCorpus
     from slopmortem.ingest import SlopClassifier
     from slopmortem.llm import EmbeddingClient, LLMClient
@@ -139,7 +139,7 @@ def _current_trace_id(*, enable_tracing: bool) -> str | None:
     return str(tid) if tid is not None else None
 
 
-@dataclass
+@dataclass(frozen=True)
 class _RecallOutcome:
     retrieved: list[Candidate]
     reranked: LlmRerankResult
