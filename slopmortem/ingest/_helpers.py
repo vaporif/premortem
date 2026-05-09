@@ -163,7 +163,7 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
     provenance_id: str,
     text_id: str,
     name: str,
-    provenance: str,
+    entry_source: str,
     synthesized: bool = False,
     verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
 ) -> CandidatePayload:
@@ -171,7 +171,7 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
     failure_year = facets.failure_year
     if synthesized:
         provenance_value: Literal["curated_real", "scraped", "synthesized"] = "synthesized"
-    elif provenance == SOURCE_CURATED:
+    elif entry_source == SOURCE_CURATED:
         provenance_value = "curated_real"
     else:
         provenance_value = "scraped"
@@ -190,7 +190,5 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
         provenance_id=provenance_id,
         text_id=text_id,
         verification_tier=verification_tier,
-        # Forwarded raw RawEntry.source so synthesize/render can branch on
-        # llm_recall without re-deriving it from provenance_id.
-        source=provenance,
+        source=entry_source,
     )

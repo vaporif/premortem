@@ -60,9 +60,8 @@ def _render_candidate(syn: Synthesis) -> str:
     failure_date_str = syn.failure_date.isoformat() if syn.failure_date else "unknown"
     lifespan_str = f"{syn.lifespan_months} months" if syn.lifespan_months is not None else "unknown"
     parts: list[str] = [f"## {syn.name}"]
-    # Surface llm_recall provenance directly under the heading so the reader
-    # can weigh the comparable accordingly: an LLM-named, web-verified entry
-    # is a softer match than a crawler-sourced obit.
+    # llm_recall comparables are LLM-named and web-verified — weaker grounding
+    # than a crawler-sourced obit. Tag them so the reader discounts accordingly.
     if syn.source == "llm_recall":
         parts.append("*Source: LLM recall (verified against live web)*")
     parts.extend(

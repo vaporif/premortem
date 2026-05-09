@@ -204,7 +204,7 @@ def test_build_payload_default_verification_tier_is_none() -> None:
         provenance_id="curated:example",
         text_id="abc123",
         name="Example",
-        provenance="curated",
+        entry_source="curated",
     )
     assert payload.verification_tier is None
     # model_dump still emits the field as None — crawler-path qdrant payloads

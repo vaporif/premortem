@@ -144,9 +144,9 @@ class Synthesis(BaseModel):
     lessons_for_input: list[str]
     sources: list[str]
     injection_detected: bool = False
-    # Threaded through from ``CandidatePayload.source`` so the renderer can flag
-    # llm_recall candidates (the LLM-named, web-verified path) for the reader.
-    # None on legacy syntheses written before the field existed.
+    # Mirrors ``CandidatePayload.source`` so the renderer can flag llm_recall
+    # candidates without re-reading the qdrant payload. None on syntheses
+    # written before the field existed.
     source: str | None = None
 
     @classmethod
@@ -215,11 +215,10 @@ class CandidatePayload(BaseModel):
     # Carries the verifier's L4 outcome ("wayback_anchored" beats "evidence_only"
     # because a corroborated snapshot is harder to fabricate than a single citation).
     verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None
-    # Raw ``RawEntry.source`` string ("crunchbase_csv", "llm_recall", …). Distinct
-    # from ``provenance`` (which collapses sources into the curated/scraped/synthesized
-    # 3-way). Synthesis and render need the finer split to flag llm_recall entries.
-    # Defaults to None so legacy qdrant rows written before the field existed still
-    # validate on read.
+    # Raw ``RawEntry.source`` ("crunchbase_csv", "llm_recall", …). Kept alongside
+    # ``provenance`` (curated/scraped/synthesized 3-way) because synthesize and
+    # render branch on the finer split — only ``llm_recall`` gets the recall tag.
+    # None for qdrant rows written before the field existed.
     source: str | None = None
 
 

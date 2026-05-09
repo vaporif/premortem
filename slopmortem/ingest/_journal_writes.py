@@ -198,7 +198,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         provenance_id=f"{entry.source}:{entry.source_id}",
         text_id=text_id,
         name=name,
-        provenance=entry.source,
+        entry_source=entry.source,
         synthesized=entry.synthesized,
         verification_tier=verification_tier,
     )
