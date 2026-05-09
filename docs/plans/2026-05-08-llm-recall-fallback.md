@@ -860,14 +860,14 @@ Note: `RawEntry` itself does not carry `verification_tier`. The tier rides as a 
 - Modify: `slopmortem/corpus/sources/_names.py` (`SOURCE_LLM_RECALL`)
 - New: `tests/stages/test_recall_persist.py`
 
-- [ ] **Step 1: Add `SOURCE_LLM_RECALL` constant**
+- [x] **Step 1: Add `SOURCE_LLM_RECALL` constant**
 
 ```python
 # In slopmortem/corpus/sources/_names.py
 SOURCE_LLM_RECALL: Final = "llm_recall"
 ```
 
-- [ ] **Step 2: Write failing tests**
+- [x] **Step 2: Write failing tests**
 
 `tests/stages/test_recall_persist.py`:
 
@@ -897,7 +897,7 @@ async def test_persist_writes_verification_tier_to_payload() -> None:
     ...
 ```
 
-- [ ] **Step 3: Add `verification_tier` to `CandidatePayload`**
+- [x] **Step 3: Add `verification_tier` to `CandidatePayload`**
 
 `verification_tier` rides into the qdrant payload via the existing `CandidatePayload` model rather than a side-channel `extra_payload` kwarg. The simpler shape avoids plumbing a new param through `_write_phase` → `_process_entry` → `_build_payload` → `_embed_and_upsert` (four layers) just to merge one optional field onto the qdrant point.
 
@@ -910,7 +910,7 @@ In `slopmortem/models.py:CandidatePayload` (`models.py:183`):
 
 In `slopmortem/ingest/_helpers.py:_build_payload`, add a `verification_tier` kwarg defaulting to `None` and forward it to the `CandidatePayload(...)` construction. Existing callers pass nothing (default applies); the recall persist path passes the tier explicitly.
 
-- [ ] **Step 4: Implement `recall_persist.py`**
+- [x] **Step 4: Implement `recall_persist.py`**
 
 The function reuses the existing ingest tail by calling each phase with a one-element batch. The three reusable seams are:
 
@@ -972,11 +972,11 @@ async def persist_recall_entry(
 
 Idempotency falls out of `journal.is_terminal(entry.source, entry.source_id)` short-circuit inside `_classify_phase` (line 142): re-persisting the same recall suggestion produces no second journal row or qdrant point because `_recall_source_id` is deterministic on `(name, homepage_url)`. A re-verification that flips tier `evidence_only → wayback_anchored` is therefore *not* propagated automatically — that's intentional; tier upgrades require a separate re-write tool, which is out of scope here.
 
-- [ ] **Step 5: Run persist tests**
+- [x] **Step 5: Run persist tests**
 
 `uv run pytest tests/stages/test_recall_persist.py -v`
 
-- [ ] **Step 6: Add reliability rank entry**
+- [x] **Step 6: Add reliability rank entry**
 
 In `slopmortem/ingest/_helpers.py`, extend the `SOURCE_*` import block to pull in `SOURCE_LLM_RECALL`, then extend `_RELIABILITY_RANK` (the dict already keys on the constants, not literals — keep the style consistent so a future rename of the literal value can't silently desync):
 
@@ -986,15 +986,15 @@ In `slopmortem/ingest/_helpers.py`, extend the `SOURCE_*` import block to pull i
 
 Add `(SOURCE_LLM_RECALL, 6)` to the parametrize set in `tests/ingest/test_reliability_rank.py`.
 
-- [ ] **Step 7: Run reliability test**
+- [x] **Step 7: Run reliability test**
 
 `uv run pytest tests/ingest/test_reliability_rank.py -v`
 
-- [ ] **Step 8: Lint + typecheck**
+- [x] **Step 8: Lint + typecheck**
 
 `just lint && just typecheck`
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 `git add slopmortem/models.py slopmortem/ingest/_helpers.py slopmortem/ingest/_journal_writes.py slopmortem/ingest/_ingest.py slopmortem/stages/recall_persist.py slopmortem/corpus/sources/_names.py tests/ && git commit -m "stages: recall_persist + verification_tier on CandidatePayload + reliability rank"`
 
