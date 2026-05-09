@@ -40,6 +40,7 @@ from lmnr import Laminar, observe
 from pydantic import BaseModel, Field, ValidationError
 
 from slopmortem.concurrency import gather_resilient
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.http import SSRFBlockedError, safe_get, safe_head
 from slopmortem.llm import prompt_template_sha, render_blocks, to_strict_response_schema
 from slopmortem.models import RawEntry, RecallSuggestion
@@ -319,7 +320,7 @@ async def verify_suggestion(  # noqa: PLR0913, PLR0911 - L5 needs LLM + three kn
     # markdown_text=None AND raw_html=None matter — WaybackEnricher.enrich
     # short-circuits if either body is already populated.
     seed = RawEntry(
-        source="llm_recall",
+        source=SOURCE_LLM_RECALL,
         source_id=_recall_source_id(suggestion),
         url=homepage,
         markdown_text=None,

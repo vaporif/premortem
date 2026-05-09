@@ -47,8 +47,9 @@ def synthesize_prompt_kwargs(candidate: Candidate, *, pitch: str) -> dict[str, A
         "candidate_id": candidate.canonical_id,
         "candidate_name": payload.name,
         "candidate_body": payload.body,
-        # ``"unknown"`` (not ``None``) so legacy qdrant rows render the literal
-        # string instead of triggering j2's ``or "unknown"`` fallback inconsistently.
+        # The j2 template renders ``source`` directly (no ``or "unknown"``
+        # fallback), so coerce here to keep legacy qdrant rows from emitting
+        # ``None`` into the prompt.
         "source": payload.source or "unknown",
         "founding_date": payload.founding_date.isoformat() if payload.founding_date else None,
         "failure_date": payload.failure_date.isoformat() if payload.failure_date else None,

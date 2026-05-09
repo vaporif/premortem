@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
+
 if TYPE_CHECKING:
     from slopmortem.models import (
         PerspectiveScore,
@@ -62,7 +64,7 @@ def _render_candidate(syn: Synthesis) -> str:
     parts: list[str] = [f"## {syn.name}"]
     # llm_recall comparables are LLM-named and web-verified — weaker grounding
     # than a crawler-sourced obit. Tag them so the reader discounts accordingly.
-    if syn.source == "llm_recall":
+    if syn.source == SOURCE_LLM_RECALL:
         parts.append("*Source: LLM recall (verified against live web)*")
     parts.extend(
         [
