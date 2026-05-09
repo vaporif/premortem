@@ -10,6 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote_plus
 
+import anyio
 import httpx
 
 from slopmortem.corpus._extract import extract_clean
@@ -27,6 +28,75 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 AVAILABILITY_ENDPOINT = "https://archive.org/wayback/available"
+
+# Wayback regularly tarpits clients (slow connects, RSTs, 429/503 bursts) when
+# under load. Drop-on-error here means real dead-startup URLs disappear from
+# the recall set on a transient signal — bounded retry recovers them. Terminal
+# errors (SSRF block, 404, other 4xx/5xx) still drop on the first attempt.
+_TRANSIENT_HTTPX_EXC: tuple[type[Exception], ...] = (
+    httpx.TimeoutException,
+    httpx.ConnectError,
+    httpx.ReadError,
+    httpx.WriteError,
+    httpx.RemoteProtocolError,
+)
+_TRANSIENT_STATUSES: frozenset[int] = frozenset({429, 503})
+# Three attempts total (initial + two retries). Backoff schedule applies to
+# the wait *before* each retry; total worst-case wait per URL is 2.0s.
+_RETRY_ATTEMPTS = 3
+_RETRY_BACKOFF_SECONDS: tuple[float, ...] = (0.5, 1.5)
+
+
+def _retry_after_seconds(resp: httpx.Response) -> float | None:
+    raw = cast("str | None", resp.headers.get("retry-after"))
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        # HTTP-date format also valid per RFC 7231 but we don't see it from
+        # IA in practice; fall back to default backoff.
+        return None
+
+
+async def _safe_get_with_retry(url: str) -> httpx.Response | None:  # noqa: PLR0911 - each return is a distinct exit (terminal exc, exhausted retry, terminal status, success); flattening obscures the rate-limit logic.
+    for attempt in range(_RETRY_ATTEMPTS):
+        try:
+            resp = await safe_get(url)
+        except SSRFBlockedError as exc:
+            logger.warning("wayback: ssrf-blocked %s: %r", url, exc)
+            return None
+        except _TRANSIENT_HTTPX_EXC as exc:
+            if attempt + 1 >= _RETRY_ATTEMPTS:
+                logger.warning(
+                    "wayback: transient error after %d attempts for %s: %r",
+                    _RETRY_ATTEMPTS,
+                    url,
+                    exc,
+                )
+                return None
+            await anyio.sleep(_RETRY_BACKOFF_SECONDS[attempt])
+            continue
+        except httpx.HTTPError as exc:
+            logger.warning("wayback: fetch failed for %s: %r", url, exc)
+            return None
+        if resp.status_code in _TRANSIENT_STATUSES:
+            if attempt + 1 >= _RETRY_ATTEMPTS:
+                logger.warning(
+                    "wayback: HTTP %s after %d attempts for %s",
+                    resp.status_code,
+                    _RETRY_ATTEMPTS,
+                    url,
+                )
+                return None
+            wait = _retry_after_seconds(resp) or _RETRY_BACKOFF_SECONDS[attempt]
+            await anyio.sleep(wait)
+            continue
+        if resp.status_code >= HTTP_BAD_REQUEST:
+            logger.warning("wayback: HTTP %s for %s", resp.status_code, url)
+            return None
+        return resp
+    return None
 
 
 def _availability_url(target: str) -> str:
@@ -71,26 +141,15 @@ class WaybackEnricher:
             logger.info("wayback: robots blocked %s", url)
             return None
         await throttle_for(url, rps=self.rps)
-        try:
-            resp = await safe_get(url)
-        except (SSRFBlockedError, httpx.HTTPError) as exc:
-            logger.warning("wayback: fetch failed for %s: %r", url, exc)
-            return None
-        if resp.status_code >= HTTP_BAD_REQUEST:
-            logger.warning("wayback: HTTP %s for %s", resp.status_code, url)
-            return None
-        return resp.text
+        resp = await _safe_get_with_retry(url)
+        return resp.text if resp is not None else None
 
     async def _fetch_json(self, url: str) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny]
         if not await respect_robots(url, user_agent=self.user_agent):
             return None
         await throttle_for(url, rps=self.rps)
-        try:
-            resp = await safe_get(url)
-        except (SSRFBlockedError, httpx.HTTPError) as exc:
-            logger.warning("wayback: availability fetch failed for %s: %r", url, exc)
-            return None
-        if resp.status_code >= HTTP_BAD_REQUEST:
+        resp = await _safe_get_with_retry(url)
+        if resp is None:
             return None
         try:
             payload = cast(
