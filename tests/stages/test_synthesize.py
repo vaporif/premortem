@@ -29,6 +29,7 @@ def _payload(
     name: str = "Acme",
     body: str = "Acme was a B2B fintech that ran out of runway.",
     sources: list[str] | None = None,
+    source: str | None = None,
 ) -> CandidatePayload:
     return CandidatePayload(
         name=name,
@@ -43,6 +44,7 @@ def _payload(
         slop_score=0.0,
         sources=sources if sources is not None else ["https://acme.com/postmortem"],
         text_id="abcdef0123456789",
+        source=source,
     )
 
 
@@ -52,11 +54,12 @@ def _candidate(
     name: str = "Acme",
     body: str = "Acme was a B2B fintech that ran out of runway.",
     sources: list[str] | None = None,
+    source: str | None = None,
 ) -> Candidate:
     return Candidate(
         canonical_id=canonical_id,
         score=0.9,
-        payload=_payload(name=name, body=body, sources=sources),
+        payload=_payload(name=name, body=body, sources=sources, source=source),
     )
 
 
@@ -174,6 +177,35 @@ async def test_synthesize_sources_empty_when_payload_has_none() -> None:
     s = await synthesize(cand, _ctx(), fake_llm, Config(), model=_DEFAULT_MODEL)
 
     assert s.sources == []
+
+
+def test_synthesize_prompt_kwargs_includes_source() -> None:
+    """``synthesize_prompt_kwargs`` surfaces ``payload.source`` so the j2 template can branch."""
+    cand = _candidate(source="llm_recall")
+    kwargs = synthesize_prompt_kwargs(cand, pitch="x")
+    assert kwargs["source"] == "llm_recall"
+
+
+def test_synthesize_prompt_kwargs_source_unknown_when_payload_missing() -> None:
+    """``payload.source=None`` becomes ``"unknown"`` in the prompt context."""
+    cand = _candidate(source=None)
+    kwargs = synthesize_prompt_kwargs(cand, pitch="x")
+    assert kwargs["source"] == "unknown"
+
+
+async def test_synthesize_threads_source_into_synthesis() -> None:
+    """``Synthesis.source`` mirrors ``CandidatePayload.source`` so render can flag llm_recall."""
+    cand = _candidate(source="llm_recall")
+    fake_llm = FakeLLMClient(
+        canned=_synthesize_canned(
+            [cand], _ctx(), text=_synthesis_payload(candidate_id=cand.canonical_id)
+        ),
+        default_model=_DEFAULT_MODEL,
+    )
+
+    s = await synthesize(cand, _ctx(), fake_llm, Config(), model=_DEFAULT_MODEL)
+
+    assert s.source == "llm_recall"
 
 
 async def test_synthesize_lifespan_none_when_dates_unknown() -> None:

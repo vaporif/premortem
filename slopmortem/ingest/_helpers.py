@@ -190,4 +190,7 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
         provenance_id=provenance_id,
         text_id=text_id,
         verification_tier=verification_tier,
+        # Forwarded raw RawEntry.source so synthesize/render can branch on
+        # llm_recall without re-deriving it from provenance_id.
+        source=provenance,
     )

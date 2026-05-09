@@ -47,6 +47,9 @@ def synthesize_prompt_kwargs(candidate: Candidate, *, pitch: str) -> dict[str, A
         "candidate_id": candidate.canonical_id,
         "candidate_name": payload.name,
         "candidate_body": payload.body,
+        # ``"unknown"`` rather than ``None`` so the j2 default branch never
+        # surfaces a Python falsey when an older qdrant row lacks ``source``.
+        "source": payload.source or "unknown",
         "founding_date": payload.founding_date.isoformat() if payload.founding_date else None,
         "failure_date": payload.failure_date.isoformat() if payload.failure_date else None,
         "sub_sector": facets.sub_sector,
@@ -122,6 +125,7 @@ async def synthesize(  # noqa: PLR0913 — every dependency is required at the c
         failure_date=candidate.payload.failure_date,
         sources=candidate.payload.sources,
         injection_detected=injection_detected,
+        source=candidate.payload.source,
     )
 
 

@@ -144,9 +144,13 @@ class Synthesis(BaseModel):
     lessons_for_input: list[str]
     sources: list[str]
     injection_detected: bool = False
+    # Threaded through from ``CandidatePayload.source`` so the renderer can flag
+    # llm_recall candidates (the LLM-named, web-verified path) for the reader.
+    # None on legacy syntheses written before the field existed.
+    source: str | None = None
 
     @classmethod
-    def from_llm(
+    def from_llm(  # noqa: PLR0913 - one kwarg per typed-payload field threaded past the LLM
         cls,
         llm_synth: LLMSynthesis,
         *,
@@ -154,6 +158,7 @@ class Synthesis(BaseModel):
         failure_date: date | None,
         sources: list[str],
         injection_detected: bool = False,
+        source: str | None = None,
     ) -> Synthesis:
         lifespan = _months_between(founding_date, failure_date)
         return cls(
@@ -169,6 +174,7 @@ class Synthesis(BaseModel):
             lessons_for_input=llm_synth.lessons_for_input,
             sources=sources,
             injection_detected=injection_detected,
+            source=source,
         )
 
 
@@ -209,6 +215,12 @@ class CandidatePayload(BaseModel):
     # Carries the verifier's L4 outcome ("wayback_anchored" beats "evidence_only"
     # because a corroborated snapshot is harder to fabricate than a single citation).
     verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None
+    # Raw ``RawEntry.source`` string ("crunchbase_csv", "llm_recall", …). Distinct
+    # from ``provenance`` (which collapses sources into the curated/scraped/synthesized
+    # 3-way). Synthesis and render need the finer split to flag llm_recall entries.
+    # Defaults to None so legacy qdrant rows written before the field existed still
+    # validate on read.
+    source: str | None = None
 
 
 class Candidate(BaseModel):

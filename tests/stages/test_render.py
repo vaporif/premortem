@@ -17,7 +17,7 @@ from slopmortem.models import (
     Synthesis,
     TopRisks,
 )
-from slopmortem.render import render
+from slopmortem.render import _render_candidate, render
 
 if TYPE_CHECKING:
     from syrupy.assertion import SnapshotAssertion
@@ -225,6 +225,45 @@ def test_render_footer_omits_recall_flags_when_default() -> None:
     assert "coverage_gap" not in md
     assert "recall_used" not in md
     assert "recall_persisted_count" not in md
+
+
+def _synthesis_with_source(source: str | None) -> Synthesis:
+    return Synthesis(
+        candidate_id="recall-co",
+        name="RecallCo",
+        one_liner="LLM-recalled comparable.",
+        failure_date=date(2022, 6, 1),
+        lifespan_months=24,
+        similarity=_scores(5.0),
+        why_similar="They served the same niche.",
+        where_diverged="Different geo footprint.",
+        failure_causes=["regulation"],
+        lessons_for_input=["watch the regulator"],
+        sources=["https://recall.example/post"],
+        source=source,
+    )
+
+
+def test_render_marks_recall_provenance() -> None:
+    """``source == "llm_recall"`` surfaces a provenance tag in the rendered candidate.
+
+    The tag warns the reader that the comparable was named by an LLM and only
+    web-verified — weaker grounding than a crawler-sourced obit.
+    """
+    out = _render_candidate(_synthesis_with_source("llm_recall"))
+    assert "Source: LLM recall (verified against live web)" in out
+
+
+def test_render_omits_recall_tag_for_other_sources() -> None:
+    """Crawler-sourced candidates render without the recall provenance line."""
+    out = _render_candidate(_synthesis_with_source("crunchbase_csv"))
+    assert "Source: LLM recall" not in out
+
+
+def test_render_omits_recall_tag_when_source_missing() -> None:
+    """Legacy syntheses (``source=None``) render without the recall provenance line."""
+    out = _render_candidate(_synthesis_with_source(None))
+    assert "Source: LLM recall" not in out
 
 
 def test_render_is_pure_no_io() -> None:

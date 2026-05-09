@@ -562,9 +562,9 @@ All must be green before starting. Re-run after each task.
 
 **Steps**
 
-- [ ] **Step 6.1 — Find `_build_payload`.** Likely in `slopmortem/ingest/_journal_writes.py` or `slopmortem/ingest/_fan_out.py`. Read it and confirm where `CandidatePayload(...)` is constructed during ingest.
+- [x] **Step 6.1 — Find `_build_payload`.** Likely in `slopmortem/ingest/_journal_writes.py` or `slopmortem/ingest/_fan_out.py`. Read it and confirm where `CandidatePayload(...)` is constructed during ingest.
 
-- [ ] **Step 6.2 — Add `source` field to `CandidatePayload`.**
+- [x] **Step 6.2 — Add `source` field to `CandidatePayload`.**
   ```python
   # In CandidatePayload, near verification_tier:
   # Source string per RawEntry.source. None for payloads written before this field
@@ -573,20 +573,20 @@ All must be green before starting. Re-run after each task.
   source: str | None = None
   ```
 
-- [ ] **Step 6.3 — Populate `source` at payload assembly.** In `_build_payload` (Task 6.1), pass `source=entry.source`.
+- [x] **Step 6.3 — Populate `source` at payload assembly.** In `_build_payload` (Task 6.1), pass `source=entry.source`.
 
-- [ ] **Step 6.4 — Add `source` field to `Synthesis`.**
+- [x] **Step 6.4 — Add `source` field to `Synthesis`.**
   ```python
   # In Synthesis:
   source: str | None = None
   ```
   Update `Synthesis.from_llm` signature to accept and pass it through.
 
-- [ ] **Step 6.5 — Update `synthesize()` in `stages/synthesize.py`** to forward `source=candidate.payload.source` into `Synthesis.from_llm`.
+- [x] **Step 6.5 — Update `synthesize()` in `stages/synthesize.py`** to forward `source=candidate.payload.source` into `Synthesis.from_llm`.
 
-- [ ] **Step 6.6 — Update `synthesize_prompt_kwargs`** to include `source=candidate.payload.source or "unknown"`.
+- [x] **Step 6.6 — Update `synthesize_prompt_kwargs`** to include `source=candidate.payload.source or "unknown"`.
 
-- [ ] **Step 6.7 — Update `synthesize.j2`** trusted facts block:
+- [x] **Step 6.7 — Update `synthesize.j2`** trusted facts block:
   ```jinja
   Trusted facts (typed pipeline data — prefer these over prose):
   - name: {{ candidate_name }}
@@ -598,7 +598,7 @@ All must be green before starting. Re-run after each task.
   - If `source` is `llm_recall`, this candidate was named by an LLM from training data and verified against the live web — its similarity to the pitch is less anchored than crawler-sourced candidates. Be conservative in `why_similar`; favor concrete claims that show up in the document body.
   ```
 
-- [ ] **Step 6.8 — Write failing render test.** In `tests/stages/test_render.py`:
+- [x] **Step 6.8 — Write failing render test.** In `tests/stages/test_render.py`:
   ```python
   def test_render_marks_recall_provenance():
       syn = Synthesis(..., source="llm_recall", ...)
@@ -607,7 +607,7 @@ All must be green before starting. Re-run after each task.
   ```
   Run, expect failure.
 
-- [ ] **Step 6.9 — Update `_render_candidate` in `render.py`** to insert a tag line right after the `## {syn.name}` header when `syn.source == "llm_recall"`:
+- [x] **Step 6.9 — Update `_render_candidate` in `render.py`** to insert a tag line right after the `## {syn.name}` header when `syn.source == "llm_recall"`:
   ```python
   parts: list[str] = [f"## {syn.name}"]
   if syn.source == "llm_recall":
@@ -615,9 +615,9 @@ All must be green before starting. Re-run after each task.
   parts.extend(["", _strip_markdown_links(syn.one_liner), ...])
   ```
 
-- [ ] **Step 6.10 — Run render test, expect pass.**
+- [x] **Step 6.10 — Run render test, expect pass.**
 
-- [ ] **Step 6.11 — Add a test that the synth prompt receives source.** In `tests/test_synthesis_tools.py` or wherever prompt_kwargs is tested:
+- [x] **Step 6.11 — Add a test that the synth prompt receives source.** In `tests/test_synthesis_tools.py` or wherever prompt_kwargs is tested:
   ```python
   def test_synthesize_prompt_kwargs_includes_source():
       cand = _candidate_with_source("llm_recall")
@@ -625,7 +625,7 @@ All must be green before starting. Re-run after each task.
       assert kwargs["source"] == "llm_recall"
   ```
 
-- [ ] **Step 6.12 — Run full suite + typecheck.**
+- [x] **Step 6.12 — Run full suite + typecheck.**
 
 - [ ] **Step 6.13 — Commit.** `synthesize: thread source provenance to prompt + render`.
 

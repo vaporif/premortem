@@ -4,6 +4,7 @@
     "candidate_id": "scribetech.com",
     "candidate_name": "ScribeTech",
     "candidate_body": "ScribeTech (2019-2023) sold AI ambient medical scribing to US primary-care clinics at $200/provider/month. Hit ~120 clinics and $4M ARR. Failed when Epic and athenahealth bundled comparable scribing features in 2022, driving churn from 8% to 32%. Shut down March 2023.\n\nSources: https://example.com/scribetech-postmortem",
+    "source": "tavily_news",
     "founding_date": "2019-01-01",
     "failure_date": "2023-01-01",
     "sub_sector": "healthtech_ambient_scribing",

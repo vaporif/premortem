@@ -59,38 +59,45 @@ def _render_bullets(items: list[str]) -> str:
 def _render_candidate(syn: Synthesis) -> str:
     failure_date_str = syn.failure_date.isoformat() if syn.failure_date else "unknown"
     lifespan_str = f"{syn.lifespan_months} months" if syn.lifespan_months is not None else "unknown"
-    parts: list[str] = [
-        f"## {syn.name}",
-        "",
-        _strip_markdown_links(syn.one_liner),
-        "",
-        f"Failure date: {failure_date_str}",
-        f"Lifespan: {lifespan_str}",
-        "",
-        "Similarity:",
-        "",
-        _render_similarity_table(syn.similarity),
-        "",
-        "Why similar:",
-        "",
-        _strip_markdown_links(syn.why_similar),
-        "",
-        "Where diverged:",
-        "",
-        _strip_markdown_links(syn.where_diverged),
-        "",
-        "Failure causes:",
-        "",
-        _render_bullets(syn.failure_causes),
-        "",
-        "Lessons:",
-        "",
-        _render_bullets(syn.lessons_for_input),
-        "",
-        "Sources:",
-        "",
-        "\n".join(syn.sources),
-    ]
+    parts: list[str] = [f"## {syn.name}"]
+    # Surface llm_recall provenance directly under the heading so the reader
+    # can weigh the comparable accordingly: an LLM-named, web-verified entry
+    # is a softer match than a crawler-sourced obit.
+    if syn.source == "llm_recall":
+        parts.append("*Source: LLM recall (verified against live web)*")
+    parts.extend(
+        [
+            "",
+            _strip_markdown_links(syn.one_liner),
+            "",
+            f"Failure date: {failure_date_str}",
+            f"Lifespan: {lifespan_str}",
+            "",
+            "Similarity:",
+            "",
+            _render_similarity_table(syn.similarity),
+            "",
+            "Why similar:",
+            "",
+            _strip_markdown_links(syn.why_similar),
+            "",
+            "Where diverged:",
+            "",
+            _strip_markdown_links(syn.where_diverged),
+            "",
+            "Failure causes:",
+            "",
+            _render_bullets(syn.failure_causes),
+            "",
+            "Lessons:",
+            "",
+            _render_bullets(syn.lessons_for_input),
+            "",
+            "Sources:",
+            "",
+            "\n".join(syn.sources),
+        ]
+    )
     return "\n".join(parts)
 
 
