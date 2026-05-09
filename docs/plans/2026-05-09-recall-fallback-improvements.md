@@ -544,7 +544,7 @@ All must be green before starting. Re-run after each task.
 
 - [x] **Step 5.6 — Run full suite.**
 
-- [ ] **Step 5.7 — Commit.** `stages: expand coverage_gate calibration fixtures`.
+- [x] **Step 5.7 — Commit.** `stages: expand coverage_gate calibration fixtures`.
 
 ---
 
