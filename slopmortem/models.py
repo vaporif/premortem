@@ -205,6 +205,10 @@ class CandidatePayload(BaseModel):
     sources: list[str]
     provenance_id: str = ""
     text_id: str
+    # None for non-recall sources; ``recall_persist`` sets it for source=llm_recall.
+    # Carries the verifier's L4 outcome ("wayback_anchored" beats "evidence_only"
+    # because a corroborated snapshot is harder to fabricate than a single citation).
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None
 
 
 class Candidate(BaseModel):

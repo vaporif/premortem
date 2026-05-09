@@ -41,6 +41,7 @@ from slopmortem.tracing import SpanEvent
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Literal
 
     from slopmortem.config import Config
     from slopmortem.corpus import MergeJournal
@@ -76,6 +77,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
     force: bool,
     span_events: list[str],
     sparse_encoder: SparseEncoder,
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
 ) -> ProcessOutcome:
     """Resolve, write, and journal one entry.
 
@@ -198,6 +200,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         name=name,
         provenance=entry.source,
         synthesized=entry.synthesized,
+        verification_tier=verification_tier,
     )
     chunks_written = await _embed_and_upsert(
         canonical_id=canonical_id,

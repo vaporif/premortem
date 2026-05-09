@@ -42,6 +42,7 @@ from slopmortem.tracing import SpanEvent, git_sha, mint_run_id
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
+    from typing import Literal
 
     from slopmortem.budget import Budget
     from slopmortem.config import Config
@@ -56,7 +57,7 @@ if TYPE_CHECKING:
     from slopmortem.llm import EmbeddingClient, LLMClient
     from slopmortem.models import RawEntry
 
-__all__ = ["ingest"]
+__all__ = ["_classify_phase", "_write_phase", "ingest"]
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +267,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
     sparse_encoder: SparseEncoder,
     progress: IngestProgress,
     result: IngestResult,
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
 ) -> None:
     """Per-entry: resolve → journal → disk → qdrant → mark_complete.
 
@@ -302,6 +304,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 force=force,
                 span_events=result.span_events,
                 sparse_encoder=sparse_encoder,
+                verification_tier=verification_tier,
             )
         except Exception as exc:  # noqa: BLE001 - per-entry isolation; run continues.
             _record_entry_failure(

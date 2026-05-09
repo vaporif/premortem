@@ -12,6 +12,7 @@ from slopmortem.corpus.sources._names import (
     SOURCE_CRUNCHBASE_CSV,
     SOURCE_CURATED,
     SOURCE_HN_ALGOLIA,
+    SOURCE_LLM_RECALL,
     SOURCE_TAVILY_NEWS,
 )
 from slopmortem.ingest._ports import IngestPhase, NullProgress
@@ -39,11 +40,15 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 # merge_text orders sections by this. Curated > HN > Crunchbase > everything else.
+# llm_recall sits below Tavily news because the verifier guarantees one
+# corroborating citation but the body itself can be either an article or a
+# Wayback snapshot — both weaker primary sources than a curated obit.
 _RELIABILITY_RANK: Final[dict[str, int]] = {
     SOURCE_CURATED: 0,
     SOURCE_HN_ALGOLIA: 1,
     SOURCE_CRUNCHBASE_CSV: 2,
     SOURCE_TAVILY_NEWS: 4,
+    SOURCE_LLM_RECALL: 6,
 }
 
 
@@ -160,6 +165,7 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
     name: str,
     provenance: str,
     synthesized: bool = False,
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
 ) -> CandidatePayload:
     founding_year = facets.founding_year
     failure_year = facets.failure_year
@@ -183,4 +189,5 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
         sources=sources_seen,
         provenance_id=provenance_id,
         text_id=text_id,
+        verification_tier=verification_tier,
     )
