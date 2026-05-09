@@ -29,6 +29,7 @@ class SpanEvent(StrEnum):
     # force_llm_recall runs that bypass the gate intentionally do NOT emit it.
     RECALL_GATE_FIRED = "recall.gate_fired"
     RECALL_SUGGESTIONS_RECEIVED = "recall.suggestions_received"
+    # Carries ``stage`` attribute: "head" (HEAD probe) or "get" (GET body fetch).
     RECALL_REJECTED_L2 = "recall.rejected_l2"
     RECALL_REJECTED_L3_NAME_MISSING = "recall.rejected_l3_name"
     RECALL_REJECTED_L3_KEYWORD_MISSING = "recall.rejected_l3_kw"

@@ -37,7 +37,7 @@ from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.tracing import SpanEvent
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Mapping
 
     from slopmortem.corpus.sources.base import Enricher
 
@@ -102,9 +102,11 @@ def _recall_source_id(suggestion: RecallSuggestion) -> str:
     return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]
 
 
-def _emit_event(event: SpanEvent) -> None:
+def _emit_event(event: SpanEvent, attributes: Mapping[str, str] | None = None) -> None:
     if Laminar.is_initialized():
-        Laminar.event(name=str(event))
+        # Laminar's signature is invariant ``dict[str, AttributeValue]``; we
+        # accept a covariant ``Mapping`` from callers and rebuild a dict here.
+        Laminar.event(name=str(event), attributes=dict(attributes) if attributes else None)
 
 
 # Tri-state so callers can tell name-missing from keyword-missing without
@@ -145,17 +147,19 @@ async def verify_suggestion(
     """Run L1-L4 against one suggestion. Returns ``None`` if any gate drops."""
     homepage = str(suggestion.homepage_url)
     evidence = str(suggestion.evidence_url)
-    # L2: HEAD both URLs.
+    # L2: HEAD both URLs. Each emission carries ``stage="head"`` so the audit
+    # dashboard can split HEAD-probe rejections from GET-stage transport
+    # failures (which use ``stage="get"`` below).
     for url in (homepage, evidence):
         try:
             head_resp = await safe_head(url, timeout=_FETCH_TIMEOUT_S)
         except (SSRFBlockedError, httpx.HTTPError) as exc:
             logger.info("recall_verify: L2 HEAD failed for %s: %r", url, exc)
-            _emit_event(SpanEvent.RECALL_REJECTED_L2)
+            _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "head"})
             return None
         if head_resp.status_code >= _HTTP_BAD_REQUEST:
             logger.info("recall_verify: L2 HEAD %s for %s", head_resp.status_code, url)
-            _emit_event(SpanEvent.RECALL_REJECTED_L2)
+            _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "head"})
             return None
     # L3: GET evidence body — primary anchor.
     # Note: ``safe_get`` does NOT consult robots.txt (unlike Wayback's
@@ -167,13 +171,14 @@ async def verify_suggestion(
     except (SSRFBlockedError, httpx.HTTPError) as exc:
         logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
         # GET-level failure on the evidence URL is functionally an L2 outcome:
-        # the URL didn't deliver a body. Fold into RECALL_REJECTED_L2 so the
-        # audit signal stays "URL didn't serve" vs "body didn't anchor".
-        _emit_event(SpanEvent.RECALL_REJECTED_L2)
+        # the URL didn't deliver a body. Fold into RECALL_REJECTED_L2 with
+        # ``stage="get"`` so the audit dashboard can still split HEAD-probe
+        # failures from GET-body transport failures.
+        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
         return None
     if evidence_resp.status_code >= _HTTP_BAD_REQUEST:
         logger.info("recall_verify: L3 GET %s for %s", evidence_resp.status_code, evidence)
-        _emit_event(SpanEvent.RECALL_REJECTED_L2)
+        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
         return None
     evidence_body = evidence_resp.text
     anchor = _body_anchors_name_and_death(suggestion.name, evidence_body)
