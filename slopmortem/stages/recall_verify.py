@@ -39,7 +39,7 @@ from slopmortem.tracing import SpanEvent
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping
 
-    from slopmortem.corpus.sources.base import Enricher
+    from slopmortem.corpus.sources import Enricher
 
 
 logger = logging.getLogger(__name__)
