@@ -42,6 +42,12 @@ class Config(BaseSettings):
     # relative order.
     recall_score_factor: float = Field(default=0.9, ge=0.0, le=1.0)
     slop_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    # llm_recall content (Wayback marketing copy, TechCrunch acquisition pieces,
+    # founder farewell blogs) is shaped differently from the HN/Crunchbase
+    # corpus the global threshold was tuned against. Override here when
+    # calibration data shows recall is over- or under-rejecting; ``None`` keeps
+    # the global threshold for every source.
+    recall_slop_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
     max_doc_tokens: int = Field(default=8000, ge=1)
     tier3_calibration_band: tuple[float, float] = (0.65, 0.85)
     max_cost_usd_per_query: float = Field(default=2.00, gt=0.0)

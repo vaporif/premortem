@@ -432,21 +432,21 @@ All must be green before starting. Re-run after each task.
 
 **Steps**
 
-- [ ] **Step 4.1 — Add config knob.**
+- [x] **Step 4.1 — Add config knob.**
   ```python
   recall_slop_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
   ```
   None means "use slop_threshold for all sources."
 
-- [ ] **Step 4.2 — Add SpanEvent.**
+- [x] **Step 4.2 — Add SpanEvent.**
   ```python
   RECALL_SLOP_BORDERLINE = "recall.slop_borderline"
   ```
   Carries `slop_score` and `effective_threshold` attributes.
 
-- [ ] **Step 4.3 — Read `_classify_phase`** in `slopmortem/ingest/_ingest.py` to locate the threshold comparison. Confirm it's a single `if score > config.slop_threshold` site or several.
+- [x] **Step 4.3 — Read `_classify_phase`** in `slopmortem/ingest/_ingest.py` to locate the threshold comparison. Confirm it's a single `if score > config.slop_threshold` site or several.
 
-- [ ] **Step 4.4 — Add helper.** In the same file (or `_slop_gate.py` if it lives there cleaner):
+- [x] **Step 4.4 — Add helper.** In the same file (or `_slop_gate.py` if it lives there cleaner):
   ```python
   def _effective_slop_threshold(entry: RawEntry, config: Config) -> float:
       if entry.source == SOURCE_LLM_RECALL and config.recall_slop_threshold is not None:
@@ -454,7 +454,7 @@ All must be green before starting. Re-run after each task.
       return config.slop_threshold
   ```
 
-- [ ] **Step 4.5 — Write failing test (default unchanged).** In `tests/ingest/test_orchestration.py`:
+- [x] **Step 4.5 — Write failing test (default unchanged).** In `tests/ingest/test_orchestration.py`:
   ```python
   async def test_recall_slop_threshold_default_uses_global():
       """recall_slop_threshold=None → llm_recall entries gated by slop_threshold (default 0.7)."""
@@ -464,7 +464,7 @@ All must be green before starting. Re-run after each task.
   ```
   Run, confirm pass (default behavior).
 
-- [ ] **Step 4.6 — Write failing test (override active).**
+- [x] **Step 4.6 — Write failing test (override active).**
   ```python
   async def test_recall_slop_threshold_override_quarantines():
       """recall_slop_threshold=0.5 → llm_recall entry scoring 0.6 quarantines."""
@@ -474,7 +474,7 @@ All must be green before starting. Re-run after each task.
   ```
   Run, expect failure (no override path yet).
 
-- [ ] **Step 4.7 — Replace direct `config.slop_threshold` reads** in `_classify_phase` with `_effective_slop_threshold(entry, config)`. Wire borderline event emission:
+- [x] **Step 4.7 — Replace direct `config.slop_threshold` reads** in `_classify_phase` with `_effective_slop_threshold(entry, config)`. Wire borderline event emission:
   ```python
   effective = _effective_slop_threshold(entry, config)
   if entry.source == SOURCE_LLM_RECALL and 0.4 <= score < effective:
@@ -486,9 +486,9 @@ All must be green before starting. Re-run after each task.
       # quarantine path
   ```
 
-- [ ] **Step 4.8 — Run tests, expect pass.**
+- [x] **Step 4.8 — Run tests, expect pass.**
 
-- [ ] **Step 4.9 — Run full suite.**
+- [x] **Step 4.9 — Run full suite.**
 
 - [ ] **Step 4.10 — Commit.** `ingest: per-source slop threshold for recall + borderline event`.
 

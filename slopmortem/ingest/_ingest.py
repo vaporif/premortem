@@ -13,6 +13,7 @@ import anyio
 from lmnr import Laminar, observe
 
 from slopmortem.concurrency import gather_resilient
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.ingest._fan_out import (
     _facet_summarize_fanout,
     _FanoutResult,
@@ -33,6 +34,7 @@ from slopmortem.ingest._ports import (
     NullProgress,
 )
 from slopmortem.ingest._slop_gate import (
+    _effective_slop_threshold,
     _quarantine,
     classify_one,
 )
@@ -60,6 +62,12 @@ if TYPE_CHECKING:
 __all__ = ["_classify_phase", "_write_phase", "ingest"]
 
 logger = logging.getLogger(__name__)
+
+# Lower bound on borderline-event emission. Scores under 0.4 trip too readily
+# on clean docs (TechCrunch obits, Wayback marketing copy, founder blogs are
+# all routinely <0.3) and would drown the trace in non-actionable noise. The
+# tunable region for ``recall_slop_threshold`` sits between 0.4 and 0.85.
+_BORDERLINE_LOWER = 0.4
 
 
 def _emit_collected_events(result: IngestResult) -> None:
@@ -196,7 +204,26 @@ async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branc
                 ),
             )
 
-            if slop_score > config.slop_threshold:
+            effective_threshold = _effective_slop_threshold(enriched, config)
+            # Borderline band logged only for llm_recall: the override knob
+            # exists for that source, and the run-time signal needed to
+            # retune is the score-vs-threshold gap. Lower bound 0.4 trims
+            # the long left tail of obviously-clean docs that aren't useful
+            # calibration data.
+            if (
+                enriched.source == SOURCE_LLM_RECALL
+                and _BORDERLINE_LOWER <= slop_score < effective_threshold
+                and Laminar.is_initialized()
+            ):
+                Laminar.event(
+                    name=SpanEvent.RECALL_SLOP_BORDERLINE.value,
+                    attributes={
+                        "slop_score": f"{slop_score:.3f}",
+                        "effective_threshold": f"{effective_threshold:.3f}",
+                    },
+                )
+
+            if slop_score > effective_threshold:
                 if not dry_run:
                     await _quarantine(
                         journal=journal,

@@ -44,3 +44,8 @@ class SpanEvent(StrEnum):
     # on died=true below threshold OR on transport/parse failure.
     RECALL_REJECTED_L5_NOT_DEAD = "recall.rejected_l5_not_dead"
     RECALL_REJECTED_L5_LOW_CONFIDENCE = "recall.rejected_l5_low_confidence"
+    # Carries ``slop_score`` and ``effective_threshold`` attributes. Fires only
+    # for llm_recall entries scoring within 0.4 ≤ score < threshold so future
+    # tuning has the data to retune ``recall_slop_threshold`` without
+    # re-classifying the corpus.
+    RECALL_SLOP_BORDERLINE = "recall.slop_borderline"

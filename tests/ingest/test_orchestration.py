@@ -385,6 +385,89 @@ async def test_ingest_quarantines_slop(tmp_path, cfg):
     assert any(p.suffix == ".md" for p in quarantine_dir.iterdir())
 
 
+async def test_recall_slop_threshold_default_uses_global(tmp_path, cfg):
+    """``recall_slop_threshold=None`` keeps llm_recall entries on the global ``slop_threshold``."""
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=cfg.embed_model_id)
+    budget = Budget(cap_usd=cfg.max_cost_usd_per_ingest)
+    classifier = FakeSlopClassifier(default_score=0.6)
+    sources = [_ListSource(entries=[_entry(source="llm_recall", source_id="acme")])]
+
+    assert cfg.recall_slop_threshold is None
+    assert cfg.slop_threshold == pytest.approx(0.7)
+    result = await ingest(
+        sources=sources,
+        enrichers=[],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=classifier,
+        config=cfg,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.processed == 1
+    assert result.quarantined == 0
+
+
+async def test_recall_slop_threshold_override_quarantines(tmp_path):
+    """``recall_slop_threshold=0.5`` quarantines an llm_recall entry scoring 0.6."""
+    config = Config(
+        max_cost_usd_per_ingest=100.0,
+        ingest_concurrency=20,
+        recall_slop_threshold=0.5,
+    )
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=config.embed_model_id)
+    budget = Budget(cap_usd=config.max_cost_usd_per_ingest)
+    classifier = FakeSlopClassifier(default_score=0.6)
+    sources = [_ListSource(entries=[_entry(source="llm_recall", source_id="acme")])]
+
+    result = await ingest(
+        sources=sources,
+        enrichers=[],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=classifier,
+        config=config,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.processed == 0
+    assert result.quarantined == 1
+    # Non-recall sources keep using the global threshold even when the
+    # override is set — score 0.6 < global 0.7 means hn passes.
+    classifier_global = FakeSlopClassifier(default_score=0.6)
+    journal2 = MergeJournal(tmp_path / "j2.sqlite")
+    await journal2.init()
+    result_hn = await ingest(
+        sources=[_ListSource(entries=[_entry(source="hn", source_id="other")])],
+        enrichers=[],
+        journal=journal2,
+        corpus=InMemoryCorpus(),
+        llm=FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU),
+        embed_client=FakeEmbeddingClient(model=config.embed_model_id),
+        budget=Budget(cap_usd=config.max_cost_usd_per_ingest),
+        slop_classifier=classifier_global,
+        config=config,
+        post_mortems_root=tmp_path / "post_mortems_hn",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result_hn.processed == 1
+    assert result_hn.quarantined == 0
+
+
 async def test_ingest_payload_sources_url_only_when_url_present(tmp_path, cfg):
     """Payload sources holds the URL; provenance_id holds <source>:<source_id>."""
     journal = MergeJournal(tmp_path / "j.sqlite")
