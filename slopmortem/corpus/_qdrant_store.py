@@ -181,9 +181,9 @@ class QdrantCorpus:
         # Soft demote on llm_recall: the term resolves to ``$score x (factor-1)``
         # when source matches and to 0 otherwise, so the outer Sum yields
         # ``$score x factor`` for recall rows and ``$score`` for everything else.
-        # No-op in prod until Task 6 of docs/plans/2026-05-09-recall-fallback-improvements.md
-        # writes ``source`` onto CandidatePayload; tests inject ``source`` into
-        # the raw Qdrant payload to exercise the formula shape today.
+        # Legacy qdrant rows written before ``source`` landed on CandidatePayload
+        # carry no ``source`` key, so the FieldCondition is false and they keep
+        # their original score.
         if self._recall_score_factor < 1.0:
             formula_terms.append(
                 MultExpression(
