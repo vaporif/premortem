@@ -988,7 +988,7 @@ def _capture_laminar_events(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, A
 
 
 async def test_gap_score_event_emitted_on_every_query(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``recall.gap_score`` fires once per query even when the predicate is quiet.
 
@@ -1034,4 +1034,3 @@ async def test_gap_score_event_emitted_on_every_query(
     # Quiet predicate → gate event must not fire, and recall stays untouched.
     assert not any(e["name"] == "recall.gate_fired" for e in events)
     assert report.pipeline_meta.coverage_gap is False
-    del tmp_path

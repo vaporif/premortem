@@ -74,24 +74,6 @@ def compute_coverage_gap(
     return CoverageGapResult(qualifying=qualifying, required=n_synthesize)
 
 
-def detect_coverage_gap(
-    *,
-    retrieved: list[Candidate],
-    ranked: list[ScoredCandidate],
-    pitch_sector: str,
-    min_similarity_score: float,
-    n_synthesize: int,
-) -> bool:
-    """Back-compat boolean shim — delegates to ``compute_coverage_gap``."""
-    return compute_coverage_gap(
-        retrieved=retrieved,
-        ranked=ranked,
-        pitch_sector=pitch_sector,
-        min_similarity_score=min_similarity_score,
-        n_synthesize=n_synthesize,
-    ).gap
-
-
 # Drop user pitch, candidate payloads, and rerank rationales from span attrs:
 # CLAUDE.md forbids prompt/response bodies in tracing. Candidate id/score still
 # show up via the ``stage.llm_rerank`` upstream span.

@@ -5,7 +5,6 @@ from __future__ import annotations
 from slopmortem.stages.consolidate_risks import consolidate_risks as consolidate_risks
 from slopmortem.stages.facet_extract import extract_facets as extract_facets
 from slopmortem.stages.llm_recall import compute_coverage_gap as compute_coverage_gap
-from slopmortem.stages.llm_recall import detect_coverage_gap as detect_coverage_gap
 from slopmortem.stages.llm_recall import llm_recall as llm_recall
 from slopmortem.stages.llm_rerank import (
     llm_rerank as llm_rerank,
@@ -47,7 +46,6 @@ __all__ = [
     "VerificationTier",
     "compute_coverage_gap",
     "consolidate_risks",
-    "detect_coverage_gap",
     "drop_below_min_similarity",
     "extract_facets",
     "llm_recall",

@@ -16,7 +16,6 @@ from slopmortem.models import (
     ScoredCandidate,
     SimilarityScores,
 )
-from slopmortem.stages import detect_coverage_gap
 from slopmortem.stages.llm_recall import compute_coverage_gap
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "coverage_gate"
@@ -86,25 +85,25 @@ def _scored(candidate_id: str, mean: float) -> ScoredCandidate:
 @pytest.mark.parametrize("name", ["hacken", "splunk_ot", "crypto_web3_sparse"])
 def test_calibration_fixture(name: str) -> None:
     retrieved, ranked, pitch_sector, expected = _load(name)
-    result = detect_coverage_gap(
+    result = compute_coverage_gap(
         retrieved=retrieved,
         ranked=ranked,
         pitch_sector=pitch_sector,
         min_similarity_score=4.0,
         n_synthesize=5,
-    )
+    ).gap
     assert result is expected
 
 
 def test_zero_candidates_fires() -> None:
     assert (
-        detect_coverage_gap(
+        compute_coverage_gap(
             retrieved=[],
             ranked=[],
             pitch_sector="crypto_web3",
             min_similarity_score=4.0,
             n_synthesize=5,
-        )
+        ).gap
         is True
     )
 
@@ -115,13 +114,13 @@ def test_one_in_sector_high_quality_match_fires() -> None:
     retrieved = [_candidate("only_one", "crypto_web3")]
     ranked = [_scored("only_one", 5.0)]
     assert (
-        detect_coverage_gap(
+        compute_coverage_gap(
             retrieved=retrieved,
             ranked=ranked,
             pitch_sector="crypto_web3",
             min_similarity_score=4.0,
             n_synthesize=5,
-        )
+        ).gap
         is True
     )
 
@@ -130,13 +129,13 @@ def test_five_in_sector_high_quality_matches_quiet() -> None:
     retrieved = [_candidate(f"c{i}", "crypto_web3") for i in range(5)]
     ranked = [_scored(f"c{i}", 4.5) for i in range(5)]
     assert (
-        detect_coverage_gap(
+        compute_coverage_gap(
             retrieved=retrieved,
             ranked=ranked,
             pitch_sector="crypto_web3",
             min_similarity_score=4.0,
             n_synthesize=5,
-        )
+        ).gap
         is False
     )
 
@@ -148,13 +147,13 @@ def test_pitch_sector_other_skips_sector_check() -> None:
     retrieved = [_candidate(f"c{i}", s) for i, s in enumerate(sectors)]
     ranked = [_scored(f"c{i}", 4.5) for i in range(5)]
     assert (
-        detect_coverage_gap(
+        compute_coverage_gap(
             retrieved=retrieved,
             ranked=ranked,
             pitch_sector="other",
             min_similarity_score=4.0,
             n_synthesize=5,
-        )
+        ).gap
         is False
     )
 
@@ -164,13 +163,13 @@ def test_wrong_vertical_noise_fires() -> None:
     retrieved = [_candidate(f"c{i}", "security") for i in range(5)]
     ranked = [_scored(f"c{i}", 6.0) for i in range(5)]
     assert (
-        detect_coverage_gap(
+        compute_coverage_gap(
             retrieved=retrieved,
             ranked=ranked,
             pitch_sector="crypto_web3",
             min_similarity_score=4.0,
             n_synthesize=5,
-        )
+        ).gap
         is True
     )
 
