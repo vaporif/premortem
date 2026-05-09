@@ -8,6 +8,7 @@ which we drop before populating ``Report.candidates``.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -54,6 +55,9 @@ if TYPE_CHECKING:
         RawEntry,
     )
     from slopmortem.stages import SparseEncoder, VerificationTier
+
+
+logger = logging.getLogger(__name__)
 
 
 class QueryPhase(StrEnum):
@@ -268,10 +272,12 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
     Per-candidate synthesis exceptions are dropped silently; ``BudgetExceededError``
     truncates the run and surfaces as ``pipeline_meta.budget_exceeded=True``.
 
-    ``recall_deps`` is required when ``config.enable_llm_recall=True`` and the
-    coverage-gap predicate fires, OR when ``config.force_llm_recall=True``.
-    Outside those cases the parameter can be ``None`` — the recall branch
-    isn't even evaluated.
+    ``recall_deps`` should be provided so the coverage-gap predicate can fire
+    when survivors < ``N_synthesize`` after rerank+min_similarity. When the
+    predicate fires without deps the branch is a logged no-op (used by tests
+    that don't exercise recall). ``config.force_llm_recall=True`` without deps
+    raises ``RuntimeError`` so explicit operator opt-in surfaces misconfig.
+    The default ``query`` CLI builds deps eagerly.
     """
     t0 = time.monotonic()
     successes: list[Synthesis] = []
@@ -342,32 +348,37 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
         progress.advance_phase(QueryPhase.RERANK)
         progress.end_phase(QueryPhase.RERANK)
 
-        if config.enable_llm_recall:
-            coverage_gap = detect_coverage_gap(
-                retrieved=retrieved,
-                ranked=reranked.ranked,
-                pitch_sector=facets.sector,
-                min_similarity_score=config.min_similarity_score,
-                n_synthesize=config.N_synthesize,
-            )
+        coverage_gap = detect_coverage_gap(
+            retrieved=retrieved,
+            ranked=reranked.ranked,
+            pitch_sector=facets.sector,
+            min_similarity_score=config.min_similarity_score,
+            n_synthesize=config.N_synthesize,
+        )
 
-        # OR-combined: trigger-driven OR force-on. ``force_llm_recall`` does
-        # not require ``enable_llm_recall`` — operators recording cassettes
-        # or running eval calibration can opt into recall without committing
-        # to trigger-driven behaviour in production.
-        gate_fired = config.enable_llm_recall and coverage_gap
-        should_fire = gate_fired or config.force_llm_recall
+        # OR-combined: predicate-driven OR force-on. ``force_llm_recall`` lets
+        # operators recording cassettes or running eval calibration fire recall
+        # on every query regardless of the predicate.
+        should_fire = coverage_gap or config.force_llm_recall
 
-        # Trigger-driven only: emit before force-driven branches so the audit
+        # Predicate-driven only: emit before force-driven branches so the audit
         # signal cleanly distinguishes "the predicate fired" from "the
         # operator opted in regardless".
-        if gate_fired and Laminar.is_initialized():
+        if coverage_gap and Laminar.is_initialized():
             Laminar.event(name=str(SpanEvent.RECALL_GATE_FIRED))
 
-        if should_fire:
-            if recall_deps is None:
-                msg = "recall enabled but RecallDeps not provided"
+        if should_fire and recall_deps is None:
+            # Predicate-only firings degrade gracefully when deps weren't
+            # threaded through (eval harnesses, focused unit tests). The
+            # production CLI always provides deps; ``force_llm_recall`` still
+            # raises so explicit operator opt-in surfaces misconfig.
+            if config.force_llm_recall:
+                msg = "force_llm_recall=True but RecallDeps not provided"
                 raise RuntimeError(msg)
+            logger.info("coverage_gap fired but RecallDeps not provided; skipping recall")
+            should_fire = False
+
+        if should_fire and recall_deps is not None:
             if sparse_encoder is None:
                 msg = "recall requires sparse_encoder"
                 raise RuntimeError(msg)

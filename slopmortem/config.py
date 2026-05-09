@@ -53,12 +53,12 @@ class Config(BaseSettings):
     model_pitch_filler: str = "anthropic/claude-haiku-4.5"
     model_title_pre_filter: str = "anthropic/claude-haiku-4.5"
 
-    enable_llm_recall: bool = False
-    # ``force_llm_recall`` fires recall on every query regardless of the
-    # coverage-gap predicate. Useful for cassette recording, eval calibration,
-    # and thin/new corpora where the predicate would always fire anyway. Spend
-    # is gated by the pipeline-level ``Budget`` shared across every LLM call —
-    # there is no per-stage cap.
+    # Recall fires automatically when the coverage-gap predicate trips
+    # (survivors < N_synthesize after rerank+min_similarity). ``force_llm_recall``
+    # fires recall on every query, bypassing the predicate. Useful for cassette
+    # recording, eval calibration, and probes against thin/new corpora. Spend is
+    # gated by the pipeline-level ``Budget`` shared across every LLM call — there
+    # is no per-stage cap.
     force_llm_recall: bool = False
     model_recall: str = "anthropic/claude-opus-4-7"
     max_tokens_recall: int = Field(default=4096, ge=1)

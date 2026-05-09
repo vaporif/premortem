@@ -1,7 +1,8 @@
 """Pipeline wiring tests for the LLM-recall fallback branch.
 
-Covers Task 6 of ``docs/plans/2026-05-08-llm-recall-fallback.md``: trigger
-evaluation, the OR-combined ``force_llm_recall`` knob, the single-pass
+Covers Task 6 of ``docs/plans/2026-05-08-llm-recall-fallback.md`` and the
+always-on follow-up in ``docs/plans/2026-05-09-recall-always-on.md``:
+predicate evaluation, the ``force_llm_recall`` bypass, the single-pass
 guarantee, and ``PipelineMeta`` flag surfacing.
 
 All upstream dependencies are faked. The verifier's HTTP probes are patched
@@ -371,7 +372,6 @@ def _build_config(
     *,
     k_retrieve: int = 6,
     n_synthesize: int = 3,
-    enable_llm_recall: bool = False,
     force_llm_recall: bool = False,
 ) -> Config:
     cfg = Config()
@@ -385,7 +385,6 @@ def _build_config(
             "model_synthesize": _SYNTH_MODEL,
             "model_consolidate": _CONSOLIDATE_MODEL,
             "model_recall": _RECALL_MODEL,
-            "enable_llm_recall": enable_llm_recall,
             "force_llm_recall": force_llm_recall,
             "enable_tracing": False,
         }
@@ -589,8 +588,8 @@ async def _make_recall_deps(tmp_path: Path) -> RecallDeps:
 async def test_pipeline_recall_fires_on_zero_candidates(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Empty corpus + recall enabled fires recall, persists 1, surfaces flags."""
-    cfg = _build_config(k_retrieve=6, n_synthesize=3, enable_llm_recall=True)
+    """Empty corpus auto-fires recall (predicate trips), persists 1, surfaces flags."""
+    cfg = _build_config(k_retrieve=6, n_synthesize=3)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     persisted = _candidate("alpha-stub")
     corpus = _HybridCorpus(base_candidates=[], augment_with=persisted)
@@ -632,10 +631,14 @@ async def test_pipeline_recall_fires_on_zero_candidates(
     assert report.candidates[0].name == "acme"
 
 
-async def test_pipeline_recall_disabled_default(
+async def test_pipeline_recall_quiet_when_predicate_clean(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """``enable_llm_recall=False`` and ``force_llm_recall=False`` skip the gate."""
+    """Healthy corpus → ``coverage_gap`` stays False → recall doesn't fire.
+
+    With recall always-on, the only thing that suppresses the branch is the
+    predicate itself: enough qualifying candidates after rerank+min_similarity.
+    """
     cfg = _build_config(k_retrieve=6, n_synthesize=3)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     candidates = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
@@ -670,11 +673,11 @@ async def test_pipeline_recall_disabled_default(
     del tmp_path  # unused; pytest fixture must accept it for parity with siblings
 
 
-async def test_pipeline_recall_trigger_fires_with_enable(
+async def test_pipeline_recall_trigger_fires_when_qualifying_low(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """``enable_llm_recall=True`` fires recall when qualifying < N_synthesize."""
-    cfg = _build_config(k_retrieve=6, n_synthesize=3, enable_llm_recall=True)
+    """Predicate fires when qualifying < N_synthesize (always-on)."""
+    cfg = _build_config(k_retrieve=6, n_synthesize=3)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     seed = [_candidate("seed-0")]
     persisted = _candidate("alpha-stub")
@@ -714,17 +717,15 @@ async def test_pipeline_recall_trigger_fires_with_enable(
     assert report.pipeline_meta.recall_persisted_count == 1
 
 
-async def test_pipeline_force_llm_recall_runs_without_enable(
+async def test_pipeline_force_llm_recall_bypasses_quiet_predicate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """``force_llm_recall=True`` fires recall even when ``enable_llm_recall=False``.
+    """``force_llm_recall=True`` fires recall even when the predicate stays quiet.
 
-    Trigger never evaluated → ``coverage_gap`` stays ``False``; ``recall_used``
-    flips to ``True``. The pair lets operators distinguish the two paths.
+    Healthy corpus → ``coverage_gap`` stays ``False``; force flips ``recall_used``
+    to ``True``. The pair lets operators distinguish the two paths in telemetry.
     """
-    cfg = _build_config(
-        k_retrieve=6, n_synthesize=3, enable_llm_recall=False, force_llm_recall=True
-    )
+    cfg = _build_config(k_retrieve=6, n_synthesize=3, force_llm_recall=True)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     base = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
     persisted = _candidate("alpha-stub")
@@ -768,13 +769,8 @@ async def test_pipeline_force_llm_recall_runs_without_enable(
 async def test_pipeline_force_llm_recall_with_quiet_trigger(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Force fires recall even when ``coverage_gap`` would have stayed quiet."""
-    cfg = _build_config(
-        k_retrieve=6,
-        n_synthesize=3,
-        enable_llm_recall=True,
-        force_llm_recall=True,
-    )
+    """Force fires recall even when ``coverage_gap`` is quiet (force overrides)."""
+    cfg = _build_config(k_retrieve=6, n_synthesize=3, force_llm_recall=True)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     # 6 strong fintech matches → 6 qualify, well above N_synthesize=3.
     base = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
@@ -825,7 +821,7 @@ async def test_pipeline_recall_max_one_pass(
     one candidate (still < N_synthesize=3). Pipeline must NOT loop the recall
     branch — the LLM client records exactly one recall-route call.
     """
-    cfg = _build_config(k_retrieve=6, n_synthesize=3, enable_llm_recall=True)
+    cfg = _build_config(k_retrieve=6, n_synthesize=3)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     persisted = _candidate("alpha-stub")
     corpus = _HybridCorpus(base_candidates=[], augment_with=persisted)
@@ -876,9 +872,7 @@ async def test_pipeline_recall_raises_when_recall_deps_missing(
     for it; surfacing ``RuntimeError`` at the call site beats crashing deeper
     in the persist tail.
     """
-    cfg = _build_config(
-        k_retrieve=6, n_synthesize=3, enable_llm_recall=False, force_llm_recall=True
-    )
+    cfg = _build_config(k_retrieve=6, n_synthesize=3, force_llm_recall=True)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     base = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
     corpus = _HybridCorpus(base_candidates=base)
@@ -894,7 +888,7 @@ async def test_pipeline_recall_raises_when_recall_deps_missing(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
 
-    with pytest.raises(RuntimeError, match="recall enabled but RecallDeps not provided"):
+    with pytest.raises(RuntimeError, match="force_llm_recall=True but RecallDeps not provided"):
         await run_query(
             ctx,
             llm=llm,
@@ -915,9 +909,7 @@ async def test_pipeline_recall_raises_when_sparse_encoder_missing(
     The persist tail needs the sparse encoder to upsert the new candidate;
     failing fast at the gate is clearer than a downstream ``TypeError``.
     """
-    cfg = _build_config(
-        k_retrieve=6, n_synthesize=3, enable_llm_recall=False, force_llm_recall=True
-    )
+    cfg = _build_config(k_retrieve=6, n_synthesize=3, force_llm_recall=True)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
     base = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
     corpus = _HybridCorpus(base_candidates=base)

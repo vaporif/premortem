@@ -25,8 +25,8 @@ class SpanEvent(StrEnum):
     INGEST_ENTRY_EMPTY_CHUNKS = "ingest_entry_empty_chunks"
     RECONCILE_REPAIR_APPLIED = "reconcile_repair_applied"
     # Recall fallback: trigger and verifier outcomes for cost/audit attribution.
-    # GATE_FIRED is trigger-driven only (enable_llm_recall + coverage_gap);
-    # force_llm_recall runs that bypass the gate intentionally do NOT emit it.
+    # GATE_FIRED is predicate-driven only (coverage_gap=True); force_llm_recall
+    # runs that bypass the predicate intentionally do NOT emit it.
     RECALL_GATE_FIRED = "recall.gate_fired"
     RECALL_SUGGESTIONS_RECEIVED = "recall.suggestions_received"
     # Carries ``stage`` attribute: "head" (HEAD probe) or "get" (GET body fetch).

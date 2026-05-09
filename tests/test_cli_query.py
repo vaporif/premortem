@@ -1,9 +1,10 @@
-"""CLI tests for ``slopmortem query`` recall flag wiring.
+"""CLI tests for ``slopmortem query`` recall wiring.
 
-Asserts ``--enable-llm-recall`` / ``--force-llm-recall`` flow into the
-``Config`` ``run_query`` receives. ``run_query`` and ``build_deps`` are
-patched so the test never builds a real LLM/Qdrant/embedder, and never
-spends any LLM credit.
+Asserts the default path always builds ``RecallDeps`` (recall fires
+automatically when the coverage gap predicate trips) and that
+``--force-llm-recall`` flips ``Config.force_llm_recall``. ``run_query`` and
+``build_deps`` are patched so the test never builds a real LLM/Qdrant/embedder
+and never spends any LLM credit.
 """
 
 from __future__ import annotations
@@ -88,9 +89,9 @@ def _patch_query_seams(
     """Wire fakes for the ``query`` CLI so the test never builds real deps.
 
     ``captured`` collects the ``Config`` ``run_query`` was called with so
-    the test can assert on the recall flags. ``stub_recall_deps=False``
-    keeps the real ``_maybe_build_recall_deps`` so a test can verify the
-    lazy contract (no journal / classifier when flags are off).
+    the test can assert on the recall flag. ``stub_recall_deps=False`` keeps
+    the real ``_build_recall_deps`` so a test can verify the real journal
+    /classifier construction path runs (used by the always-on contract test).
     """
 
     async def _fake_run_query(input_ctx: InputContext, **kwargs: Any) -> Report:
@@ -99,53 +100,24 @@ def _patch_query_seams(
         report = _fixture_report()
         return report.model_copy(update={"input": input_ctx})
 
-    async def _noop_build_recall_deps(*_args: object, **_kwargs: object) -> None:
-        # Skip the journal init so the test doesn't touch the filesystem.
-        return None
+    async def _stub_build_recall_deps(*_args: object, **_kwargs: object) -> object:
+        # Return a sentinel so the CLI passes a non-None deps object; tests
+        # that care about identity assert against this value.
+        return _RECALL_DEPS_STUB
 
     monkeypatch.setattr("slopmortem.cli._query_cmd.build_deps", _build_fake_deps)
     monkeypatch.setattr("slopmortem.cli._query_cmd.set_query_corpus", _noop_set_corpus)
     monkeypatch.setattr("slopmortem.cli._query_cmd.run_query", _fake_run_query)
     if stub_recall_deps:
-        monkeypatch.setattr(
-            "slopmortem.cli._query_cmd._maybe_build_recall_deps", _noop_build_recall_deps
-        )
+        monkeypatch.setattr("slopmortem.cli._query_cmd._build_recall_deps", _stub_build_recall_deps)
     monkeypatch.chdir(tmp_path)
 
 
-class _ForbiddenConstruction:
-    """Sentinel that raises if instantiated.
-
-    Used to prove the lazy contract: when both recall flags are False,
-    production code must NOT construct ``MergeJournal`` or
-    ``HaikuSlopClassifier``. Drop one of these in via ``monkeypatch`` and a
-    regression that eagerly builds the heavy deps will trip the assert.
-    """
-
-    def __init__(self, *_args: object, **_kwargs: object) -> None:
-        msg = (
-            "lazy contract regressed: heavy recall dep was constructed even "
-            "though both --enable-llm-recall and --force-llm-recall are off"
-        )
-        raise AssertionError(msg)
-
-
-def test_enable_llm_recall_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--enable-llm-recall`` flips ``Config.enable_llm_recall`` to True; force stays False."""
-    captured: dict[str, Any] = {}
-    _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path)
-
-    runner = CliRunner()
-    result = runner.invoke(app, ["query", "A pitch", "--enable-llm-recall", "--stdout"])
-    assert result.exit_code == 0, result.stdout + (result.stderr or "")
-
-    cfg = captured["config"]
-    assert cfg.enable_llm_recall is True
-    assert cfg.force_llm_recall is False
+_RECALL_DEPS_STUB = object()
 
 
 def test_force_llm_recall_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--force-llm-recall`` alone flips force=True, leaves enable=False (OR-combined)."""
+    """``--force-llm-recall`` flips ``Config.force_llm_recall`` to True."""
     captured: dict[str, Any] = {}
     _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path)
 
@@ -154,49 +126,49 @@ def test_force_llm_recall_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     assert result.exit_code == 0, result.stdout + (result.stderr or "")
 
     cfg = captured["config"]
-    assert cfg.enable_llm_recall is False
     assert cfg.force_llm_recall is True
 
 
-def test_both_recall_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Both flags together set both Config bools to True."""
-    captured: dict[str, Any] = {}
-    _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path)
+def test_recall_deps_built_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Without flags, ``force_llm_recall`` stays False but ``RecallDeps`` is built.
 
-    runner = CliRunner()
-    result = runner.invoke(
-        app,
-        ["query", "A pitch", "--enable-llm-recall", "--force-llm-recall", "--stdout"],
-    )
-    assert result.exit_code == 0, result.stdout + (result.stderr or "")
-
-    cfg = captured["config"]
-    assert cfg.enable_llm_recall is True
-    assert cfg.force_llm_recall is True
-
-
-def test_recall_flags_default_off(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Without flags, both knobs stay False; recall_deps stays None.
-
-    Exercises the REAL ``_maybe_build_recall_deps`` (not a stub) so the
-    assertion bites if the lazy contract regresses. ``_ForbiddenConstruction``
-    is patched in for both heavy deps; the test fails loudly if production
-    instantiates them despite both flags being off.
+    Predicate-driven recall fires inside ``run_query``; the CLI's job is to
+    always provide deps so the branch can run.
     """
     captured: dict[str, Any] = {}
-    _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path, stub_recall_deps=False)
-    # Patch at the source modules — ``_maybe_build_recall_deps`` does
-    # ``from slopmortem.corpus import MergeJournal`` / ``from slopmortem.ingest
-    # import HaikuSlopClassifier`` lazily, so the rebound names there are
-    # what gets resolved at call time.
-    monkeypatch.setattr("slopmortem.corpus.MergeJournal", _ForbiddenConstruction)
-    monkeypatch.setattr("slopmortem.ingest.HaikuSlopClassifier", _ForbiddenConstruction)
+    _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(app, ["query", "A pitch", "--stdout"])
     assert result.exit_code == 0, result.stdout + (result.stderr or "")
 
     cfg = captured["config"]
-    assert cfg.enable_llm_recall is False
     assert cfg.force_llm_recall is False
-    assert captured["recall_deps"] is None
+    assert captured["recall_deps"] is _RECALL_DEPS_STUB
+
+
+def test_debug_retrieve_skips_recall_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--debug-retrieve`` returns before deps construction.
+
+    Patches ``MergeJournal`` and ``HaikuSlopClassifier`` to a sentinel that
+    raises on instantiation; the test passes if neither is touched.
+    """
+
+    class _Forbidden:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            msg = "debug-retrieve must not build recall deps"
+            raise AssertionError(msg)
+
+    async def _fake_debug_retrieve(*_args: object, **_kwargs: object) -> None:
+        return
+
+    monkeypatch.setattr("slopmortem.cli._query_cmd.build_deps", _build_fake_deps)
+    monkeypatch.setattr("slopmortem.cli._query_cmd.set_query_corpus", _noop_set_corpus)
+    monkeypatch.setattr("slopmortem.cli._query_cmd._debug_retrieve", _fake_debug_retrieve)
+    monkeypatch.setattr("slopmortem.corpus.MergeJournal", _Forbidden)
+    monkeypatch.setattr("slopmortem.ingest.HaikuSlopClassifier", _Forbidden)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["query", "A pitch", "--debug-retrieve"])
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")

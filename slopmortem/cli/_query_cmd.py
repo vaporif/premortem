@@ -98,26 +98,15 @@ def query_cmd(  # noqa: PLR0913 - every flag mirrors a knob; user types kwargs.
             ),
         ),
     ] = False,
-    enable_llm_recall: Annotated[
-        bool,
-        typer.Option(
-            "--enable-llm-recall/--no-llm-recall",
-            help=(
-                "Enable LLM-based recall fallback when retrieval has no usable "
-                "comparables for the pitch's vertical. Verified suggestions are "
-                "persisted as source=llm_recall corpus entries for reuse. "
-                "Costs ~$0.05-0.15 per call when the gate fires."
-            ),
-        ),
-    ] = False,
     force_llm_recall: Annotated[
         bool,
         typer.Option(
             "--force-llm-recall/--no-force-llm-recall",
             help=(
                 "Fire LLM recall on every query regardless of the coverage gate. "
-                "Independent of --enable-llm-recall (OR-combined in the pipeline). "
-                "Use for cassette recording, eval calibration, or thin/new corpora."
+                "Default behaviour already fires recall when the gate trips; this "
+                "flag bypasses the gate. Use for cassette recording, eval "
+                "calibration, or thin/new corpora."
             ),
         ),
     ] = False,
@@ -136,41 +125,35 @@ def query_cmd(  # noqa: PLR0913 - every flag mirrors a knob; user types kwargs.
             years=years,
             debug_retrieve=debug_retrieve,
             to_stdout=to_stdout,
-            enable_llm_recall=enable_llm_recall,
             force_llm_recall=force_llm_recall,
         )
     )
 
 
 @observe(name="cli.query")
-async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface 1:1.
+async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
     *,
     description: str,
     name: str | None,
     years: int | None,
     debug_retrieve: bool = False,
     to_stdout: bool = False,
-    enable_llm_recall: bool = False,
     force_llm_recall: bool = False,
 ) -> None:
     config = load_config()
-    # ``model_copy(update=...)`` skips validators; neither flag participates
-    # in cross-field validation, so this is safe. If a future flag does need
-    # re-validation, switch to ``Config.model_validate({**config.model_dump(), **overrides})``.
-    config = config.model_copy(
-        update={
-            "enable_llm_recall": enable_llm_recall,
-            "force_llm_recall": force_llm_recall,
-        }
-    )
+    # ``model_copy(update=...)`` skips validators; ``force_llm_recall`` does
+    # not participate in cross-field validation, so this is safe. If a future
+    # flag does need re-validation, switch to
+    # ``Config.model_validate({**config.model_dump(), **overrides})``.
+    config = config.model_copy(update={"force_llm_recall": force_llm_recall})
     _maybe_init_tracing(config)
     llm, embedder, corpus, budget = build_deps(config)
     set_query_corpus(corpus)
-    recall_deps = await _maybe_build_recall_deps(config, llm=llm)
     ctx = InputContext(name=name or "(unnamed)", description=description, years_filter=years)
     if debug_retrieve:
         await _debug_retrieve(ctx, llm=llm, embedder=embedder, corpus=corpus, config=config)
         return
+    recall_deps = await _build_recall_deps(config, llm=llm)
 
     progress_ctx: contextlib.AbstractContextManager[RichQueryProgress | None] = (
         RichQueryProgress() if sys.stderr.isatty() else contextlib.nullcontext()
@@ -215,21 +198,18 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface 1:1.
         typer.echo(str(out_path))
 
 
-async def _maybe_build_recall_deps(
+async def _build_recall_deps(
     config: Config,
     *,
     llm: LLMClient,
-) -> RecallDeps | None:
-    """Construct ``RecallDeps`` only when at least one recall flag is on.
+) -> RecallDeps:
+    """Construct ``RecallDeps`` for every non-debug query.
 
-    Mirrors the ingest CLI's lazy-construction style: queries that don't
-    use recall pay nothing extra (no journal init, no slop classifier).
-    Returns ``None`` when both flags are off; ``run_query`` accepts that
-    and skips the recall branch entirely.
+    The recall branch can fire on any query whose coverage-gap predicate
+    trips, so deps are built up front. Cold-start cost is dominated by
+    ``MergeJournal.init()`` (sqlite open + table check), well under 50ms.
     """
-    if not (config.enable_llm_recall or config.force_llm_recall):
-        return None
-    # Local imports keep the cold-start cost off non-recall queries; mirrors
+    # Local imports keep the cold-start cost off the import path; mirrors
     # the ``_ingest_cmd.py`` pattern of deferring heavyweight deps.
     from slopmortem.corpus import MergeJournal  # noqa: PLC0415
     from slopmortem.ingest import HaikuSlopClassifier  # noqa: PLC0415

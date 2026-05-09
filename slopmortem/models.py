@@ -306,10 +306,11 @@ class PipelineMeta(BaseModel):
     budget_exceeded: bool
     filtered_pre_synth: int = 0
     filtered_post_synth: int = 0
-    # ``coverage_gap`` is only computed when ``enable_llm_recall=True``.
-    # ``recall_used`` flips only after a verified entry landed and the
-    # post-recall rerank ran (not on attempt). ``recall_persisted_count``
-    # counts suggestions that passed L1-L4 verification AND the slop classifier.
+    # ``coverage_gap`` is the predicate result (survivors < N_synthesize after
+    # rerank+min_similarity) and is computed on every query. ``recall_used``
+    # flips only after a verified entry landed and the post-recall rerank ran
+    # (not on attempt). ``recall_persisted_count`` counts suggestions that passed
+    # L1-L4 verification AND the slop classifier.
     coverage_gap: bool = False
     recall_used: bool = False
     recall_persisted_count: int = 0
