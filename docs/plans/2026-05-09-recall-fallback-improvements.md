@@ -490,7 +490,7 @@ All must be green before starting. Re-run after each task.
 
 - [x] **Step 4.9 — Run full suite.**
 
-- [ ] **Step 4.10 — Commit.** `ingest: per-source slop threshold for recall + borderline event`.
+- [x] **Step 4.10 — Commit.** `ingest: per-source slop threshold for recall + borderline event`.
 
 ---
 
