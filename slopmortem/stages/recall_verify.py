@@ -1,4 +1,4 @@
-"""Verifier for LLM-recalled suggestions: gates L1-L4 before persistence.
+"""Verifier for LLM-recalled suggestions: gates L1-L5 before persistence.
 
 The recall stage (``stages.llm_recall``) returns ``RecallSuggestion`` rows
 the LLM thinks failed. None of them have been verified, and a fraction will
@@ -14,6 +14,13 @@ L4 — Wayback corroboration. Best-effort: a snapshot whose body still
      mentions the name promotes the suggestion to ``wayback_anchored``
      and replaces the body with the snapshot text (richer marketing copy
      wins for vector retrieval). Failure here never drops the suggestion.
+L5 — Deathness judgment. L1-L4 only prove a URL exists, serves content,
+     and mentions the name + a death-ish word. They don't tell apart "real
+     dead company" from "real live company that had layoffs once". Haiku
+     reads the verified body and answers ``died`` + ``confidence``. We
+     drop on died=false, on confidence below threshold, and on any LLM
+     transport/parse failure (conservative — false admits are worse than
+     false drops in the recall fallback).
 
 The verified ``RawEntry`` rides a ``VerificationTier`` sibling argument to
 the persistence helper (Task 5). ``RawEntry`` itself is unchanged across
@@ -30,9 +37,11 @@ from typing import TYPE_CHECKING, Final, Literal
 import anyio
 import httpx
 from lmnr import Laminar, observe
+from pydantic import BaseModel, Field, ValidationError
 
 from slopmortem.concurrency import gather_resilient
 from slopmortem.http import SSRFBlockedError, safe_get, safe_head
+from slopmortem.llm import prompt_template_sha, render_blocks, to_strict_response_schema
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.tracing import SpanEvent
 
@@ -40,6 +49,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping
 
     from slopmortem.corpus.sources import Enricher
+    from slopmortem.llm import LLMClient
 
 
 logger = logging.getLogger(__name__)
@@ -139,12 +149,132 @@ def _log_and_emit_l3_rejection(
         _emit_event(SpanEvent.RECALL_REJECTED_L3_KEYWORD_MISSING)
 
 
-async def verify_suggestion(
+class _DeathnessJudgment(BaseModel):
+    """L5 verdict: did the verified evidence body actually establish death.
+
+    ``evidence_quote`` rides along for audit trails — it's not consumed by
+    the gate, just preserved for diagnostics if a downstream operator wants
+    to inspect why a suggestion was admitted or rejected.
+    """
+
+    died: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_quote: str
+
+
+# Mirrors ``stages._classify_phase``'s 8000-char cap on the slop-classifier
+# prompt: Haiku doesn't need the whole article to call death-or-not, and
+# capping keeps the L5 spend predictable per suggestion.
+_L5_BODY_CHAR_BUDGET: Final = 8000
+
+
+async def _l5_deathness_judgment(
+    *,
+    suggestion: RecallSuggestion,
+    body: str,
+    llm: LLMClient,
+    model: str,
+    max_tokens: int,
+) -> _DeathnessJudgment | None:
+    """Ask Haiku whether the body proves the company died.
+
+    Returns ``None`` on transport or parse failure; ``verify_suggestion``
+    treats that as a drop. False admits are worse than false drops here:
+    a hallucinated suggestion that slips L1-L4 still has to defeat L5.
+    """
+    blocks = render_blocks(
+        "recall_deathness",
+        # ``render_blocks`` takes the template name as its first positional
+        # arg, so we rebind the company name to ``company_name`` to avoid
+        # the kwarg collision.
+        company_name=suggestion.name,
+        status=suggestion.status,
+        failure_year=suggestion.failure_year,
+        body=body[:_L5_BODY_CHAR_BUDGET],
+    )
+    try:
+        result = await llm.complete(
+            blocks["user"],
+            system=blocks["system"],
+            model=model,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "DeathnessJudgment",
+                    "schema": to_strict_response_schema(_DeathnessJudgment),
+                    "strict": True,
+                },
+            },
+            extra_body={"prompt_template_sha": prompt_template_sha("recall_deathness")},
+            max_tokens=max_tokens,
+        )
+    # RuntimeError covers OpenRouter's hard-stop / null-tool-calls / unknown
+    # finish-reason failures. BudgetExceededError extends Exception directly
+    # so budget exhaustion still propagates up.
+    except (httpx.HTTPError, RuntimeError) as exc:
+        logger.info("recall_verify: L5 LLM call failed: %r", exc)
+        return None
+    try:
+        return _DeathnessJudgment.model_validate_json(result.text)
+    except ValidationError as exc:
+        logger.info("recall_verify: L5 invalid response: %r", exc)
+        return None
+
+
+async def _l5_admits(  # noqa: PLR0913 - mirrors the deathness knob set passed through from config
+    *,
+    suggestion: RecallSuggestion,
+    body: str,
+    llm: LLMClient,
+    model: str,
+    max_tokens: int,
+    min_confidence: float,
+) -> bool:
+    """L5 verdict: ``True`` admits the suggestion, ``False`` drops it.
+
+    Logging + span events live here so ``verify_suggestion`` keeps a single
+    L5 branch and stays under the cyclomatic-complexity cap.
+    """
+    judgment = await _l5_deathness_judgment(
+        suggestion=suggestion,
+        body=body,
+        llm=llm,
+        model=model,
+        max_tokens=max_tokens,
+    )
+    if judgment is None:
+        _emit_event(SpanEvent.RECALL_REJECTED_L5_LOW_CONFIDENCE)
+        return False
+    if not judgment.died:
+        logger.info(
+            "recall_verify: L5 ruled %r not dead (confidence=%.2f)",
+            suggestion.name,
+            judgment.confidence,
+        )
+        _emit_event(SpanEvent.RECALL_REJECTED_L5_NOT_DEAD)
+        return False
+    if judgment.confidence < min_confidence:
+        logger.info(
+            "recall_verify: L5 confidence %.2f below threshold %.2f for %r",
+            judgment.confidence,
+            min_confidence,
+            suggestion.name,
+        )
+        _emit_event(SpanEvent.RECALL_REJECTED_L5_LOW_CONFIDENCE)
+        return False
+    return True
+
+
+async def verify_suggestion(  # noqa: PLR0913, PLR0911 - L5 needs LLM + three knobs from config; each gate carries its own return path so audit logs split cleanly
     suggestion: RecallSuggestion,
     *,
     wayback: Enricher,
+    llm: LLMClient,
+    model_recall_deathness: str,
+    max_tokens_recall_deathness: int,
+    min_confidence: float,
 ) -> tuple[RawEntry, VerificationTier] | None:
-    """Run L1-L4 against one suggestion. Returns ``None`` if any gate drops."""
+    """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops."""
     homepage = suggestion.homepage_url
     evidence = suggestion.evidence_url
     # L2: HEAD both URLs. Each emission carries ``stage="head"`` so the audit
@@ -210,6 +340,18 @@ async def verify_suggestion(
         _emit_event(SpanEvent.RECALL_VERIFIED_WAYBACK_ANCHORED)
     else:
         _emit_event(SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY)
+    # L5: does the body actually prove the company died? Run on the same
+    # body L4 picked (Wayback marketing copy if anchored, else the evidence
+    # article). Conservative on failure — false admits cost more than drops.
+    if not await _l5_admits(
+        suggestion=suggestion,
+        body=body,
+        llm=llm,
+        model=model_recall_deathness,
+        max_tokens=max_tokens_recall_deathness,
+        min_confidence=min_confidence,
+    ):
+        return None
     # Body lands on markdown_text. _entry_summary_text already prefers
     # markdown_text over raw_html; leaving raw_html=None avoids a second
     # extract pass downstream.
@@ -219,33 +361,44 @@ async def verify_suggestion(
 
 # Decorator lives at the fan-out level so the trace gets one
 # ``stage.recall_verify`` parent with N child spans, not N siblings with no
-# parent. Suggestions, persist, and wayback handles never go to span attrs:
-# CLAUDE.md forbids prompt/response bodies in tracing, and the evidence body
-# can be sizeable.
+# parent. Suggestions, persist, wayback, and llm handles never go to span
+# attrs: CLAUDE.md forbids prompt/response bodies in tracing, and the
+# evidence body can be sizeable.
 @observe(
     name="stage.recall_verify",
-    ignore_inputs=["suggestions", "persist", "wayback"],
+    ignore_inputs=["suggestions", "persist", "wayback", "llm"],
     ignore_output=True,
 )
-async def verify_and_persist_all(
+async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knobs flow through from pipeline
     suggestions: list[RecallSuggestion],
     *,
     wayback: Enricher,
     persist: Callable[[RawEntry, VerificationTier], Awaitable[None]],
+    llm: LLMClient,
+    model_recall_deathness: str,
+    max_tokens_recall_deathness: int,
+    min_confidence: float,
     concurrency: int = _DEFAULT_CONCURRENCY,
 ) -> list[RawEntry]:
     """Verify each suggestion under a capacity limiter; persist accepted entries.
 
     ``gather_resilient`` keeps a sibling failure from cancelling the rest —
     a transient outage on one citation host shouldn't poison the whole batch.
-    Returned list contains only the entries that passed L1-L4 AND persisted
+    Returned list contains only the entries that passed L1-L5 AND persisted
     cleanly; per-suggestion exceptions land in the logs instead.
     """
     limiter = anyio.CapacityLimiter(concurrency)
 
     async def _one(s: RecallSuggestion) -> RawEntry | None:
         async with limiter:
-            verified = await verify_suggestion(s, wayback=wayback)
+            verified = await verify_suggestion(
+                s,
+                wayback=wayback,
+                llm=llm,
+                model_recall_deathness=model_recall_deathness,
+                max_tokens_recall_deathness=max_tokens_recall_deathness,
+                min_confidence=min_confidence,
+            )
         if verified is None:
             return None
         entry, tier = verified

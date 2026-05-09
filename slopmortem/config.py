@@ -64,6 +64,14 @@ class Config(BaseSettings):
     max_tokens_recall: int = Field(default=4096, ge=1)
     recall_max_suggestions_per_pitch: int = Field(default=8, ge=1, le=20)
 
+    # L5 deathness gate: a verified URL with the right keywords still doesn't
+    # prove the company actually died (could be a layoff article about a still-
+    # running firm). Haiku reads the body and answers died/confidence; we drop
+    # below ``recall_deathness_min_confidence`` or on died=false.
+    model_recall_deathness: str = "anthropic/claude-haiku-4.5"
+    max_tokens_recall_deathness: int = Field(default=128, ge=1)
+    recall_deathness_min_confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+
     # Per-stage output caps. OpenRouter holds upfront credit for the model's
     # max output, so leaving these unset reserves the full 64K Anthropic
     # ceiling and surfaces as HTTP 402 on low-balance keys. Values sized to

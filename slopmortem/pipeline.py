@@ -218,7 +218,15 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
                 attributes={"tier": tier},
             )
 
-    verified = await verify_and_persist_all(suggestions, wayback=wb, persist=_persist)
+    verified = await verify_and_persist_all(
+        suggestions,
+        wayback=wb,
+        persist=_persist,
+        llm=llm,
+        model_recall_deathness=config.model_recall_deathness,
+        max_tokens_recall_deathness=config.max_tokens_recall_deathness,
+        min_confidence=config.recall_deathness_min_confidence,
+    )
     persisted_count = len(verified)
     if not verified:
         return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)

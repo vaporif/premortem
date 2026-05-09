@@ -1,5 +1,7 @@
 # LLM Recall Fallback — Implementation Plan
 
+> **Follow-up (2026-05-09):** the `enable_llm_recall` flag added in this plan was removed. Recall now fires automatically on the coverage-gap predicate; `force_llm_recall` stays as the bypass for cassette/eval. See `docs/plans/2026-05-09-recall-always-on.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or `/team-feature` to implement this plan task-by-task, per the Execution Strategy below. Steps use checkbox (`- [ ]`) syntax — these are **persistent durable state**, not visual decoration. The executor edits the plan file in place: `- [ ]` → `- [x]` the instant a step verifies, before moving on. On resume (new session, crash, takeover), the executor scans existing `- [x]` marks and skips them — these steps are NOT redone. TodoWrite mirrors this state in-session; the plan file is the source of truth across sessions.
 
 **Goal:** Close the vendor-side coverage gap that the Hacken/Extractor pitch (and any future niche-B2B pitch) hits today, where retrieval surfaces vertically-mismatched comparables (Norse Corp / Carbon Black for a `crypto_web3` pitch) because the corpus has no real Web3-security analogs and the embeddings are vertically promiscuous.

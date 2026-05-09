@@ -36,3 +36,8 @@ class SpanEvent(StrEnum):
     RECALL_VERIFIED_WAYBACK_ANCHORED = "recall.verified_wayback"
     RECALL_VERIFIED_EVIDENCE_ONLY = "recall.verified_evidence"
     RECALL_PERSISTED = "recall.persisted"
+    # L5 deathness gate (Haiku judges whether the verified body actually
+    # establishes the company died): NOT_DEAD on died=false, LOW_CONFIDENCE
+    # on died=true below threshold OR on transport/parse failure.
+    RECALL_REJECTED_L5_NOT_DEAD = "recall.rejected_l5_not_dead"
+    RECALL_REJECTED_L5_LOW_CONFIDENCE = "recall.rejected_l5_low_confidence"

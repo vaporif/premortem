@@ -1,13 +1,15 @@
-"""Tests for ``stages.recall_verify``: L1-L4 gates plus fan-out isolation."""
+"""Tests for ``stages.recall_verify``: L1-L5 gates plus fan-out isolation."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from slopmortem.http import SSRFBlockedError
+from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.stages.recall_verify import (
     _DEATH_KEYWORDS,
@@ -20,6 +22,55 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     import pytest
+
+
+_DEATHNESS_PASS = '{"died": true, "confidence": 0.95, "evidence_quote": "shut down"}'  # noqa: S105 - JSON literal, not a credential
+_DEATHNESS_MODEL = "test-haiku"
+_DEATHNESS_MAX_TOKENS = 128
+_DEATHNESS_MIN_CONFIDENCE = 0.7
+
+
+@dataclass
+class _FakeLLM:
+    """Minimal LLMClient stub: returns a queued reply or raises the queued exc.
+
+    Each call pops one entry off ``responses``; an empty queue raises so a
+    test can't accidentally pass on a missing fixture. Tests that only need
+    one L5 call queue exactly one entry. ``_FakeLLM(default=_DEATHNESS_PASS)``
+    is the L1-L4 happy-path companion so existing tests don't have to
+    queue a deathness reply they don't care about.
+    """
+
+    responses: list[str | BaseException] = field(default_factory=list)
+    default: str | None = None
+    calls: list[dict[str, Any]] = field(default_factory=list)
+
+    async def complete(  # noqa: PLR0913 - mirrors LLMClient.complete signature
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        tools: list[Any] | None = None,
+        model: str | None = None,
+        cache: bool = False,
+        response_format: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
+        max_tokens: int | None = None,
+        single_tool_call: bool = False,
+    ) -> CompletionResult:
+        del tools, cache, response_format, extra_body, single_tool_call
+        self.calls.append(
+            {"prompt": prompt, "system": system, "model": model, "max_tokens": max_tokens}
+        )
+        if self.responses:
+            item = self.responses.pop(0)
+            if isinstance(item, BaseException):
+                raise item
+            return CompletionResult(text=item, stop_reason="stop")
+        if self.default is not None:
+            return CompletionResult(text=self.default, stop_reason="stop")
+        msg = "no response queued"
+        raise AssertionError(msg)
 
 
 def _suggestion(name: str = "Hexagate") -> RecallSuggestion:
@@ -112,7 +163,14 @@ async def test_l2_rejects_404_homepage(monkeypatch: pytest.MonkeyPatch) -> None:
         get_responses={},  # evidence GET should never fire
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is None
     assert wb.calls == []
 
@@ -128,7 +186,14 @@ async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
         get_responses={},
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is None
     assert wb.calls == []
 
@@ -142,7 +207,14 @@ async def test_l2_rejects_ssrf_homepage(monkeypatch: pytest.MonkeyPatch) -> None
         get_responses={},
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is None
 
 
@@ -155,7 +227,14 @@ async def test_l2_rejects_httpx_error_homepage(monkeypatch: pytest.MonkeyPatch) 
         get_responses={},
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is None
 
 
@@ -175,7 +254,14 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
         },
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is None
     assert wb.calls == []
 
@@ -196,7 +282,14 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
         },
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is None
 
 
@@ -212,7 +305,14 @@ async def test_l3_rejects_evidence_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
         get_responses={str(sug.evidence_url): _FakeResp(status=500)},
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is None
 
 
@@ -231,7 +331,14 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
     )
     # Wayback returns nothing → tier stays evidence_only, evidence body retained.
     wb = _FakeWayback(enriched_text=None)
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
@@ -257,7 +364,14 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
         get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
     )
     wb = _FakeWayback(enriched_text=wayback_body)
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is not None
     entry, tier = out
     assert tier == "wayback_anchored"
@@ -279,7 +393,14 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
         get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
     )
     wb = _FakeWayback(enriched_text=None)
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
@@ -302,7 +423,14 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
         get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
     )
     wb = _FakeWayback(enriched_text=squatter_body)
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
@@ -321,7 +449,14 @@ async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) 
         get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
     )
     wb = _FakeWayback(raises=httpx.ReadTimeout("ia is down"))
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
@@ -365,6 +500,10 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         sugs,
         wayback=wb,
         persist=typed_persist,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
     )
     assert {e.source_id for e in out} == {e.source_id for e in [persisted[0][0], persisted[1][0]]}
     assert len(out) == 2
@@ -399,6 +538,10 @@ async def test_verify_skips_persist_for_dropped_suggestions(
         [sug],
         wayback=wb,
         persist=persist,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
     )
     assert out == []
     assert persisted == []
@@ -417,7 +560,14 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
         get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
     )
     wb = _FakeWayback()
-    out = await verify_suggestion(sug, wayback=wb)
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert out is not None
     entry, _tier = out
     assert entry.source == "llm_recall"
@@ -460,11 +610,157 @@ async def test_recall_source_id_collapses_on_same_homepage(
         },
     )
     wb = _FakeWayback()
-    first = await verify_suggestion(sug, wayback=wb)
-    second = await verify_suggestion(same_vendor_other_citation, wayback=wb)
-    third = await verify_suggestion(diff_vendor, wayback=wb)
+    llm = _FakeLLM(default=_DEATHNESS_PASS)
+    first = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
+    second = await verify_suggestion(
+        same_vendor_other_citation,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
+    third = await verify_suggestion(
+        diff_vendor,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
     assert first is not None
     assert second is not None
     assert third is not None
     assert first[0].source_id == second[0].source_id
     assert first[0].source_id != third[0].source_id
+
+
+def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *, body: str) -> None:
+    """Wire HEAD/GET so the suggestion sails through L1-L4 cleanly.
+
+    Lets the L5 tests focus on the deathness gate without re-stating the
+    L1-L4 plumbing each time.
+    """
+    _patch_http(
+        monkeypatch,
+        head_responses={
+            str(sug.homepage_url): _FakeResp(status=200),
+            str(sug.evidence_url): _FakeResp(status=200),
+        },
+        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
+    )
+
+
+async def test_l5_drops_when_not_dead(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L5 deathness=false rejects the suggestion even though L1-L4 passed.
+
+    The body would otherwise survive L3 (name + "shutdown" both present),
+    but Haiku's reading of the full passage says the company is alive.
+    """
+    sug = _suggestion()
+    body = "Hexagate had a shutdown of one product line, then raised a Series C."
+    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    wb = _FakeWayback()
+    llm = _FakeLLM(
+        responses=['{"died": false, "confidence": 0.95, "evidence_quote": "raised series C"}'],
+    )
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
+    assert out is None
+    assert len(llm.calls) == 1
+    assert llm.calls[0]["model"] == _DEATHNESS_MODEL
+    assert llm.calls[0]["max_tokens"] == _DEATHNESS_MAX_TOKENS
+
+
+async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``died=true`` but confidence below threshold → drop (avoid noisy admits)."""
+    sug = _suggestion()
+    body = "Hexagate shutdown rumored, sources unconfirmed."
+    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    wb = _FakeWayback()
+    llm = _FakeLLM(
+        responses=['{"died": true, "confidence": 0.5, "evidence_quote": "rumored"}'],
+    )
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
+    assert out is None
+
+
+async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``died=true`` with confidence ≥ threshold returns the entry+tier tuple."""
+    sug = _suggestion()
+    body = "Hexagate shutdown its operations in 2024 after losing key clients."
+    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    wb = _FakeWayback(enriched_text=None)
+    llm = _FakeLLM(
+        responses=[
+            '{"died": true, "confidence": 0.85, "evidence_quote": "shutdown its operations"}',
+        ],
+    )
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
+    assert out is not None
+    entry, tier = out
+    assert tier == "evidence_only"
+    assert entry.markdown_text == body
+
+
+async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LLM returns malformed JSON → drop conservatively (no false admits)."""
+    sug = _suggestion()
+    body = "Hexagate shutdown its operations in 2024."
+    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    wb = _FakeWayback()
+    llm = _FakeLLM(responses=["this is not json"])
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
+    assert out is None
+
+
+async def test_l5_drops_on_transport_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LLM raises httpx.HTTPError → drop conservatively (parity with parse failure)."""
+    sug = _suggestion()
+    body = "Hexagate shutdown its operations in 2024."
+    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    wb = _FakeWayback()
+    llm = _FakeLLM(responses=[httpx.ConnectError("boom")])
+    out = await verify_suggestion(
+        sug,
+        wayback=wb,
+        llm=llm,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+    )
+    assert out is None

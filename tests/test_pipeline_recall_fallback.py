@@ -25,6 +25,7 @@ from slopmortem.config import Config
 from slopmortem.corpus import MergeJournal
 from slopmortem.ingest import FakeSlopClassifier
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
+from slopmortem.llm.client import CompletionResult
 from slopmortem.models import (
     Candidate,
     CandidatePayload,
@@ -38,7 +39,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-    from slopmortem.llm.client import CompletionResult
     from slopmortem.models import RawEntry
 
 
@@ -67,8 +67,15 @@ _RERANK_MODEL = "test-rerank"
 _SYNTH_MODEL = "test-synth"
 _CONSOLIDATE_MODEL = "test-consolidate"
 _RECALL_MODEL = "test-recall"
+_RECALL_DEATHNESS_MODEL = "test-recall-deathness"
 _SUMMARIZE_MODEL = "test-summarize"
 _EMBED_MODEL = "text-embedding-3-small"
+
+# Default L5 reply for the routing LLM. The pipeline tests don't exercise L5
+# semantics — they care that recall fires, persists, and surfaces meta flags.
+# Confidence sits well above the default 0.7 threshold so verified suggestions
+# pass the gate and reach the persist tail.
+_RECALL_DEATHNESS_PASS = '{"died": true, "confidence": 0.95, "evidence_quote": "shutdown"}'  # noqa: S105 - JSON literal, not a credential
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +230,7 @@ class _RecallRoutingLLM:
     inner: FakeLLMClient
     recall_responses: list[FakeResponse | RuntimeError | Exception]
     recall_calls: list[dict[str, object]] = field(default_factory=list)
+    deathness_calls: list[dict[str, object]] = field(default_factory=list)
 
     async def complete(  # noqa: PLR0913 - mirrors LLMClient.complete signature
         self,
@@ -246,6 +254,14 @@ class _RecallRoutingLLM:
             if isinstance(item, BaseException):
                 raise item
             return item.to_completion()
+        if model == _RECALL_DEATHNESS_MODEL:
+            # L5 sits inside the verifier, which fires once per suggestion that
+            # cleared L1-L4. These pipeline tests don't exercise L5 semantics;
+            # always admit so verified suggestions reach the persist tail.
+            self.deathness_calls.append(
+                {"prompt": prompt, "system": system, "max_tokens": max_tokens}
+            )
+            return CompletionResult(text=_RECALL_DEATHNESS_PASS, stop_reason="stop")
         return await self.inner.complete(
             prompt,
             system=system,
@@ -385,6 +401,7 @@ def _build_config(
             "model_synthesize": _SYNTH_MODEL,
             "model_consolidate": _CONSOLIDATE_MODEL,
             "model_recall": _RECALL_MODEL,
+            "model_recall_deathness": _RECALL_DEATHNESS_MODEL,
             "force_llm_recall": force_llm_recall,
             "enable_tracing": False,
         }
