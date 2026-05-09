@@ -111,26 +111,37 @@ def _render_top_risks(top_risks: TopRisks, candidates: list[Synthesis]) -> str:
 
 def _render_footer(meta: PipelineMeta) -> str:
     models_block = "\n".join(f"- {role}: {model}" for role, model in sorted(meta.models.items()))
-    return "\n".join(
+    lines: list[str] = [
+        "---",
+        "",
+        "Pipeline meta:",
+        "",
+        f"- cost_usd_total: {meta.cost_usd_total:.4f}",
+        f"- latency_ms_total: {meta.latency_ms_total}",
+        f"- trace_id: {meta.trace_id or 'none'}",
+        f"- budget_remaining_usd: {meta.budget_remaining_usd:.4f}",
+        f"- budget_exceeded: {meta.budget_exceeded}",
+        f"- K_retrieve: {meta.K_retrieve}",
+        f"- N_synthesize: {meta.N_synthesize}",
+        f"- min_similarity_score: {meta.min_similarity_score:.1f}",
+    ]
+    # Recall fallback signals: only render when non-default so existing
+    # report shapes don't grow noisy lines on every query.
+    if meta.coverage_gap:
+        lines.append(f"- coverage_gap: {meta.coverage_gap}")
+    if meta.recall_used:
+        lines.append(f"- recall_used: {meta.recall_used}")
+    if meta.recall_persisted_count:
+        lines.append(f"- recall_persisted_count: {meta.recall_persisted_count}")
+    lines.extend(
         [
-            "---",
-            "",
-            "Pipeline meta:",
-            "",
-            f"- cost_usd_total: {meta.cost_usd_total:.4f}",
-            f"- latency_ms_total: {meta.latency_ms_total}",
-            f"- trace_id: {meta.trace_id or 'none'}",
-            f"- budget_remaining_usd: {meta.budget_remaining_usd:.4f}",
-            f"- budget_exceeded: {meta.budget_exceeded}",
-            f"- K_retrieve: {meta.K_retrieve}",
-            f"- N_synthesize: {meta.N_synthesize}",
-            f"- min_similarity_score: {meta.min_similarity_score:.1f}",
             "",
             "Models:",
             "",
             models_block,
         ]
     )
+    return "\n".join(lines)
 
 
 def _render_no_comparables_banner(meta: PipelineMeta) -> str:

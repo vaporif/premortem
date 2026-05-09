@@ -1009,7 +1009,7 @@ Add `(SOURCE_LLM_RECALL, 6)` to the parametrize set in `tests/ingest/test_reliab
 - Modify: `slopmortem/render.py` (surface flags in report)
 - New: `tests/test_pipeline_recall_fallback.py`
 
-- [ ] **Step 1: Add PipelineMeta flags**
+- [x] **Step 1: Add PipelineMeta flags**
 
 In `slopmortem/models.py`:
 
@@ -1021,7 +1021,7 @@ class PipelineMeta(BaseModel):
     recall_persisted_count: int = 0
 ```
 
-- [ ] **Step 2: Add `QueryPhase.RECALL`**
+- [x] **Step 2: Add `QueryPhase.RECALL`**
 
 In `slopmortem/pipeline.py`:
 
@@ -1036,7 +1036,7 @@ class QueryPhase(StrEnum):
 
 No `NullQueryProgress` change needed — its methods accept any `QueryPhase` value.
 
-- [ ] **Step 3: Write failing E2E test**
+- [x] **Step 3: Write failing E2E test**
 
 `tests/test_pipeline_recall_fallback.py`:
 
@@ -1086,11 +1086,11 @@ async def test_pipeline_recall_max_one_pass() -> None:
     ...
 ```
 
-- [ ] **Step 4: Run test to verify failure**
+- [x] **Step 4: Run test to verify failure**
 
 `uv run pytest tests/test_pipeline_recall_fallback.py -v`
 
-- [ ] **Step 5: Wire the recall branch in `pipeline.py`**
+- [x] **Step 5: Wire the recall branch in `pipeline.py`**
 
 `run_query` (`pipeline.py:102`) does not currently take a `WaybackEnricher` — and `WaybackEnricher` is *not* instantiated anywhere in prod today (only in `tests/sources/test_wayback.py`). The CLI ingest path at `_ingest_cmd.py:378-394` deliberately keeps it out of the enrichers list because of Wayback's HEAD/GET rate-limiting under bulk crawl. The recall path is much lighter — at most `recall_max_suggestions_per_pitch=8` Wayback lookups *only when the gate fires* — so the rate-limit concern that gates the bulk ingest path doesn't gate this one.
 
@@ -1189,11 +1189,11 @@ The `coverage_gap` flag is computed only when `enable_llm_recall=True` because i
 
 Pass `coverage_gap`, `recall_used`, `recall_persisted_count` into `PipelineMeta(...)` at the bottom of the function.
 
-- [ ] **Step 6: Run E2E tests**
+- [x] **Step 6: Run E2E tests**
 
 `uv run pytest tests/test_pipeline_recall_fallback.py -v`
 
-- [ ] **Step 7: Update render.py**
+- [x] **Step 7: Update render.py**
 
 In `slopmortem/render.py`, add a "Pipeline meta" line for each non-default flag. E.g.:
 
@@ -1203,15 +1203,15 @@ In `slopmortem/render.py`, add a "Pipeline meta" line for each non-default flag.
 - recall_persisted_count: 1
 ```
 
-- [ ] **Step 8: Run full test suite**
+- [x] **Step 8: Run full test suite**
 
 `just test`
 
-- [ ] **Step 9: Lint + typecheck**
+- [x] **Step 9: Lint + typecheck**
 
 `just lint && just typecheck`
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 `git add slopmortem/pipeline.py slopmortem/models.py slopmortem/render.py tests/ && git commit -m "pipeline: wire llm_recall fallback after rerank"`
 
