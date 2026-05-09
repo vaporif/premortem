@@ -1225,7 +1225,7 @@ In `slopmortem/render.py`, add a "Pipeline meta" line for each non-default flag.
 - Modify: `slopmortem/tracing/events.py` (add new SpanEvent values)
 - New: `tests/test_cli_query.py` (CLI-test files live at the top level — `test_cli_ingest.py`, `test_cli_smoke.py`, etc. There is no `tests/cli/` dir.)
 
-- [ ] **Step 1: Add Typer flag**
+- [x] **Step 1: Add Typer flag**
 
 In `slopmortem/cli/_query_cmd.py`:
 
@@ -1267,7 +1267,7 @@ config = config.model_copy(update={
 
 Pydantic v2's `model_copy(update=...)` skips validators (model_validator(mode="after") doesn't re-run), but neither flag participates in cross-field validation, so this is safe. If a future flag *does* need re-validation, switch to `Config.model_validate({**config.model_dump(), **overrides})`.
 
-- [ ] **Step 2: Add SpanEvent values**
+- [x] **Step 2: Add SpanEvent values**
 
 In `slopmortem/tracing/events.py`, add:
 
@@ -1284,7 +1284,7 @@ RECALL_PERSISTED = "recall.persisted"
 
 Emit them at the matching call sites in `pipeline.py` and `recall_verify.py`.
 
-- [ ] **Step 3: Write CLI tests**
+- [x] **Step 3: Write CLI tests**
 
 ```python
 def test_enable_llm_recall_flag() -> None:
@@ -1305,11 +1305,11 @@ def test_both_recall_flags() -> None:
     ...
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 `just test`
 
-- [ ] **Step 5: Lint + typecheck**
+- [x] **Step 5: Lint + typecheck**
 
 `just lint && just typecheck`
 
@@ -1323,7 +1323,7 @@ OPENROUTER_API_KEY=<key> uv run slopmortem query \
 
 Verify the rendered report includes `coverage_gap: True` and `recall_used: True`, and at least one synthesized comparable's source resolves to `llm_recall`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 `git add slopmortem/cli/_query_cmd.py slopmortem/tracing/events.py tests/ && git commit -m "cli: --enable-llm-recall flag + SpanEvents"`
 

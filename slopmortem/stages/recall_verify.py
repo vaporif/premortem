@@ -29,11 +29,12 @@ from typing import TYPE_CHECKING, Final, Literal
 
 import anyio
 import httpx
-from lmnr import observe
+from lmnr import Laminar, observe
 
 from slopmortem.concurrency import gather_resilient
 from slopmortem.http import SSRFBlockedError, safe_get, safe_head
 from slopmortem.models import RawEntry, RecallSuggestion
+from slopmortem.tracing import SpanEvent
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -101,11 +102,39 @@ def _recall_source_id(suggestion: RecallSuggestion) -> str:
     return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]
 
 
-def _body_anchors_name_and_death(name: str, body: str) -> bool:
+def _emit_event(event: SpanEvent) -> None:
+    if Laminar.is_initialized():
+        Laminar.event(name=str(event))
+
+
+# Tri-state so callers can tell name-missing from keyword-missing without
+# re-scanning the body. ``"ok"`` means both anchors present.
+type _AnchorResult = Literal["ok", "name_missing", "keyword_missing"]
+
+
+def _body_anchors_name_and_death(name: str, body: str) -> _AnchorResult:
     haystack = body.lower()
     if name.lower() not in haystack:
-        return False
-    return any(kw in haystack for kw in _DEATH_KEYWORDS)
+        return "name_missing"
+    if not any(kw in haystack for kw in _DEATH_KEYWORDS):
+        return "keyword_missing"
+    return "ok"
+
+
+def _log_and_emit_l3_rejection(
+    anchor: _AnchorResult,
+    *,
+    name: str,
+    evidence: str,
+) -> None:
+    """Log + emit the right L3 rejection event for the failing anchor."""
+    if anchor == "name_missing":
+        logger.info("recall_verify: L3 body lacks name anchor for %r at %s", name, evidence)
+        _emit_event(SpanEvent.RECALL_REJECTED_L3_NAME_MISSING)
+        return
+    if anchor == "keyword_missing":
+        logger.info("recall_verify: L3 body lacks death keyword for %r at %s", name, evidence)
+        _emit_event(SpanEvent.RECALL_REJECTED_L3_KEYWORD_MISSING)
 
 
 async def verify_suggestion(
@@ -122,9 +151,11 @@ async def verify_suggestion(
             head_resp = await safe_head(url, timeout=_FETCH_TIMEOUT_S)
         except (SSRFBlockedError, httpx.HTTPError) as exc:
             logger.info("recall_verify: L2 HEAD failed for %s: %r", url, exc)
+            _emit_event(SpanEvent.RECALL_REJECTED_L2)
             return None
         if head_resp.status_code >= _HTTP_BAD_REQUEST:
             logger.info("recall_verify: L2 HEAD %s for %s", head_resp.status_code, url)
+            _emit_event(SpanEvent.RECALL_REJECTED_L2)
             return None
     # L3: GET evidence body — primary anchor.
     # Note: ``safe_get`` does NOT consult robots.txt (unlike Wayback's
@@ -135,17 +166,19 @@ async def verify_suggestion(
         evidence_resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
     except (SSRFBlockedError, httpx.HTTPError) as exc:
         logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
+        # GET-level failure on the evidence URL is functionally an L2 outcome:
+        # the URL didn't deliver a body. Fold into RECALL_REJECTED_L2 so the
+        # audit signal stays "URL didn't serve" vs "body didn't anchor".
+        _emit_event(SpanEvent.RECALL_REJECTED_L2)
         return None
     if evidence_resp.status_code >= _HTTP_BAD_REQUEST:
         logger.info("recall_verify: L3 GET %s for %s", evidence_resp.status_code, evidence)
+        _emit_event(SpanEvent.RECALL_REJECTED_L2)
         return None
     evidence_body = evidence_resp.text
-    if not _body_anchors_name_and_death(suggestion.name, evidence_body):
-        logger.info(
-            "recall_verify: L3 body lacks name+death anchor for %r at %s",
-            suggestion.name,
-            evidence,
-        )
+    anchor = _body_anchors_name_and_death(suggestion.name, evidence_body)
+    if anchor != "ok":
+        _log_and_emit_l3_rejection(anchor, name=suggestion.name, evidence=evidence)
         return None
     # L4: optional Wayback corroboration.
     tier: VerificationTier = "evidence_only"
@@ -169,6 +202,9 @@ async def verify_suggestion(
         tier = "wayback_anchored"
         # Wayback marketing copy beats the article body for vector search.
         body = enriched.markdown_text
+        _emit_event(SpanEvent.RECALL_VERIFIED_WAYBACK_ANCHORED)
+    else:
+        _emit_event(SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY)
     # Body lands on markdown_text. _entry_summary_text already prefers
     # markdown_text over raw_html; leaving raw_html=None avoids a second
     # extract pass downstream.

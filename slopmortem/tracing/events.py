@@ -24,3 +24,14 @@ class SpanEvent(StrEnum):
     INGEST_ENTRY_FAILED = "ingest_entry_failed"
     INGEST_ENTRY_EMPTY_CHUNKS = "ingest_entry_empty_chunks"
     RECONCILE_REPAIR_APPLIED = "reconcile_repair_applied"
+    # Recall fallback: trigger and verifier outcomes for cost/audit attribution.
+    # GATE_FIRED is trigger-driven only (enable_llm_recall + coverage_gap);
+    # force_llm_recall runs that bypass the gate intentionally do NOT emit it.
+    RECALL_GATE_FIRED = "recall.gate_fired"
+    RECALL_SUGGESTIONS_RECEIVED = "recall.suggestions_received"
+    RECALL_REJECTED_L2 = "recall.rejected_l2"
+    RECALL_REJECTED_L3_NAME_MISSING = "recall.rejected_l3_name"
+    RECALL_REJECTED_L3_KEYWORD_MISSING = "recall.rejected_l3_kw"
+    RECALL_VERIFIED_WAYBACK_ANCHORED = "recall.verified_wayback"
+    RECALL_VERIFIED_EVIDENCE_ONLY = "recall.verified_evidence"
+    RECALL_PERSISTED = "recall.persisted"

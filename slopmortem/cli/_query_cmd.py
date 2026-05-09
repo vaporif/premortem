@@ -30,7 +30,7 @@ from slopmortem.config import load_config
 from slopmortem.corpus import set_query_corpus
 from slopmortem.deps import build_deps
 from slopmortem.models import InputContext
-from slopmortem.pipeline import cutoff_iso, run_query
+from slopmortem.pipeline import RecallDeps, cutoff_iso, run_query
 from slopmortem.render import render
 from slopmortem.stages import extract_facets, retrieve
 
@@ -62,7 +62,7 @@ def _query_run_path(ctx: InputContext) -> Path:
 
 
 @app.command("query")
-def query_cmd(
+def query_cmd(  # noqa: PLR0913 - every flag mirrors a knob; user types kwargs.
     description: Annotated[
         str,
         typer.Argument(help="The pitch text to analyze."),
@@ -98,6 +98,29 @@ def query_cmd(
             ),
         ),
     ] = False,
+    enable_llm_recall: Annotated[
+        bool,
+        typer.Option(
+            "--enable-llm-recall/--no-llm-recall",
+            help=(
+                "Enable LLM-based recall fallback when retrieval has no usable "
+                "comparables for the pitch's vertical. Verified suggestions are "
+                "persisted as source=llm_recall corpus entries for reuse. "
+                "Costs ~$0.05-0.15 per call when the gate fires."
+            ),
+        ),
+    ] = False,
+    force_llm_recall: Annotated[
+        bool,
+        typer.Option(
+            "--force-llm-recall/--no-force-llm-recall",
+            help=(
+                "Fire LLM recall on every query regardless of the coverage gate. "
+                "Independent of --enable-llm-recall (OR-combined in the pipeline). "
+                "Use for cassette recording, eval calibration, or thin/new corpora."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """When no candidates clear the similarity floor, exits 1 and writes no file.
 
@@ -113,23 +136,37 @@ def query_cmd(
             years=years,
             debug_retrieve=debug_retrieve,
             to_stdout=to_stdout,
+            enable_llm_recall=enable_llm_recall,
+            force_llm_recall=force_llm_recall,
         )
     )
 
 
 @observe(name="cli.query")
-async def _query(
+async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface 1:1.
     *,
     description: str,
     name: str | None,
     years: int | None,
     debug_retrieve: bool = False,
     to_stdout: bool = False,
+    enable_llm_recall: bool = False,
+    force_llm_recall: bool = False,
 ) -> None:
     config = load_config()
+    # ``model_copy(update=...)`` skips validators; neither flag participates
+    # in cross-field validation, so this is safe. If a future flag does need
+    # re-validation, switch to ``Config.model_validate({**config.model_dump(), **overrides})``.
+    config = config.model_copy(
+        update={
+            "enable_llm_recall": enable_llm_recall,
+            "force_llm_recall": force_llm_recall,
+        }
+    )
     _maybe_init_tracing(config)
     llm, embedder, corpus, budget = build_deps(config)
     set_query_corpus(corpus)
+    recall_deps = await _maybe_build_recall_deps(config, llm=llm)
     ctx = InputContext(name=name or "(unnamed)", description=description, years_filter=years)
     if debug_retrieve:
         await _debug_retrieve(ctx, llm=llm, embedder=embedder, corpus=corpus, config=config)
@@ -149,6 +186,7 @@ async def _query(
                 config=config,
                 budget=budget,
                 progress=bar,
+                recall_deps=recall_deps,
             )
     except KeyboardInterrupt:
         err_console.rule("[bold yellow]query cancelled (Ctrl-C)", style="yellow")
@@ -175,6 +213,43 @@ async def _query(
     err_console.print(f"[bold green]Report saved to[/bold green] {out_path.resolve()}")
     if not sys.stdout.isatty():
         typer.echo(str(out_path))
+
+
+async def _maybe_build_recall_deps(
+    config: Config,
+    *,
+    llm: LLMClient,
+) -> RecallDeps | None:
+    """Construct ``RecallDeps`` only when at least one recall flag is on.
+
+    Mirrors the ingest CLI's lazy-construction style: queries that don't
+    use recall pay nothing extra (no journal init, no slop classifier).
+    Returns ``None`` when both flags are off; ``run_query`` accepts that
+    and skips the recall branch entirely.
+    """
+    if not (config.enable_llm_recall or config.force_llm_recall):
+        return None
+    # Local imports keep the cold-start cost off non-recall queries; mirrors
+    # the ``_ingest_cmd.py`` pattern of deferring heavyweight deps.
+    from slopmortem.corpus import MergeJournal  # noqa: PLC0415
+    from slopmortem.ingest import HaikuSlopClassifier  # noqa: PLC0415
+
+    post_mortems_root = Path(config.post_mortems_root)
+    journal_path = Path(
+        config.merge_journal_path or str(post_mortems_root.parent / "journal.sqlite")
+    )
+    journal = MergeJournal(journal_path)
+    await journal.init()
+    classifier = HaikuSlopClassifier(
+        llm=llm,
+        model=config.model_summarize,
+        max_tokens=config.max_tokens_slop_judge,
+    )
+    return RecallDeps(
+        journal=journal,
+        slop_classifier=classifier,
+        post_mortems_root=post_mortems_root,
+    )
 
 
 _DEBUG_SUMMARY_MAX = 200

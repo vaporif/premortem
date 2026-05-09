@@ -173,6 +173,11 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         max_tokens=config.max_tokens_recall,
         cap=config.recall_max_suggestions_per_pitch,
     )
+    if Laminar.is_initialized():
+        Laminar.event(
+            name=str(SpanEvent.RECALL_SUGGESTIONS_RECEIVED),
+            attributes={"count": len(suggestions)},
+        )
     if not suggestions:
         return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
     # Lazy default: only constructed on the recall path so non-recall queries
@@ -203,6 +208,11 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
             progress=NullProgress(),
             result=IngestResult(),
         )
+        if Laminar.is_initialized():
+            Laminar.event(
+                name=str(SpanEvent.RECALL_PERSISTED),
+                attributes={"tier": tier},
+            )
 
     verified = await verify_and_persist_all(suggestions, wayback=wb, persist=_persist)
     persisted_count = len(verified)
@@ -345,7 +355,14 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
         # not require ``enable_llm_recall`` — operators recording cassettes
         # or running eval calibration can opt into recall without committing
         # to trigger-driven behaviour in production.
-        should_fire = (config.enable_llm_recall and coverage_gap) or config.force_llm_recall
+        gate_fired = config.enable_llm_recall and coverage_gap
+        should_fire = gate_fired or config.force_llm_recall
+
+        # Trigger-driven only: emit before force-driven branches so the audit
+        # signal cleanly distinguishes "the predicate fired" from "the
+        # operator opted in regardless".
+        if gate_fired and Laminar.is_initialized():
+            Laminar.event(name=str(SpanEvent.RECALL_GATE_FIRED))
 
         if should_fire:
             if recall_deps is None:
