@@ -954,3 +954,84 @@ async def test_pipeline_recall_raises_when_sparse_encoder_missing(
             sparse_encoder=None,
             recall_deps=deps,
         )
+
+
+def _capture_laminar_events(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Force ``Laminar.is_initialized`` true and capture every emitted event.
+
+    The tracer is otherwise inert in tests (``enable_tracing=False`` plus
+    ``Laminar.initialize`` never called), so the gap-score branch would never
+    fire under default fakes. Patching the import site in ``slopmortem.pipeline``
+    keeps the rest of the suite untouched.
+    """
+    events: list[dict[str, Any]] = []
+
+    class _StubLaminar:
+        @staticmethod
+        def is_initialized() -> bool:
+            return True
+
+        @staticmethod
+        def event(name: str, attributes: dict[str, str] | None = None) -> None:
+            events.append({"name": name, "attributes": attributes or {}})
+
+        @staticmethod
+        def set_span_attributes(_attrs: dict[str, Any]) -> None:
+            return
+
+        @staticmethod
+        def get_trace_id() -> str | None:
+            return None
+
+    monkeypatch.setattr("slopmortem.pipeline.Laminar", _StubLaminar)
+    return events
+
+
+async def test_gap_score_event_emitted_on_every_query(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """``recall.gap_score`` fires once per query even when the predicate is quiet.
+
+    Calibration eval needs the qualifying/required pair on every run, not just
+    fires. Reuses the healthy-corpus scenario where ``coverage_gap=False`` and
+    ``RECALL_GATE_FIRED`` is intentionally absent.
+    """
+    events = _capture_laminar_events(monkeypatch)
+    cfg = _build_config(k_retrieve=6, n_synthesize=3)
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    candidates = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
+    corpus = _HybridCorpus(base_candidates=candidates)
+    canned = _build_canned(
+        retrieved=candidates,
+        top_n=candidates[: cfg.N_synthesize],
+        ctx=ctx,
+        cfg=cfg,
+    )
+    inner = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    llm = _RecallRoutingLLM(inner=inner, recall_responses=[])
+    embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    budget = Budget(cap_usd=2.0)
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
+
+    report = await run_query(
+        ctx,
+        llm=llm,
+        embedding_client=embed,
+        corpus=corpus,
+        config=cfg,
+        budget=budget,
+        sparse_encoder=_stub_sparse,
+    )
+
+    gap_events = [e for e in events if e["name"] == "recall.gap_score"]
+    assert len(gap_events) == 1
+    attrs = gap_events[0]["attributes"]
+    # Canned rerank only ranks min(N_synthesize, K_retrieve) candidates, so
+    # qualifying tops out at N_synthesize for the healthy scenario.
+    assert attrs["qualifying"] == str(cfg.N_synthesize)
+    assert attrs["required"] == str(cfg.N_synthesize)
+    assert attrs["pitch_sector"] == "fintech"
+    # Quiet predicate → gate event must not fire, and recall stays untouched.
+    assert not any(e["name"] == "recall.gate_fired" for e in events)
+    assert report.pipeline_meta.coverage_gap is False
+    del tmp_path

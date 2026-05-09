@@ -28,6 +28,10 @@ class SpanEvent(StrEnum):
     # GATE_FIRED is predicate-driven only (coverage_gap=True); force_llm_recall
     # runs that bypass the predicate intentionally do NOT emit it.
     RECALL_GATE_FIRED = "recall.gate_fired"
+    # GAP_SCORE fires on every query for predicate calibration. Carries
+    # qualifying/required counts and pitch sector as stringly-typed attributes
+    # so eval can sweep thresholds without re-running queries.
+    RECALL_GAP_SCORE = "recall.gap_score"
     RECALL_SUGGESTIONS_RECEIVED = "recall.suggestions_received"
     # Carries ``stage`` attribute: "head" (HEAD probe) or "get" (GET body fetch).
     RECALL_REJECTED_L2 = "recall.rejected_l2"

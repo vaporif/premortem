@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import httpx
@@ -20,19 +21,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def detect_coverage_gap(
+@dataclass(frozen=True)
+class CoverageGapResult:
+    """Outcome of the coverage-gap predicate with the underlying counts.
+
+    The pipeline emits ``qualifying``/``required`` on every query so eval can
+    sweep predicate thresholds without re-running the corpus. ``gap`` is the
+    fire/don't-fire decision the recall branch consumes.
+    """
+
+    qualifying: int
+    required: int
+
+    @property
+    def gap(self) -> bool:
+        return self.qualifying < self.required
+
+
+def compute_coverage_gap(
     *,
     retrieved: list[Candidate],
     ranked: list[ScoredCandidate],
     pitch_sector: str,
     min_similarity_score: float,
     n_synthesize: int,
-) -> bool:
-    """Decide whether to fire the LLM-recall fallback.
+) -> CoverageGapResult:
+    """Score the retrieve+rerank result against the LLM-recall predicate.
 
-    Fires when fewer than ``n_synthesize`` candidates are both high-quality
-    (mean perspective >= ``min_similarity_score``) and in-sector (own sector
-    or the catch-all ``"other"``).
+    Counts candidates that are both high-quality (mean perspective >=
+    ``min_similarity_score``) and in-sector (own sector or the catch-all
+    ``"other"``). Fewer than ``n_synthesize`` qualifying → gap.
 
     A ``pitch_sector`` of ``"other"`` short-circuits the in-sector check —
     sector is uninformative there, so quality alone gates the count.
@@ -53,7 +71,25 @@ def detect_coverage_gap(
             continue
         if cand.payload.facets.sector in (pitch_sector, "other"):
             qualifying += 1
-    return qualifying < n_synthesize
+    return CoverageGapResult(qualifying=qualifying, required=n_synthesize)
+
+
+def detect_coverage_gap(
+    *,
+    retrieved: list[Candidate],
+    ranked: list[ScoredCandidate],
+    pitch_sector: str,
+    min_similarity_score: float,
+    n_synthesize: int,
+) -> bool:
+    """Back-compat boolean shim — delegates to ``compute_coverage_gap``."""
+    return compute_coverage_gap(
+        retrieved=retrieved,
+        ranked=ranked,
+        pitch_sector=pitch_sector,
+        min_similarity_score=min_similarity_score,
+        n_synthesize=n_synthesize,
+    ).gap
 
 
 # Drop user pitch, candidate payloads, and rerank rationales from span attrs:

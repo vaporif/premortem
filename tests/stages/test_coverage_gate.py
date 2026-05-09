@@ -17,6 +17,7 @@ from slopmortem.models import (
     SimilarityScores,
 )
 from slopmortem.stages import detect_coverage_gap
+from slopmortem.stages.llm_recall import compute_coverage_gap
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "coverage_gate"
 
@@ -172,3 +173,21 @@ def test_wrong_vertical_noise_fires() -> None:
         )
         is True
     )
+
+
+def test_compute_returns_qualifying_count() -> None:
+    # compute_coverage_gap exposes the underlying qualifying count so the
+    # pipeline can emit it on every query for predicate calibration, not just
+    # when the gate fires.
+    retrieved = [_candidate(f"c{i}", "crypto_web3") for i in range(3)]
+    ranked = [_scored(f"c{i}", 4.5) for i in range(3)]
+    result = compute_coverage_gap(
+        retrieved=retrieved,
+        ranked=ranked,
+        pitch_sector="crypto_web3",
+        min_similarity_score=4.0,
+        n_synthesize=5,
+    )
+    assert result.qualifying == 3
+    assert result.required == 5
+    assert result.gap is True

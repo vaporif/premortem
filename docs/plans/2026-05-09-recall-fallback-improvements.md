@@ -231,7 +231,7 @@ All must be green before starting. Re-run after each task.
   just lint
   ```
 
-- [ ] **Step 1.13 — Commit.** `recall: L5 deathness gate over verified bodies`.
+- [x] **Step 1.13 — Commit.** `recall: L5 deathness gate over verified bodies`.
 
 ---
 
@@ -247,13 +247,13 @@ All must be green before starting. Re-run after each task.
 
 **Steps**
 
-- [ ] **Step 2.1 — Add SpanEvent.**
+- [x] **Step 2.1 — Add SpanEvent.**
   ```python
   RECALL_GAP_SCORE = "recall.gap_score"
   ```
   Carries attributes `qualifying: int`, `required: int`, `pitch_sector: str`.
 
-- [ ] **Step 2.2 — Refactor predicate.** Extend `slopmortem/stages/llm_recall.py`:
+- [x] **Step 2.2 — Refactor predicate.** Extend `slopmortem/stages/llm_recall.py`:
   ```python
   @dataclass(frozen=True)
   class CoverageGapResult:
@@ -281,7 +281,7 @@ All must be green before starting. Re-run after each task.
       return compute_coverage_gap(...).gap
   ```
 
-- [ ] **Step 2.3 — Write failing test.** In `tests/stages/test_coverage_gate.py`:
+- [x] **Step 2.3 — Write failing test.** In `tests/stages/test_coverage_gate.py`:
   ```python
   def test_compute_returns_qualifying_count():
       retrieved = [_candidate(f"c{i}", "crypto_web3") for i in range(3)]
@@ -299,9 +299,9 @@ All must be green before starting. Re-run after each task.
   ```
   Run, expect failure.
 
-- [ ] **Step 2.4 — Implement and re-run.** Test should pass.
+- [x] **Step 2.4 — Implement and re-run.** Test should pass.
 
-- [ ] **Step 2.5 — Update pipeline.run_query** to compute on every query, regardless of `enable_llm_recall`:
+- [x] **Step 2.5 — Update pipeline.run_query** to compute on every query, regardless of `enable_llm_recall`:
   ```python
   # Replace the existing `if config.enable_llm_recall: coverage_gap = detect_coverage_gap(...)` block with:
   gap_result = compute_coverage_gap(
@@ -324,9 +324,9 @@ All must be green before starting. Re-run after each task.
   ```
   Note: Laminar event attribute values are stringly-typed for portability; cast ints to str.
 
-- [ ] **Step 2.6 — Update gate-fired logic** so `gate_fired` still requires `enable_llm_recall AND coverage_gap` — the always-log change is observability only, not behavior.
+- [x] **Step 2.6 — Update gate-fired logic** so `gate_fired` still requires `enable_llm_recall AND coverage_gap` — the always-log change is observability only, not behavior. (No-op: `enable_llm_recall` was removed in 33ea0ac when recall went always-on; `RECALL_GATE_FIRED` already gates on `coverage_gap` only.)
 
-- [ ] **Step 2.7 — Add pipeline test.** In `tests/test_pipeline_recall_fallback.py`:
+- [x] **Step 2.7 — Add pipeline test.** In `tests/test_pipeline_recall_fallback.py`:
   ```python
   async def test_gap_score_event_emitted_when_recall_disabled(monkeypatch, caplog):
       """Gap score event fires on every query, including when enable_llm_recall=False."""
@@ -339,7 +339,7 @@ All must be green before starting. Re-run after each task.
   ```
   Pattern off existing event-capture tests in the file.
 
-- [ ] **Step 2.8 — Run tests + full suite.**
+- [x] **Step 2.8 — Run tests + full suite.**
   ```bash
   uv run pytest tests/stages/test_coverage_gate.py tests/test_pipeline_recall_fallback.py -v
   just test

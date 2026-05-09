@@ -23,8 +23,8 @@ from slopmortem.corpus.sources import WaybackEnricher
 from slopmortem.ingest import IngestResult, NullProgress
 from slopmortem.models import PipelineMeta, Report, Synthesis, TopRisks
 from slopmortem.stages import (
+    compute_coverage_gap,
     consolidate_risks,
-    detect_coverage_gap,
     drop_below_min_similarity,
     extract_facets,
     llm_recall,
@@ -356,22 +356,34 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
         progress.advance_phase(QueryPhase.RERANK)
         progress.end_phase(QueryPhase.RERANK)
 
-        coverage_gap = detect_coverage_gap(
+        gap_result = compute_coverage_gap(
             retrieved=retrieved,
             ranked=reranked.ranked,
             pitch_sector=facets.sector,
             min_similarity_score=config.min_similarity_score,
             n_synthesize=config.N_synthesize,
         )
+        coverage_gap = gap_result.gap
+
+        # GAP_SCORE fires unconditionally so eval can sweep predicate
+        # thresholds against historical traces. GATE_FIRED keeps its narrower
+        # semantics: predicate-driven (coverage_gap=True) only.
+        # Laminar attribute values are stringly-typed for OTLP portability.
+        if Laminar.is_initialized():
+            Laminar.event(
+                name=str(SpanEvent.RECALL_GAP_SCORE),
+                attributes={
+                    "qualifying": str(gap_result.qualifying),
+                    "required": str(gap_result.required),
+                    "pitch_sector": facets.sector,
+                },
+            )
 
         # OR-combined: predicate-driven OR force-on. ``force_llm_recall`` lets
         # operators recording cassettes or running eval calibration fire recall
         # on every query regardless of the predicate.
         should_fire = coverage_gap or config.force_llm_recall
 
-        # Predicate-driven only: emit before force-driven branches so the audit
-        # signal cleanly distinguishes "the predicate fired" from "the
-        # operator opted in regardless".
         if coverage_gap and Laminar.is_initialized():
             Laminar.event(name=str(SpanEvent.RECALL_GATE_FIRED))
 
