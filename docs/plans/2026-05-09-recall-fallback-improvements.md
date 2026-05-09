@@ -504,25 +504,25 @@ All must be green before starting. Re-run after each task.
 
 **Steps**
 
-- [ ] **Step 5.1 — Author 4 "should fire" fixtures** matching real failure shapes:
+- [x] **Step 5.1 — Author 4 "should fire" fixtures** matching real failure shapes:
   - `wrong_sector_high_quality.json` — 5 candidates with mean=6.0 in sector=security, pitch_sector=crypto_web3. Expected: fire (qualifying=0).
   - `mostly_in_sector_low_quality.json` — 5 candidates in-sector but mean=2.0 (under 4.0 threshold). Expected: fire.
   - `borderline_one_qualifying.json` — 1 in-sector with mean=4.5, 4 out-of-sector with mean=8.0. Expected: fire (qualifying=1 < N=5).
   - `mixed_quality_two_qualifying.json` — 2 in-sector mean=5.0, 3 in-sector mean=3.5. Expected: fire (qualifying=2).
 
-- [ ] **Step 5.2 — Author 4 "should not fire" fixtures**:
+- [x] **Step 5.2 — Author 4 "should not fire" fixtures**:
   - `exact_n_qualifying.json` — exactly 5 in-sector candidates with mean=4.5. Expected: quiet (qualifying=N=5).
   - `over_n_qualifying.json` — 7 in-sector candidates with mean=6.0. Expected: quiet.
   - `pitch_sector_other_quality_pass.json` — pitch_sector=other, 5 candidates mixed sectors all mean=5.0. Expected: quiet (sector check skipped).
   - `sector_other_in_candidates.json` — pitch_sector=fintech, 5 candidates with sector=other and mean=4.5. Expected: quiet (catch-all matches).
 
-- [ ] **Step 5.3 — Author 4 "edge geometry" fixtures**:
+- [x] **Step 5.3 — Author 4 "edge geometry" fixtures**:
   - `ranked_id_not_in_retrieved.json` — rerank emits a candidate_id absent from retrieved. Predicate treats as miss; combined with 4 valid in-sector qualifiers should fire (qualifying=4).
   - `exact_min_similarity_bound.json` — 5 candidates with mean exactly 4.0 (=min_similarity_score). Expected: depends on `<` vs `<=` semantics — pin the current behavior (`<` means 4.0 qualifies).
   - `n_synthesize_one.json` — N_synthesize=1, 1 in-sector qualifying candidate. Expected: quiet. (This requires parameterizing the test on n_synthesize too — acceptable change to the parametrize.)
   - `empty_ranked_nonempty_retrieved.json` — retrieved has 5 entries, ranked is empty. Expected: fire (qualifying=0). Catches the case where rerank failed silently.
 
-- [ ] **Step 5.4 — Extend `test_calibration_fixture` parametrize.**
+- [x] **Step 5.4 — Extend `test_calibration_fixture` parametrize.**
   ```python
   @pytest.mark.parametrize("name", [
       "hacken", "splunk_ot", "crypto_web3_sparse",
@@ -536,13 +536,13 @@ All must be green before starting. Re-run after each task.
   ```
   If `n_synthesize_one` requires per-fixture overrides, extend the loader to read optional `n_synthesize` and `min_similarity_score` keys from the JSON and thread them into the call.
 
-- [ ] **Step 5.5 — Run.**
+- [x] **Step 5.5 — Run.**
   ```bash
   uv run pytest tests/stages/test_coverage_gate.py -v
   ```
   All fixtures pass. If a fixture's expected outcome contradicts the predicate, fix the fixture (the predicate is the spec) — don't tweak the predicate.
 
-- [ ] **Step 5.6 — Run full suite.**
+- [x] **Step 5.6 — Run full suite.**
 
 - [ ] **Step 5.7 — Commit.** `stages: expand coverage_gate calibration fixtures`.
 

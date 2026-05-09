@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -21,11 +22,30 @@ from slopmortem.stages.llm_recall import compute_coverage_gap
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "coverage_gate"
 
 
-def _load(name: str) -> tuple[list[Candidate], list[ScoredCandidate], str, bool]:
+@dataclass(frozen=True)
+class _Fixture:
+    retrieved: list[Candidate]
+    ranked: list[ScoredCandidate]
+    pitch_sector: str
+    expected: bool
+    n_synthesize: int
+    min_similarity_score: float
+
+
+def _load(name: str) -> _Fixture:
+    # n_synthesize / min_similarity_score are optional per-fixture overrides
+    # so calibration cases can pin a non-default predicate threshold.
     data = json.loads((FIXTURES / f"{name}.json").read_text())
     retrieved = [Candidate.model_validate(item) for item in data["retrieved"]]
     ranked = [ScoredCandidate.model_validate(item) for item in data["ranked"]]
-    return retrieved, ranked, data["pitch_sector"], bool(data["expected_gate"])
+    return _Fixture(
+        retrieved=retrieved,
+        ranked=ranked,
+        pitch_sector=data["pitch_sector"],
+        expected=bool(data["expected_gate"]),
+        n_synthesize=int(data.get("n_synthesize", 5)),
+        min_similarity_score=float(data.get("min_similarity_score", 4.0)),
+    )
 
 
 def _facets(sector: str) -> Facets:
@@ -82,17 +102,36 @@ def _scored(candidate_id: str, mean: float) -> ScoredCandidate:
     )
 
 
-@pytest.mark.parametrize("name", ["hacken", "splunk_ot", "crypto_web3_sparse"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "hacken",
+        "splunk_ot",
+        "crypto_web3_sparse",
+        "wrong_sector_high_quality",
+        "mostly_in_sector_low_quality",
+        "borderline_one_qualifying",
+        "mixed_quality_two_qualifying",
+        "exact_n_qualifying",
+        "over_n_qualifying",
+        "pitch_sector_other_quality_pass",
+        "sector_other_in_candidates",
+        "ranked_id_not_in_retrieved",
+        "exact_min_similarity_bound",
+        "n_synthesize_one",
+        "empty_ranked_nonempty_retrieved",
+    ],
+)
 def test_calibration_fixture(name: str) -> None:
-    retrieved, ranked, pitch_sector, expected = _load(name)
+    fx = _load(name)
     result = compute_coverage_gap(
-        retrieved=retrieved,
-        ranked=ranked,
-        pitch_sector=pitch_sector,
-        min_similarity_score=4.0,
-        n_synthesize=5,
+        retrieved=fx.retrieved,
+        ranked=fx.ranked,
+        pitch_sector=fx.pitch_sector,
+        min_similarity_score=fx.min_similarity_score,
+        n_synthesize=fx.n_synthesize,
     ).gap
-    assert result is expected
+    assert result is fx.expected
 
 
 def test_zero_candidates_fires() -> None:

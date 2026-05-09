@@ -1,0 +1,243 @@
+{
+  "pitch_sector": "other",
+  "retrieved": [
+    {
+      "canonical_id": "c0",
+      "score": 0.8,
+      "payload": {
+        "name": "c0",
+        "summary": "c0 summary",
+        "body": "c0 body",
+        "facets": {
+          "sector": "fintech",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:c0",
+        "text_id": "c0"
+      }
+    },
+    {
+      "canonical_id": "c1",
+      "score": 0.8,
+      "payload": {
+        "name": "c1",
+        "summary": "c1 summary",
+        "body": "c1 body",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:c1",
+        "text_id": "c1"
+      }
+    },
+    {
+      "canonical_id": "c2",
+      "score": 0.8,
+      "payload": {
+        "name": "c2",
+        "summary": "c2 summary",
+        "body": "c2 body",
+        "facets": {
+          "sector": "healthtech",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:c2",
+        "text_id": "c2"
+      }
+    },
+    {
+      "canonical_id": "c3",
+      "score": 0.8,
+      "payload": {
+        "name": "c3",
+        "summary": "c3 summary",
+        "body": "c3 body",
+        "facets": {
+          "sector": "edtech",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:c3",
+        "text_id": "c3"
+      }
+    },
+    {
+      "canonical_id": "c4",
+      "score": 0.8,
+      "payload": {
+        "name": "c4",
+        "summary": "c4 summary",
+        "body": "c4 body",
+        "facets": {
+          "sector": "biotech",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:c4",
+        "text_id": "c4"
+      }
+    }
+  ],
+  "ranked": [
+    {
+      "candidate_id": "c0",
+      "perspective_scores": {
+        "business_model": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 5.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "c1",
+      "perspective_scores": {
+        "business_model": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 5.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "c2",
+      "perspective_scores": {
+        "business_model": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 5.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "c3",
+      "perspective_scores": {
+        "business_model": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 5.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "c4",
+      "perspective_scores": {
+        "business_model": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 5.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    }
+  ],
+  "expected_gate": false
+}
