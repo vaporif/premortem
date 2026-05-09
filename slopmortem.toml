@@ -33,8 +33,8 @@ rrf_k = 60
 
 # Multiplicative score factor for source=="llm_recall" payloads in the
 # retrieval FormulaQuery. 1.0 disables the down-weight; 0.0 zeroes recall
-# scores entirely. Default tilts toward crawler-sourced entries when both
-# match equally, while leaving recall-only result sets unchanged in order.
+# scores. Default tilts toward crawler-sourced rows when both match equally
+# and leaves recall-only result sets in their original order.
 recall_score_factor = 0.9
 
 # Slop classifier threshold during ingest. Above this, docs go to

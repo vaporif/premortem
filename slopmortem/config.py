@@ -35,11 +35,11 @@ class Config(BaseSettings):
     ingest_concurrency: int = Field(default=20, ge=1)
     facet_boost: float = Field(default=0.01, ge=0.0)
     rrf_k: int = Field(default=60, ge=1)
-    # Multiplicative score factor applied to ``source=="llm_recall"`` payloads in
-    # the retrieval FormulaQuery. 1.0 disables the down-weight; 0.0 zeroes recall
-    # scores entirely. Down-weight is always-on: when crawler-sourced rows are
-    # present they outrank, when only recall rows match a uniform shift doesn't
-    # drop them (rerank cares about relative order).
+    # Multiplicative score factor for ``source=="llm_recall"`` payloads in the
+    # retrieval FormulaQuery. 1.0 disables the down-weight; 0.0 zeroes recall
+    # scores. Always on: crawler-sourced rows outrank when present; with only
+    # recall rows the uniform shift doesn't drop them since rerank cares about
+    # relative order.
     recall_score_factor: float = Field(default=0.9, ge=0.0, le=1.0)
     slop_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     max_doc_tokens: int = Field(default=8000, ge=1)

@@ -54,9 +54,9 @@ def _make_chunk_with_sector(
     """Like ``_make_chunk`` but with a full CandidatePayload — ``query`` validates payloads.
 
     ``source`` lands in the Qdrant payload as a plain key (CandidatePayload
-    ignores extras), letting tests exercise source-keyed filters before the
-    field is part of the model. ``dense_value`` overrides the per-idx vector
-    when a test needs a fixed embedding (e.g. score-parity assertions).
+    ignores extras), so tests can hit source-keyed filters before the field
+    is part of the model. ``dense_value`` overrides the per-idx vector when a
+    test needs a fixed embedding (e.g. score-parity assertions).
     """
     raw = (idx + 1) * 0.001 if dense_value is None else dense_value
     dense = [float(raw)] * _DIM
@@ -286,8 +286,7 @@ async def test_recall_score_factor_one_is_neutral(tmp_path: Path) -> None:
         k_retrieve=5,
     )
     terms = _formula_terms(client.last_query)
-    # The pre-change shape is exactly ``["$score", MultExpression(facet boost)]`` —
-    # one literal $score term plus the facet-boost Mult. No recall demote.
+    # Pre-change shape: ``["$score", MultExpression(facet boost)]`` — no recall demote.
     assert terms[0] == "$score"
     assert len(terms) == 2
 

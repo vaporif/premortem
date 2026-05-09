@@ -101,10 +101,9 @@ class QdrantCorpus:
     ) -> None:
         # ``facet_boost=0.01`` lifts ~0.04 max for a 4-facet match against an
         # RRF ceiling of ~0.033. ``rrf_k=60`` matches Qdrant's server default.
-        # ``recall_score_factor=1.0`` is a no-op default so existing callers
-        # (and tests) keep their pre-change scoring; production wires the
-        # config value through ``build_deps``. ``fetch_aliases=None`` no-ops
-        # the alias-graph dedup pass for tests that don't seed an aliases table.
+        # ``recall_score_factor=1.0`` keeps tests on the pre-change formula;
+        # ``build_deps`` wires the config value in production. ``fetch_aliases=None``
+        # no-ops the alias-graph dedup pass for tests that don't seed an aliases table.
         self._client = client
         self._collection = collection
         self._root = post_mortems_root
@@ -181,8 +180,6 @@ class QdrantCorpus:
         # Soft demote on llm_recall: the term resolves to ``$score x (factor-1)``
         # when source matches and to 0 otherwise, so the outer Sum yields
         # ``$score x factor`` for recall rows and ``$score`` for everything else.
-        # Skipped at factor=1.0 to keep the formula identical to the pre-change
-        # shape for callers that opt out.
         # No-op in prod until Task 6 of docs/plans/2026-05-09-recall-fallback-improvements.md
         # writes ``source`` onto CandidatePayload; tests inject ``source`` into
         # the raw Qdrant payload to exercise the formula shape today.
