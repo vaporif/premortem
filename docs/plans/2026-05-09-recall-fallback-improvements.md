@@ -627,7 +627,7 @@ All must be green before starting. Re-run after each task.
 
 - [x] **Step 6.12 — Run full suite + typecheck.**
 
-- [ ] **Step 6.13 — Commit.** `synthesize: thread source provenance to prompt + render`.
+- [x] **Step 6.13 — Commit.** `synthesize: thread source provenance to prompt + render`.
 
 ---
 
