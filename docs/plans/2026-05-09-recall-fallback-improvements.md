@@ -346,7 +346,7 @@ All must be green before starting. Re-run after each task.
   just typecheck
   ```
 
-- [ ] **Step 2.9 — Commit.** `recall: always log gap score for calibration`.
+- [x] **Step 2.9 — Commit.** `recall: always log gap score for calibration`.
 
 ---
 
