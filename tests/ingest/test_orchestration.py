@@ -415,7 +415,7 @@ async def test_recall_slop_threshold_default_uses_global(tmp_path, cfg):
     assert result.quarantined == 0
 
 
-async def test_recall_slop_threshold_override_quarantines(tmp_path):
+async def test_recall_slop_threshold_override_quarantines_llm_recall(tmp_path):
     """``recall_slop_threshold=0.5`` quarantines an llm_recall entry scoring 0.6."""
     config = Config(
         max_cost_usd_per_ingest=100.0,
@@ -446,26 +446,33 @@ async def test_recall_slop_threshold_override_quarantines(tmp_path):
     )
     assert result.processed == 0
     assert result.quarantined == 1
-    # Non-recall sources keep using the global threshold even when the
-    # override is set — score 0.6 < global 0.7 means hn passes.
-    classifier_global = FakeSlopClassifier(default_score=0.6)
-    journal2 = MergeJournal(tmp_path / "j2.sqlite")
-    await journal2.init()
-    result_hn = await ingest(
+
+
+async def test_recall_slop_threshold_override_does_not_affect_other_sources(tmp_path):
+    """Override only applies to llm_recall; hn at 0.6 still passes the global 0.7."""
+    config = Config(
+        max_cost_usd_per_ingest=100.0,
+        ingest_concurrency=20,
+        recall_slop_threshold=0.5,
+    )
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    classifier = FakeSlopClassifier(default_score=0.6)
+    result = await ingest(
         sources=[_ListSource(entries=[_entry(source="hn", source_id="other")])],
         enrichers=[],
-        journal=journal2,
+        journal=journal,
         corpus=InMemoryCorpus(),
         llm=FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU),
         embed_client=FakeEmbeddingClient(model=config.embed_model_id),
         budget=Budget(cap_usd=config.max_cost_usd_per_ingest),
-        slop_classifier=classifier_global,
+        slop_classifier=classifier,
         config=config,
-        post_mortems_root=tmp_path / "post_mortems_hn",
+        post_mortems_root=tmp_path / "post_mortems",
         sparse_encoder=_stub_sparse,
     )
-    assert result_hn.processed == 1
-    assert result_hn.quarantined == 0
+    assert result.processed == 1
+    assert result.quarantined == 0
 
 
 async def test_ingest_payload_sources_url_only_when_url_present(tmp_path, cfg):

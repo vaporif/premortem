@@ -205,11 +205,9 @@ async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branc
             )
 
             effective_threshold = _effective_slop_threshold(enriched, config)
-            # Borderline band logged only for llm_recall: the override knob
-            # exists for that source, and the run-time signal needed to
-            # retune is the score-vs-threshold gap. Lower bound 0.4 trims
-            # the long left tail of obviously-clean docs that aren't useful
-            # calibration data.
+            # Borderline band only fires for llm_recall — that's the source the
+            # override knob targets, and the score-vs-threshold gap is the data
+            # we need to retune it.
             if (
                 enriched.source == SOURCE_LLM_RECALL
                 and _BORDERLINE_LOWER <= slop_score < effective_threshold
