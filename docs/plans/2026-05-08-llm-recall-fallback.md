@@ -1352,11 +1352,11 @@ The 7 telecom entries can wait — they hurt one out-of-vertical pitch each, and
 
 ### Polish
 
-- [ ] **Step 1: Run post-implementation polish**
+- [x] **Step 1: Run post-implementation polish**
 
 Dispatch the `post-implementation-polish` skill on the diff produced by Tasks 1–8.
 
-- [ ] **Step 2: Address findings, recommit if needed**
+- [x] **Step 2: Address findings, recommit if needed**
 
 Each polish-driven fix lands as its own commit so blame stays useful.
 
@@ -1366,7 +1366,7 @@ Each polish-driven fix lands as its own commit so blame stays useful.
 
 Expected: clean, coverage on new modules ≥ existing project floor.
 
-- [ ] **Step 4: Update `docs/architecture.md`**
+- [x] **Step 4: Update `docs/architecture.md`**
 
 Add a one-line pointer:
 
