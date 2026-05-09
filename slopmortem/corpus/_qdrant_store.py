@@ -96,20 +96,24 @@ class QdrantCorpus:
         post_mortems_root: Path,
         facet_boost: float = 0.01,
         rrf_k: int = 60,
+        recall_score_factor: float = 1.0,
         fetch_aliases: Callable[[str], Awaitable[list[AliasEdge]]] | None = None,
     ) -> None:
         # ``facet_boost=0.01`` lifts ~0.04 max for a 4-facet match against an
         # RRF ceiling of ~0.033. ``rrf_k=60`` matches Qdrant's server default.
-        # ``fetch_aliases=None`` no-ops the alias-graph dedup pass for tests
-        # that don't seed an aliases table.
+        # ``recall_score_factor=1.0`` is a no-op default so existing callers
+        # (and tests) keep their pre-change scoring; production wires the
+        # config value through ``build_deps``. ``fetch_aliases=None`` no-ops
+        # the alias-graph dedup pass for tests that don't seed an aliases table.
         self._client = client
         self._collection = collection
         self._root = post_mortems_root
         self._facet_boost = facet_boost
         self._rrf_k = rrf_k
+        self._recall_score_factor = recall_score_factor
         self._fetch_aliases = fetch_aliases
 
-    async def query(  # noqa: PLR0913 — Protocol method signature is the public contract
+    async def query(  # noqa: PLR0913, C901 — Protocol method signature; one branch per orchestration knob
         self,
         *,
         dense: list[float],
@@ -174,6 +178,21 @@ class QdrantCorpus:
         formula_terms: list[Any] = ["$score"]  # pyright: ignore[reportExplicitAny]
         if boost_must:
             formula_terms.append(MultExpression(mult=[self._facet_boost, Filter(must=boost_must)]))
+        # Soft demote on llm_recall: the term resolves to ``$score x (factor-1)``
+        # when source matches and to 0 otherwise, so the outer Sum yields
+        # ``$score x factor`` for recall rows and ``$score`` for everything else.
+        # Skipped at factor=1.0 to keep the formula identical to the pre-change
+        # shape for callers that opt out.
+        if self._recall_score_factor < 1.0:
+            formula_terms.append(
+                MultExpression(
+                    mult=[
+                        "$score",
+                        self._recall_score_factor - 1.0,
+                        FieldCondition(key="source", match=MatchValue(value="llm_recall")),
+                    ]
+                )
+            )
         formula = FormulaQuery(formula=SumExpression(sum=formula_terms))
 
         query_filter = _and_filters(

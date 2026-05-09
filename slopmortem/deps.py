@@ -48,6 +48,7 @@ def build_deps(
         post_mortems_root=Path(config.post_mortems_root),
         facet_boost=config.facet_boost,
         rrf_k=config.rrf_k,
+        recall_score_factor=config.recall_score_factor,
     )
 
     return llm, embedder, corpus, budget

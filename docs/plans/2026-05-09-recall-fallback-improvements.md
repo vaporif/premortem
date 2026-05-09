@@ -367,15 +367,15 @@ All must be green before starting. Re-run after each task.
 
 **Steps**
 
-- [ ] **Step 3.1 — Add config knob.**
+- [x] **Step 3.1 — Add config knob.**
   ```python
   recall_score_factor: float = Field(default=0.9, ge=0.0, le=1.0)
   ```
   1.0 = no down-weight; 0.0 would zero out llm_recall scores entirely (don't recommend).
 
-- [ ] **Step 3.2 — Extend QdrantCorpus.__init__** to accept and store `recall_score_factor: float = 1.0` (1.0 default keeps existing test setups unaffected).
+- [x] **Step 3.2 — Extend QdrantCorpus.__init__** to accept and store `recall_score_factor: float = 1.0` (1.0 default keeps existing test setups unaffected).
 
-- [ ] **Step 3.3 — Write failing test (`requires_qdrant` marker).** In `tests/corpus/test_qdrant_store.py`:
+- [x] **Step 3.3 — Write failing test (`requires_qdrant` marker).** In `tests/corpus/test_qdrant_store.py`:
   ```python
   @pytest.mark.requires_qdrant
   async def test_llm_recall_score_downweighted(...):
@@ -385,11 +385,11 @@ All must be green before starting. Re-run after each task.
       # Assert llm_recall.score / curated.score is close to recall_score_factor (within tol).
   ```
 
-- [ ] **Step 3.4 — Run test, expect failure** (sources rank equally today).
+- [x] **Step 3.4 — Run test, expect failure** (sources rank equally today).
 
-- [ ] **Step 3.5 — Verify `$score`-in-`Mult` composition.** Open `qdrant_client.models.MultExpression` (its Pydantic model) and confirm the `mult` field accepts string variables alongside constants and Filters. If yes, proceed with multiplicative; if the type forbids it, fall back to additive penalty and document the fallback inline.
+- [x] **Step 3.5 — Verify `$score`-in-`Mult` composition.** Open `qdrant_client.models.MultExpression` (its Pydantic model) and confirm the `mult` field accepts string variables alongside constants and Filters. If yes, proceed with multiplicative; if the type forbids it, fall back to additive penalty and document the fallback inline.
 
-- [ ] **Step 3.6 — Extend FormulaQuery in `QdrantCorpus.query`.** Append a multiplicative term that scales `$score` by `recall_score_factor` when `source=="llm_recall"`. Reading: when source matches, the new term equals `$score × (factor - 1)` (negative); summed with the existing `$score` term gives `$score × factor`. When source doesn't match, the Filter evaluates to 0 and the term contributes nothing.
+- [x] **Step 3.6 — Extend FormulaQuery in `QdrantCorpus.query`.** Append a multiplicative term that scales `$score` by `recall_score_factor` when `source=="llm_recall"`. Reading: when source matches, the new term equals `$score × (factor - 1)` (negative); summed with the existing `$score` term gives `$score × factor`. When source doesn't match, the Filter evaluates to 0 and the term contributes nothing.
   ```python
   if self._recall_score_factor < 1.0:
       formula_terms.append(
@@ -404,19 +404,19 @@ All must be green before starting. Re-run after each task.
   ```
   Same outer shape as the existing facet boost at `_qdrant_store.py:170-178` — sum of `$score` + per-doc deltas.
 
-- [ ] **Step 3.7 — Plumb through `build_deps`.** In `slopmortem/deps.py`, pass `recall_score_factor=config.recall_score_factor` to QdrantCorpus.
+- [x] **Step 3.7 — Plumb through `build_deps`.** In `slopmortem/deps.py`, pass `recall_score_factor=config.recall_score_factor` to QdrantCorpus.
 
-- [ ] **Step 3.8 — Run test, expect pass.**
+- [x] **Step 3.8 — Run test, expect pass.**
 
-- [ ] **Step 3.9 — Add unit test for backward compatibility.** Default `recall_score_factor=1.0` produces identical scores to the pre-change code:
+- [x] **Step 3.9 — Add unit test for backward compatibility.** Default `recall_score_factor=1.0` produces identical scores to the pre-change code:
   ```python
   def test_recall_score_factor_one_is_neutral():
       # FormulaQuery with factor=1.0 yields the same scores as the pre-change formula.
   ```
 
-- [ ] **Step 3.10 — Run full suite.**
+- [x] **Step 3.10 — Run full suite.**
 
-- [ ] **Step 3.11 — Commit.** `retrieve: soft down-weight on llm_recall sources`.
+- [x] **Step 3.11 — Commit.** `retrieve: soft down-weight on llm_recall sources`.
 
 ---
 
