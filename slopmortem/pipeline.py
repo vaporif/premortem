@@ -71,23 +71,21 @@ class RecallDeps:
     """Long-lived deps the recall persist tail needs.
 
     Bundled into one kwarg so non-recall callers (the default ``slopmortem
-    query`` path) don't have to thread four extra arguments through. The
-    pipeline raises ``RuntimeError`` if recall fires while ``recall_deps``
-    is missing — the misconfiguration surfaces at the call site rather
-    than silently no-oping mid-run.
+    query`` path) don't have to thread four extra arguments through. If
+    recall fires while ``recall_deps`` is missing, the pipeline raises
+    ``RuntimeError`` so the misconfig surfaces at the call site instead of
+    silently no-oping mid-run.
 
-    ``wayback`` defaults to ``None`` so production wiring can leave it out
-    and let the pipeline construct a fresh ``WaybackEnricher()``; tests
-    inject a fake to avoid hitting archive.org.
+    ``wayback`` defaults to ``None`` so production wiring can omit it and
+    let the pipeline construct a fresh ``WaybackEnricher()``; tests inject
+    a fake to avoid hitting archive.org.
     """
 
     journal: MergeJournal
     slop_classifier: SlopClassifier
     post_mortems_root: Path
-    # Typed as the broad ``Enricher`` Protocol so tests can inject a
-    # behaviorally-equivalent fake without subclassing ``WaybackEnricher``.
-    # Production wiring passes ``None`` and the pipeline lazy-constructs a
-    # real ``WaybackEnricher`` on the recall path.
+    # Typed as the broad ``Enricher`` Protocol so tests can inject a fake
+    # without subclassing ``WaybackEnricher``.
     wayback: Enricher | None = None
 
 
@@ -163,9 +161,8 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
 ) -> _RecallOutcome:
     """Recall fallback: ``llm_recall`` → verify → persist → re-retrieve / re-rerank.
 
-    Single-pass by construction — no loop, runs at most once per query.
-    Caller wraps in ``QueryProgress`` start/advance/end hooks; this helper
-    only owns the LLM/HTTP work.
+    Runs at most once per query (no loop). Caller wraps in ``QueryProgress``
+    start/advance/end hooks; this helper only owns the LLM/HTTP work.
     """
     suggestions = await llm_recall(
         pitch=input_ctx.description,
@@ -211,8 +208,6 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
     persisted_count = len(verified)
     if not verified:
         return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
-    # Re-run retrieve + rerank on the augmented corpus. Single-pass: this
-    # branch runs at most once; no loop.
     new_retrieved = await retrieve(
         description=input_ctx.description,
         facets=facets,

@@ -306,11 +306,10 @@ class PipelineMeta(BaseModel):
     budget_exceeded: bool
     filtered_pre_synth: int = 0
     filtered_post_synth: int = 0
-    # Recall fallback signals: ``coverage_gap`` is the unified count-based
-    # trigger (only computed when ``enable_llm_recall=True``). ``recall_used``
-    # flips when a verified recall entry actually landed in the corpus and the
-    # post-recall rerank ran. ``recall_persisted_count`` is how many suggestions
-    # passed L1-L4 verification AND the slop classifier.
+    # ``coverage_gap`` is only computed when ``enable_llm_recall=True``.
+    # ``recall_used`` flips only after a verified entry landed and the
+    # post-recall rerank ran (not on attempt). ``recall_persisted_count``
+    # counts suggestions that passed L1-L4 verification AND the slop classifier.
     coverage_gap: bool = False
     recall_used: bool = False
     recall_persisted_count: int = 0
