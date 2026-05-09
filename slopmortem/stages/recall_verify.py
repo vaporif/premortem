@@ -145,8 +145,8 @@ async def verify_suggestion(
     wayback: Enricher,
 ) -> tuple[RawEntry, VerificationTier] | None:
     """Run L1-L4 against one suggestion. Returns ``None`` if any gate drops."""
-    homepage = str(suggestion.homepage_url)
-    evidence = str(suggestion.evidence_url)
+    homepage = suggestion.homepage_url
+    evidence = suggestion.evidence_url
     # L2: HEAD both URLs. Each emission carries ``stage="head"`` so the audit
     # dashboard can split HEAD-probe rejections from GET-stage transport
     # failures (which use ``stage="get"`` below).
