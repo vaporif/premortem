@@ -34,6 +34,10 @@ _DEATHNESS_MIN_CONFIDENCE = 0.7
 class _FakeLLM:
     """Minimal LLMClient stub: returns a queued reply or raises the queued exc.
 
+    ``FakeLLMClient`` keys on ``(prompt_template_sha, model, prompt_hash)``;
+    these tests want sequenced replies per call without computing hashes,
+    so a local stub is simpler than threading canned-key fixtures.
+
     Each call pops one entry off ``responses``; an empty queue raises so a
     test can't accidentally pass on a missing fixture. Tests that only need
     one L5 call queue exactly one entry. ``_FakeLLM(default=_DEATHNESS_PASS)``

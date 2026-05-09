@@ -184,9 +184,7 @@ async def _l5_deathness_judgment(
     """
     blocks = render_blocks(
         "recall_deathness",
-        # ``render_blocks`` takes the template name as its first positional
-        # arg, so we rebind the company name to ``company_name`` to avoid
-        # the kwarg collision.
+        # ``company_name`` not ``name`` — ``render_blocks(name, ...)`` would collide.
         company_name=suggestion.name,
         status=suggestion.status,
         failure_year=suggestion.failure_year,
