@@ -83,11 +83,14 @@ def _patch_query_seams(
     *,
     captured: dict[str, Any],
     tmp_path: Path,
+    stub_recall_deps: bool = True,
 ) -> None:
     """Wire fakes for the ``query`` CLI so the test never builds real deps.
 
     ``captured`` collects the ``Config`` ``run_query`` was called with so
-    the test can assert on the recall flags.
+    the test can assert on the recall flags. ``stub_recall_deps=False``
+    keeps the real ``_maybe_build_recall_deps`` so a test can verify the
+    lazy contract (no journal / classifier when flags are off).
     """
 
     async def _fake_run_query(input_ctx: InputContext, **kwargs: Any) -> Report:
@@ -103,10 +106,28 @@ def _patch_query_seams(
     monkeypatch.setattr("slopmortem.cli._query_cmd.build_deps", _build_fake_deps)
     monkeypatch.setattr("slopmortem.cli._query_cmd.set_query_corpus", _noop_set_corpus)
     monkeypatch.setattr("slopmortem.cli._query_cmd.run_query", _fake_run_query)
-    monkeypatch.setattr(
-        "slopmortem.cli._query_cmd._maybe_build_recall_deps", _noop_build_recall_deps
-    )
+    if stub_recall_deps:
+        monkeypatch.setattr(
+            "slopmortem.cli._query_cmd._maybe_build_recall_deps", _noop_build_recall_deps
+        )
     monkeypatch.chdir(tmp_path)
+
+
+class _ForbiddenConstruction:
+    """Sentinel that raises if instantiated.
+
+    Used to prove the lazy contract: when both recall flags are False,
+    production code must NOT construct ``MergeJournal`` or
+    ``HaikuSlopClassifier``. Drop one of these in via ``monkeypatch`` and a
+    regression that eagerly builds the heavy deps will trip the assert.
+    """
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        msg = (
+            "lazy contract regressed: heavy recall dep was constructed even "
+            "though both --enable-llm-recall and --force-llm-recall are off"
+        )
+        raise AssertionError(msg)
 
 
 def test_enable_llm_recall_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -157,11 +178,19 @@ def test_both_recall_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
 def test_recall_flags_default_off(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Without flags, both knobs stay False; recall_deps stays None.
 
-    Guards the "non-recall callers pay nothing" principle: a vanilla query
-    must not construct a journal or slop classifier.
+    Exercises the REAL ``_maybe_build_recall_deps`` (not a stub) so the
+    assertion bites if the lazy contract regresses. ``_ForbiddenConstruction``
+    is patched in for both heavy deps; the test fails loudly if production
+    instantiates them despite both flags being off.
     """
     captured: dict[str, Any] = {}
-    _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path)
+    _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path, stub_recall_deps=False)
+    # Patch at the source modules — ``_maybe_build_recall_deps`` does
+    # ``from slopmortem.corpus import MergeJournal`` / ``from slopmortem.ingest
+    # import HaikuSlopClassifier`` lazily, so the rebound names there are
+    # what gets resolved at call time.
+    monkeypatch.setattr("slopmortem.corpus.MergeJournal", _ForbiddenConstruction)
+    monkeypatch.setattr("slopmortem.ingest.HaikuSlopClassifier", _ForbiddenConstruction)
 
     runner = CliRunner()
     result = runner.invoke(app, ["query", "A pitch", "--stdout"])
