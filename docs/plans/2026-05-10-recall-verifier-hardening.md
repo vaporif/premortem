@@ -1511,7 +1511,7 @@ synthesize: verdict-aware prompt + Synthesis.deathness_verdict + render
 
 ## Cross-cutting checks (after all tasks)
 
-- [ ] **CC.1: Re-run Task 0 retrieval-survival test as the final regression guard**
+- [x] **CC.1: Re-run Task 0 retrieval-survival test as the final regression guard**
 
 Run: `uv run pytest tests/stages/test_recall_retrieval_survival.py -v`
 Expected: PASS. Confirms that all of Tasks 1-6 together still leave a real recall entry able to land in `top_n` after persist. If this fails after passing in Task 0 and Task 5, something downstream of persistence regressed retrieval — bisect by task before declaring done.
@@ -1521,16 +1521,16 @@ Expected: PASS. Confirms that all of Tasks 1-6 together still leave a real recal
 Run: `just eval`
 Expected: passes. Recall-fallback eval cases should show admit-rate change consistent with the fixes (more vanished-vendor admits now that homepage HEAD no longer gates and Wayback is advisory, more paywalled-citation admits via the L2 HEAD→GET fallback, fewer sidebar-bleed false admits via Task 1, fewer paywall-stub false admits via Task 1's body-length gate).
 
-- [ ] **CC.3: Confirm import-linter still passes**
+- [x] **CC.3: Confirm import-linter still passes**
 
 Run: `uv run lint-imports`
 Expected: pass. `stages.recall_verify` imports `extract_clean` from the public `slopmortem.corpus` re-export (NOT `corpus._extract` — that one is in `corpus-leaf.forbidden_modules` for source `slopmortem.stages`, see `.importlinter:23-37`).
 
-- [ ] **CC.4: Update `slopmortem.toml` defaults block**
+- [x] **CC.4: Update `slopmortem.toml` defaults block**
 
 Confirm the new key `recall_struggling_min_confidence` is documented in `slopmortem.toml` with a comment explaining the difference from `recall_deathness_min_confidence`.
 
-- [ ] **CC.5: Update `docs/architecture.md` recall section**
+- [x] **CC.5: Update `docs/architecture.md` recall section**
 
 Add one paragraph: "The verifier no longer gates on the homepage URL. On the evidence URL, HEAD failure falls through to GET so paywalled and anti-bot citations don't false-drop on hosts that respond to GET but not HEAD. Wayback enrichment is advisory — its failure or absence never drops a candidate, since archive.org coverage is patchy enough that 'no snapshot' is not a reliable realness signal; `WaybackEnricher.enrich()` is called directly because the enricher already retries 3× internally and swallows transient errors. The persisted body always contains the news article (the citation L5 verifies against); when Wayback anchors, its snapshot is prepended under a 'Vendor description (archived)' section so synthesis can read both the value-prop and the death narrative from a single entry. Persisted recall entries flow through the standard heading-aware chunker — section markers keep boundaries clean, each chunk inherits the same payload so synthesis still sees the full combined body, and per-chunk vectors give the marketing-copy section a focused signal that matches pitches better than a diluted whole-body vector would. The slop classifier is bypassed for recall entries — L5 is the stricter gate operating on the death-citation substrate. L5 is tri-state (`dead` / `struggling` / `alive`); admitted verdicts ride the qdrant payload as `deathness_verdict` and the synthesis prompt reads them, so a struggling vendor produces a forward-looking distress report rather than a post-mortem. After recall persists and re-rerank runs, `compute_coverage_gap` fires a second time emitting `RECALL_GAP_SCORE_AFTER`, so prod telemetry can answer 'did recall close the gap on this query' without an offline eval re-run."
 
