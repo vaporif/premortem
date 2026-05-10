@@ -206,8 +206,9 @@ def test_synthesize_prompt_kwargs_source_unknown_when_payload_missing() -> None:
 def test_synthesize_prompt_kwargs_defaults_deathness_status_to_dead() -> None:
     """``payload.deathness_verdict=None`` defaults to ``"dead"`` in the prompt context.
 
-    Pre-Task-3 crunchbase/web rows have no verdict and were already-curated
-    post-mortems, so the prompt's post-mortem framing is the right default.
+    Legacy crunchbase/web rows predate the verdict field and were already-
+    curated post-mortems, so the prompt's post-mortem framing is the right
+    default.
     """
     cand = _candidate(deathness_verdict=None)
     kwargs = synthesize_prompt_kwargs(cand, pitch="x")
