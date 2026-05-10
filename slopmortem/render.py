@@ -61,17 +61,16 @@ def _render_bullets(items: list[str]) -> str:
 def _render_candidate(syn: Synthesis) -> str:
     is_struggling = syn.deathness_verdict == "struggling"
     date_str = syn.failure_date.isoformat() if syn.failure_date else "unknown"
-    # Struggling vendors are still operating, so "Failure date" / "Lifespan"
-    # would both read wrong (no failure has happened, lifespan is open-ended).
-    # Swap the heading + date label and skip lifespan rather than render
-    # "unknown" for a still-running company.
+    # Struggling vendors are still operating, so the default "Failure date" /
+    # "Lifespan" framing reads wrong (no failure has happened, lifespan is
+    # open-ended). Swap the heading + date label and skip lifespan instead of
+    # rendering "unknown" for a still-running company.
     if is_struggling:
         heading = f"## {syn.name} — currently struggling"
         date_label = "Distress observed:"
     else:
         heading = f"## {syn.name}"
         date_label = "Failure date:"
-    lifespan_str = f"{syn.lifespan_months} months" if syn.lifespan_months is not None else "unknown"
     parts: list[str] = [heading]
     # llm_recall comparables are LLM-named and web-verified — weaker grounding
     # than a crawler-sourced obit. Tag them so the reader discounts accordingly.
@@ -86,6 +85,9 @@ def _render_candidate(syn: Synthesis) -> str:
         ]
     )
     if not is_struggling:
+        lifespan_str = (
+            f"{syn.lifespan_months} months" if syn.lifespan_months is not None else "unknown"
+        )
         parts.append(f"Lifespan: {lifespan_str}")
     parts.extend(
         [
