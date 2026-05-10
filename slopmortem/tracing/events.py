@@ -31,6 +31,11 @@ class SpanEvent(StrEnum):
     # GAP_SCORE fires every query so eval can sweep predicate thresholds
     # against historical traces. Attributes: qualifying, required, pitch_sector.
     RECALL_GAP_SCORE = "recall.gap_score"
+    # Second pass: same shape as GAP_SCORE but fires after the recall branch
+    # re-retrieves + re-reranks. The extra ``gap_closed`` attribute lets a
+    # join-on-trace query answer "did recall close the gap" without subtracting
+    # before/after qualifying counts.
+    RECALL_GAP_SCORE_AFTER = "recall.gap_score_after"
     RECALL_SUGGESTIONS_RECEIVED = "recall.suggestions_received"
     # Carries ``stage`` attribute: "head" (HEAD probe) or "get" (GET body fetch).
     RECALL_REJECTED_L2 = "recall.rejected_l2"

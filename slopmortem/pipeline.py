@@ -257,6 +257,26 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         model=config.model_rerank,
         max_tokens=config.max_tokens_rerank,
     )
+    # Mirror the pre-recall GAP_SCORE shape so a join-on-trace query can pair
+    # before/after. ``gap_closed`` is the derived boolean the calibration
+    # dashboard reads to answer "was recall worth the budget on this query".
+    gap_after = compute_coverage_gap(
+        retrieved=new_retrieved,
+        ranked=new_reranked.ranked,
+        pitch_sector=facets.sector,
+        min_similarity_score=config.min_similarity_score,
+        n_synthesize=config.N_synthesize,
+    )
+    if Laminar.is_initialized():
+        Laminar.event(
+            name=str(SpanEvent.RECALL_GAP_SCORE_AFTER),
+            attributes={
+                "qualifying": str(gap_after.qualifying),
+                "required": str(gap_after.required),
+                "gap_closed": str(not gap_after.gap),
+                "pitch_sector": facets.sector,
+            },
+        )
     return _RecallOutcome(
         retrieved=new_retrieved,
         reranked=new_reranked,

@@ -131,6 +131,7 @@ async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branc
     force: bool,
     progress: IngestProgress,
     result: IngestResult,
+    skip_slop: bool = False,
 ) -> list[tuple[RawEntry, str]]:
     """Enrich → extract body → slop-gate; return survivors as ``(entry, body)``.
 
@@ -195,14 +196,21 @@ async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branc
                 progress.advance_phase(IngestPhase.CLASSIFY)
                 return None
 
-            slop_score = await classify_one(
-                entry=enriched,
-                body=body,
-                slop_classifier=slop_classifier,
-                on_error=lambda exc: progress.error(
-                    IngestPhase.CLASSIFY, f"slop classifier failed: {exc}"
-                ),
-            )
+            if skip_slop:
+                # L5 deathness is the stricter gate for recall entries; slop
+                # was tuned on a different body shape (raw crawler output, no
+                # combined Wayback + news citation), so running it here risks
+                # false-quarantining L5-verified rows.
+                slop_score = 0.0
+            else:
+                slop_score = await classify_one(
+                    entry=enriched,
+                    body=body,
+                    slop_classifier=slop_classifier,
+                    on_error=lambda exc: progress.error(
+                        IngestPhase.CLASSIFY, f"slop classifier failed: {exc}"
+                    ),
+                )
 
             effective_threshold = _effective_slop_threshold(enriched, config)
             # Borderline band only fires for llm_recall — that's the source the

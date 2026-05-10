@@ -22,7 +22,7 @@ import pytest
 from conftest import llm_canned_key
 from slopmortem.budget import Budget
 from slopmortem.config import Config
-from slopmortem.corpus import MergeJournal
+from slopmortem.corpus import MergeJournal, extract_clean
 from slopmortem.ingest import FakeSlopClassifier
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.llm.client import CompletionResult
@@ -180,8 +180,33 @@ _ALPHA_HOMEPAGE = "https://alpha.example.com/"
 _ALPHA_EVIDENCE = "https://news.example.com/alpha-shutdown"
 _BETA_HOMEPAGE = "https://beta.example.com/"
 _BETA_EVIDENCE = "https://news.example.com/beta-launch"
-_ALPHA_EVIDENCE_BODY = "Alpha shutdown its operations in 2024 after losing key clients."
-_BETA_EVIDENCE_BODY = "Beta announced a Series B and is hiring engineers."
+# L3 hygiene (Task 1) gates on ``extract_clean``'s 500-char floor; raw text
+# under that returns ``""`` and L3 rejects. Wrap the lead sentence in
+# ``<main><article>`` and pad with filler so trafilatura's main-content
+# extractor keeps it well above the floor. Mirrors
+# ``tests/stages/test_recall_verify.py::_article_html``.
+_FILLER_SENTENCE = (
+    "The board cited prolonged headwinds, falling renewal rates, and a stalled "
+    "fundraising process as the proximate causes. Customers were notified by "
+    "email and given ninety days to migrate. Vendors and contractors were "
+    "instructed to file claims through the trustee. "
+)
+
+
+def _article_html(lead: str) -> str:
+    return (
+        "<html><body><main><article><p>"
+        + lead
+        + " "
+        + (_FILLER_SENTENCE * 5)
+        + "</p></article></main></body></html>"
+    )
+
+
+_ALPHA_EVIDENCE_BODY = _article_html(
+    "Alpha shutdown its operations in 2024 after losing key clients."
+)
+_BETA_EVIDENCE_BODY = _article_html("Beta announced a Series B and is hiring engineers.")
 
 
 def _recall_payload() -> str:
@@ -450,10 +475,18 @@ class _NoOpWayback:
         return entry
 
 
-# Body the verifier will plant on the persisted entry. _classify_phase passes
-# this through ``_entry_summary_text``, then through facet_extract +
-# summarize. We canned both LLM calls keyed on this exact body.
-_PERSISTED_BODY = _ALPHA_EVIDENCE_BODY
+# Body the verifier will plant on the persisted entry. After Task 3's combine,
+# the verifier wraps the cleaned news body in a ``# Failure citation`` section
+# (and a ``# Vendor description (archived)`` section when Wayback anchored —
+# ``_NoOpWayback`` returns the seed unchanged, so no anchor here). The combined
+# body is what ``_classify_phase`` feeds through facet_extract + summarize.
+_ALPHA_NEWS_BODY = extract_clean(_ALPHA_EVIDENCE_BODY)
+_PERSISTED_BODY = (
+    "# Failure citation\n\n"
+    f"Source: {_ALPHA_EVIDENCE}\n"
+    "Status (LLM-suggested): dead (2024)\n\n"
+    f"{_ALPHA_NEWS_BODY}"
+)
 
 
 def _build_canned(  # noqa: PLR0913 - test fixture: every parameter shapes a canned response key

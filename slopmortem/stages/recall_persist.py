@@ -87,6 +87,8 @@ async def persist_recall_entry(  # noqa: PLR0913 - mirrors the ingest tail's dep
         force=False,
         progress=progress,
         result=result,
+        # L5 deathness is the stricter gate; slop tuned on a different body shape.
+        skip_slop=True,
     )
     if not keepers:
         # Quarantined by slop classifier, duplicate per the journal, or empty body.

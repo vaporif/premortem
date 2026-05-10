@@ -1184,14 +1184,14 @@ ingest: emit RECALL_DEDUPED_EXISTING span when resolver merges an llm_recall row
 
 ### Steps
 
-- [ ] **Step 5.1: Add the new SpanEvent member**
+- [x] **Step 5.1: Add the new SpanEvent member**
 
 ```python
 # slopmortem/tracing/events.py
 RECALL_GAP_SCORE_AFTER = "recall.gap_score_after"
 ```
 
-- [ ] **Step 5.2: Failing test — slop classifier is not invoked for recall entries**
+- [x] **Step 5.2: Failing test — slop classifier is not invoked for recall entries**
 
 ```python
 async def test_recall_entry_bypasses_slop_classifier(...):
@@ -1207,7 +1207,7 @@ async def test_recall_entry_bypasses_slop_classifier(...):
     assert len(fake_corpus.upserted) == 1
 ```
 
-- [ ] **Step 5.3: Failing test — `RECALL_GAP_SCORE_AFTER` emits with post-recall qualifying count**
+- [x] **Step 5.3: Failing test — `RECALL_GAP_SCORE_AFTER` emits with post-recall qualifying count**
 
 ```python
 async def test_post_recall_gap_score_emits_after_rerank(...):
@@ -1222,12 +1222,12 @@ async def test_post_recall_gap_score_emits_after_rerank(...):
     assert after["required"] == str(config.N_synthesize)
 ```
 
-- [ ] **Step 5.4: Run the two tests, confirm they fail**
+- [x] **Step 5.4: Run the two tests, confirm they fail**
 
 Run: `uv run pytest tests/stages/test_recall_persist_gap_closures.py -v`
 Expected: all FAIL.
 
-- [ ] **Step 5.5: Plumb `skip_slop` through `_classify_phase`**
+- [x] **Step 5.5: Plumb `skip_slop` through `_classify_phase`**
 
 ```python
 # slopmortem/ingest/_ingest.py — _classify_phase signature add
@@ -1242,7 +1242,7 @@ else:
 
 `classify_one` and the quarantine path stay intact; the journal idempotency check and the post_mortems disk write are unaffected.
 
-- [ ] **Step 5.6: Wire `skip_slop=True` from `persist_recall_entry`**
+- [x] **Step 5.6: Wire `skip_slop=True` from `persist_recall_entry`**
 
 The snippet below adds the Task 5 flag. Preserve the `deathness_verdict=deathness_verdict` pass-through Task 3 already wired into the `write_phase` call — don't drop it when copying this snippet. No `single_chunk` flag — the standard chunker handles recall bodies (see "Why no single-chunk path" in this task's preamble).
 
@@ -1280,7 +1280,7 @@ await write_phase(
 )
 ```
 
-- [ ] **Step 5.7: Add the post-recall gap measurement in `_run_recall_branch`**
+- [x] **Step 5.7: Add the post-recall gap measurement in `_run_recall_branch`**
 
 ```python
 # slopmortem/pipeline.py — at the tail of _run_recall_branch, after llm_rerank
@@ -1305,27 +1305,27 @@ if Laminar.is_initialized():
 
 The `gap_closed` derived attribute makes the join-on-trace query trivial (one boolean per query, no before/after subtraction needed).
 
-- [ ] **Step 5.8: Re-run Task 0 (retrieval-survival pre-flight) against the now-chunked recall path**
+- [x] **Step 5.8: Re-run Task 0 (retrieval-survival pre-flight) against the now-chunked recall path**
 
 Run: `uv run pytest tests/stages/test_recall_retrieval_survival.py -v`
 Expected: PASS. Task 0 was written against the combined-body construction and is the regression guard for "does a real recall entry still survive retrieve+rerank after the Task 5 changes." If it fails here, the chunker's behavior on the combined body is the issue — debug before continuing.
 
-- [ ] **Step 5.9: Run all gap-closure tests, confirm green**
+- [x] **Step 5.9: Run all gap-closure tests, confirm green**
 
 Run: `uv run pytest tests/stages/test_recall_persist_gap_closures.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5.10: Re-run prior task tests to confirm no regression**
+- [x] **Step 5.10: Re-run prior task tests to confirm no regression**
 
 Run: `uv run pytest tests/stages/ tests/cli/ -v`
 Expected: still PASS. Particularly verify the existing `test_recall_persist.py` (Task 4) still passes with the new `skip_slop` flag defaulting to False on the non-recall ingest path.
 
-- [ ] **Step 5.11: Run typecheck, lint, full test suite**
+- [x] **Step 5.11: Run typecheck, lint, full test suite**
 
 Run: `just typecheck && just lint && just test`
 Expected: all pass.
 
-- [ ] **Step 5.12: Commit**
+- [x] **Step 5.12: Commit**
 
 ```
 recall: skip slop + post-recall gap measurement
