@@ -1092,14 +1092,14 @@ recall: L5 tri-state verdict + L5 reads news body when Wayback anchored
 
 ### Steps
 
-- [ ] **Step 4.1: Add the SpanEvent member**
+- [x] **Step 4.1: Add the SpanEvent member**
 
 ```python
 # slopmortem/tracing/events.py
 RECALL_DEDUPED_EXISTING = "recall.deduped_existing"
 ```
 
-- [ ] **Step 4.2: Write the failing test**
+- [x] **Step 4.2: Write the failing test**
 
 ```python
 async def test_resolver_alias_blocked_emits_recall_deduped_existing(...):
@@ -1116,12 +1116,12 @@ async def test_resolver_alias_blocked_emits_recall_deduped_existing(...):
     assert "recall.deduped_existing" in captured
 ```
 
-- [ ] **Step 4.3: Run the test, confirm it fails**
+- [x] **Step 4.3: Run the test, confirm it fails**
 
 Run: `uv run pytest tests/stages/test_recall_persist_dedup_event.py -v`
 Expected: FAIL — event not currently emitted.
 
-- [ ] **Step 4.4: Wire the emission in `_journal_writes.py`**
+- [x] **Step 4.4: Wire the emission in `_journal_writes.py`**
 
 Add the `SOURCE_LLM_RECALL` import (currently absent from this file):
 
@@ -1142,17 +1142,17 @@ if res.action == "alias_blocked" and entry.source == SOURCE_LLM_RECALL:
 
 Style match: this file already calls `Laminar.event(name=SpanEvent.X.value, attributes={...})` directly (see `_journal_writes.py:178`), no `is_initialized` gate. `resolver_flipped` is intentionally not in the condition — `RESOLVER_FLIP_DETECTED` already covers it via `res.span_events`.
 
-- [ ] **Step 4.5: Run the test, confirm it passes**
+- [x] **Step 4.5: Run the test, confirm it passes**
 
 Run: `uv run pytest tests/stages/test_recall_persist_dedup_event.py -v`
 Expected: PASS.
 
-- [ ] **Step 4.6: Run typecheck, lint, full test suite**
+- [x] **Step 4.6: Run typecheck, lint, full test suite**
 
 Run: `just typecheck && just lint && just test`
 Expected: all pass.
 
-- [ ] **Step 4.7: Commit**
+- [x] **Step 4.7: Commit**
 
 ```
 ingest: emit RECALL_DEDUPED_EXISTING span when resolver merges an llm_recall row
