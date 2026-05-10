@@ -183,35 +183,13 @@ def _patch_http(
     monkeypatch.setattr("slopmortem.stages.recall_verify.safe_get", fake_get)
 
 
-async def test_l2_rejects_404_homepage(monkeypatch: pytest.MonkeyPatch) -> None:
-    sug = _suggestion()
-    _patch_http(
-        monkeypatch,
-        head_responses={str(sug.homepage_url): _FakeResp(status=404)},
-        get_responses={},  # evidence GET should never fire
-    )
-    wb = _FakeWayback()
-    out = await verify_suggestion(
-        sug,
-        wayback=wb,
-        llm=_FakeLLM(default=_DEATHNESS_PASS),
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-    )
-    assert out is None
-    assert wb.calls == []
-
-
 async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """HEAD 404 falls through to GET; GET 404 drops at the L2 GET stage."""
     sug = _suggestion()
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=404),
-        },
-        get_responses={},
+        head_responses={str(sug.evidence_url): _FakeResp(status=404)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=404)},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
@@ -226,13 +204,13 @@ async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     assert wb.calls == []
 
 
-async def test_l2_rejects_ssrf_homepage(monkeypatch: pytest.MonkeyPatch) -> None:
-    """SSRFBlockedError on HEAD short-circuits before any GET."""
+async def test_l2_rejects_ssrf_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SSRFBlockedError on the evidence URL drops at the L2 GET stage."""
     sug = _suggestion()
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.homepage_url): SSRFBlockedError("nope")},
-        get_responses={},
+        head_responses={str(sug.evidence_url): SSRFBlockedError("nope")},
+        get_responses={str(sug.evidence_url): SSRFBlockedError("nope")},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
@@ -246,13 +224,13 @@ async def test_l2_rejects_ssrf_homepage(monkeypatch: pytest.MonkeyPatch) -> None
     assert out is None
 
 
-async def test_l2_rejects_httpx_error_homepage(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A transport error (DNS, connect, timeout) on HEAD drops the suggestion."""
+async def test_l2_rejects_httpx_error_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Transport error (DNS, connect, timeout) on the evidence URL drops at L2 GET."""
     sug = _suggestion()
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.homepage_url): httpx.ConnectError("dns")},
-        get_responses={},
+        head_responses={str(sug.evidence_url): httpx.ConnectError("dns")},
+        get_responses={str(sug.evidence_url): httpx.ConnectError("dns")},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
@@ -553,8 +531,8 @@ async def test_verify_skips_persist_for_dropped_suggestions(
     sug = _suggestion("DroppedCo")
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.homepage_url): _FakeResp(status=404)},
-        get_responses={},
+        head_responses={str(sug.evidence_url): _FakeResp(status=404)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=404)},
     )
     wb = _FakeWayback()
     persisted: list[RawEntry] = []

@@ -553,11 +553,11 @@ recall: L3 hygiene — extract_clean, body-length gate, word-boundary regex, exp
 
 ### Steps
 
-- [ ] **Step 2.1: No new SpanEvent in this task**
+- [x] **Step 2.1: No new SpanEvent in this task**
 
 `RECALL_VERIFIED_EVIDENCE_ONLY_RATE_LIMITED` is *not* added — its trigger condition can't occur in production. `WaybackEnricher.enrich()` (`slopmortem/corpus/sources/wayback.py:163-202`) catches every transient error inside `_safe_get_with_retry` and returns the seed entry unchanged on failure; the outer `try/except` in `verify_suggestion` only fires for fakes that explicitly `raise` (test-only path). Adding a span event for a path that can only fire in tests pollutes production telemetry. Similarly `RECALL_REJECTED_L4_NO_ARCHIVE` is not added — Wayback's absence no longer drops candidates.
 
-- [ ] **Step 2.2: Failing test — dead homepage admits when Wayback anchors**
+- [x] **Step 2.2: Failing test — dead homepage admits when Wayback anchors**
 
 ```python
 # tests/stages/test_recall_verify_l2_l4_bprime.py
@@ -574,7 +574,7 @@ async def test_homepage_head_does_not_gate_when_wayback_anchors(httpx_mock, fake
     assert tier == "wayback_anchored"
 ```
 
-- [ ] **Step 2.3: Failing test — Wayback empty falls through to evidence_only (no drop)**
+- [x] **Step 2.3: Failing test — Wayback empty falls through to evidence_only (no drop)**
 
 ```python
 async def test_wayback_empty_admits_at_evidence_only_tier(httpx_mock, fake_wayback_empty, fake_llm_admits):
@@ -587,7 +587,7 @@ async def test_wayback_empty_admits_at_evidence_only_tier(httpx_mock, fake_wayba
     assert tier == "evidence_only"
 ```
 
-- [ ] **Step 2.4: Failing test — Wayback transient failure does not crash the verifier**
+- [x] **Step 2.4: Failing test — Wayback transient failure does not crash the verifier**
 
 ```python
 async def test_wayback_transient_failure_does_not_drop(httpx_mock, fake_llm_admits):
@@ -607,7 +607,7 @@ async def test_wayback_transient_failure_does_not_drop(httpx_mock, fake_llm_admi
     assert tier == "evidence_only"
 ```
 
-- [ ] **Step 2.5: Failing test — evidence_url HEAD failure falls through to GET; only GET 4xx drops**
+- [x] **Step 2.5: Failing test — evidence_url HEAD failure falls through to GET; only GET 4xx drops**
 
 ```python
 async def test_evidence_head_405_falls_through_to_get(httpx_mock, fake_wayback_anchored, fake_llm_admits):
@@ -630,12 +630,12 @@ async def test_evidence_get_404_drops(httpx_mock, fake_wayback_anchored, llm_cal
 
 (L5 should never run when both HEAD and GET fail; the LLM blocker proves it.)
 
-- [ ] **Step 2.6: Run all four tests, confirm they fail**
+- [x] **Step 2.6: Run all four tests, confirm they fail**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l2_l4_bprime.py -v`
 Expected: FAIL — current verifier drops on `homepage_url` HEAD 404 and on `evidence_url` HEAD 405.
 
-- [ ] **Step 2.7: Refactor `verify_suggestion`**
+- [x] **Step 2.7: Refactor `verify_suggestion`**
 
 Drop the homepage-HEAD branch entirely. Add HEAD→GET fallback on the evidence URL. Call Wayback directly (no outer wrapper). Collapse L4 to body selection.
 
@@ -730,22 +730,22 @@ else:
     _emit_event(SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY)
 ```
 
-- [ ] **Step 2.8: Run all Task 2 tests, confirm green**
+- [x] **Step 2.8: Run all Task 2 tests, confirm green**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l2_l4_bprime.py -v`
 Expected: all PASS.
 
-- [ ] **Step 2.9: Re-run Task 1 tests to confirm no regression**
+- [x] **Step 2.9: Re-run Task 1 tests to confirm no regression**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l3_hygiene.py -v`
 Expected: still PASS.
 
-- [ ] **Step 2.10: Run typecheck, lint, full test suite**
+- [x] **Step 2.10: Run typecheck, lint, full test suite**
 
 Run: `just typecheck && just lint && just test`
 Expected: all pass.
 
-- [ ] **Step 2.11: Commit**
+- [x] **Step 2.11: Commit**
 
 ```
 recall: drop homepage HEAD gate; HEAD→GET fallback on evidence URL; direct Wayback call

@@ -6,14 +6,17 @@ be hallucinated. This module gates each one through:
 
 L1 — Pydantic schema (already enforced at ``RecallSuggestion`` parse time;
      no work here).
-L2 — Liveness HEAD on both URLs. Drops suggestions whose homepage or
-     citation host is dead, returns 4xx/5xx, or trips the SSRF guard.
-L3 — Body GET on the evidence URL. Drops if the body doesn't contain both
-     the company name AND a death/distress keyword (case-insensitive).
-L4 — Wayback corroboration. Best-effort: a snapshot whose body still
-     mentions the name promotes the suggestion to ``wayback_anchored``
-     and replaces the body with the snapshot text (richer marketing copy
-     wins for vector retrieval). Failure here never drops the suggestion.
+L2 — Liveness on the evidence URL only. HEAD->GET fallthrough: HEAD is the
+     cheap first probe, but paywalled/anti-bot citations routinely 401/403/405
+     on HEAD while serving GET. The GET status code is the authoritative gate.
+     The homepage URL is provenance, not corroboration — its liveness isn't
+     load-bearing here.
+L3 — Body extraction on the GET response. Drops if the body doesn't contain
+     both the company name AND a death/distress keyword (case-insensitive).
+L4 — Wayback enrichment, advisory only. A snapshot whose body still mentions
+     the name promotes the suggestion to ``wayback_anchored`` and replaces
+     the body with the snapshot text (richer marketing copy wins for vector
+     retrieval). Failure or empty result never drops the suggestion.
 L5 — Deathness judgment. L1-L4 only prove a URL exists, serves content,
      and mentions the name + a death-ish word. They don't tell apart "real
      dead company" from "real live company that had layoffs once". Haiku
@@ -298,38 +301,18 @@ async def _l5_admits(  # noqa: PLR0913 - mirrors the deathness knob set passed t
     return True
 
 
-async def _fetch_l3_body(*, name: str, evidence: str) -> str | None:
-    """GET the evidence URL and return an extracted body, or ``None`` to drop.
+async def _l3_body_or_drop(*, name: str, evidence: str, body_text: str) -> str | None:
+    """Extract clean text, gate on the 500-char floor and the name+keyword anchors.
 
-    Folds the three L3 failure modes (transport, HTTP status, body too short
-    or anchor missing) into one helper. Each rejection path emits its own
-    span event so the audit dashboard keeps the granularity. Pulled out of
-    ``verify_suggestion`` to stay under the cyclomatic-complexity cap.
+    Pulled out so ``verify_suggestion`` stays under the cyclomatic-complexity
+    cap once the HEAD->GET fallthrough lives inline.
     """
-    # ``safe_get`` does NOT consult robots.txt (unlike Wayback's ``_fetch``).
-    # Recall surfaces vendors whose own sites are robots-blocked or vanished;
-    # the evidence URL is a third-party citation, so vendor robots policy
-    # doesn't apply.
-    try:
-        evidence_resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
-    except (SSRFBlockedError, httpx.HTTPError) as exc:
-        logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
-        # GET-level failure on the evidence URL is functionally an L2 outcome:
-        # the URL didn't deliver a body. Fold into RECALL_REJECTED_L2 with
-        # ``stage="get"`` so the audit dashboard can still split HEAD-probe
-        # failures from GET-body transport failures.
-        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
-        return None
-    if evidence_resp.status_code >= _HTTP_BAD_REQUEST:
-        logger.info("recall_verify: L3 GET %s for %s", evidence_resp.status_code, evidence)
-        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
-        return None
     # ``extract_clean`` strips HTML, runs trafilatura/readability, and returns
     # ``""`` below its 500-char floor. Treating empty as a hard reject means
     # paywalls, JS shells, and any page where main-article extraction failed
     # get dropped — no fallback to raw HTML, which would reintroduce the
     # sidebar-bleed and nav-link false positives the strip prevents.
-    evidence_body = extract_clean(evidence_resp.text)
+    evidence_body = extract_clean(body_text)
     if len(evidence_body) < _L3_MIN_BODY_CHARS:
         logger.info(
             "recall_verify: L3 body too short (%d chars) for %s", len(evidence_body), evidence
@@ -355,25 +338,57 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + three knobs from 
     """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops."""
     homepage = suggestion.homepage_url
     evidence = suggestion.evidence_url
-    # L2: HEAD both URLs. Each emission carries ``stage="head"`` so the audit
-    # dashboard can split HEAD-probe rejections from GET-stage transport
-    # failures (which use ``stage="get"`` below).
-    for url in (homepage, evidence):
-        try:
-            head_resp = await safe_head(url, timeout=_FETCH_TIMEOUT_S)
-        except (SSRFBlockedError, httpx.HTTPError) as exc:
-            logger.info("recall_verify: L2 HEAD failed for %s: %r", url, exc)
-            _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "head"})
-            return None
+    # L2: gate the evidence URL only. The homepage is provenance, not
+    # corroboration — its liveness isn't load-bearing. HEAD->GET fallthrough
+    # because many real news sites (paywalls, CDNs, anti-bot) return 401/403/405
+    # on HEAD even when GET works. Try HEAD first because it's cheap; on any
+    # failure shape, fall through to the L3 GET that would have run anyway and
+    # let its status code be the gate.
+    head_failed = False
+    try:
+        head_resp = await safe_head(evidence, timeout=_FETCH_TIMEOUT_S)
+    except (SSRFBlockedError, httpx.HTTPError) as exc:
+        logger.info(
+            "recall_verify: L2 HEAD failed for %s, falling through to GET: %r", evidence, exc
+        )
+        head_failed = True
+    else:
         if head_resp.status_code >= _HTTP_BAD_REQUEST:
-            logger.info("recall_verify: L2 HEAD %s for %s", head_resp.status_code, url)
-            _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "head"})
-            return None
-    evidence_body = await _fetch_l3_body(name=suggestion.name, evidence=evidence)
+            logger.info(
+                "recall_verify: L2 HEAD %s for %s, falling through to GET",
+                head_resp.status_code,
+                evidence,
+            )
+            head_failed = True
+    # L3: GET the evidence body. Authoritative gate once HEAD is non-load-bearing.
+    # ``safe_get`` does NOT consult robots.txt (unlike Wayback's ``_fetch``).
+    # The evidence URL is a third-party citation, so vendor robots policy doesn't apply.
+    try:
+        evidence_resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
+    except (SSRFBlockedError, httpx.HTTPError) as exc:
+        logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
+        _emit_event(
+            SpanEvent.RECALL_REJECTED_L2,
+            attributes={"stage": "get", "head_failed": str(head_failed)},
+        )
+        return None
+    if evidence_resp.status_code >= _HTTP_BAD_REQUEST:
+        logger.info("recall_verify: L3 GET %s for %s", evidence_resp.status_code, evidence)
+        _emit_event(
+            SpanEvent.RECALL_REJECTED_L2,
+            attributes={"stage": "get", "head_failed": str(head_failed)},
+        )
+        return None
+    evidence_body = await _l3_body_or_drop(
+        name=suggestion.name, evidence=evidence, body_text=evidence_resp.text
+    )
     if evidence_body is None:
         return None
-    # L4: optional Wayback corroboration.
-    tier: VerificationTier = "evidence_only"
+    # L4: Wayback enrichment, advisory only. Direct call — WaybackEnricher.enrich
+    # already retries 3x internally with exponential backoff and swallows transient
+    # errors by returning the entry unchanged (wayback.py:62-99, 163-202). The
+    # outer try/except is a refactor guard for fakes that raise; in production
+    # this branch is dead.
     body = evidence_body
     # markdown_text=None AND raw_html=None matter — WaybackEnricher.enrich
     # short-circuits if either body is already populated.
@@ -387,15 +402,18 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + three knobs from 
     )
     try:
         enriched = await wayback.enrich(seed)
-    except Exception as exc:  # noqa: BLE001 - L3 already passed; L4 is best-effort.
-        logger.info("recall_verify: wayback corroboration failed: %r", exc)
+    except (httpx.HTTPError, RuntimeError) as exc:
+        # Real WaybackEnricher catches these internally. Logged so a future
+        # Wayback change that starts surfacing exceptions doesn't go unnoticed.
+        logger.info("recall_verify: wayback raised (unexpected — enricher should swallow): %r", exc)
         enriched = seed
-    if enriched.markdown_text and suggestion.name.lower() in enriched.markdown_text.lower():
-        tier = "wayback_anchored"
-        # Wayback marketing copy beats the article body for vector search.
-        body = enriched.markdown_text
+    snapshot_body = enriched.markdown_text
+    if snapshot_body and suggestion.name.lower() in snapshot_body.lower():
+        tier: VerificationTier = "wayback_anchored"
+        body = snapshot_body
         _emit_event(SpanEvent.RECALL_VERIFIED_WAYBACK_ANCHORED)
     else:
+        tier = "evidence_only"
         _emit_event(SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY)
     # L5: does the body actually prove the company died? Run on the same
     # body L4 picked (Wayback marketing copy if anchored, else the evidence
