@@ -1358,7 +1358,7 @@ recall: skip slop + post-recall gap measurement
 
 ### Steps
 
-- [ ] **Step 6.1: Failing test — synthesis prose for a struggling candidate is forward-looking**
+- [x] **Step 6.1: Failing test — synthesis prose for a struggling candidate is forward-looking**
 
 ```python
 # tests/stages/test_synthesize.py
@@ -1387,7 +1387,7 @@ async def test_synthesize_struggling_candidate_uses_distress_framing(...):
     assert syn.deathness_verdict == "struggling"
 ```
 
-- [ ] **Step 6.2: Plumb `deathness_verdict` through `synthesize_prompt_kwargs`**
+- [x] **Step 6.2: Plumb `deathness_verdict` through `synthesize_prompt_kwargs`**
 
 ```python
 # slopmortem/stages/synthesize.py
@@ -1415,7 +1415,7 @@ def synthesize_prompt_kwargs(candidate: Candidate, *, pitch: str) -> dict[str, A
     }
 ```
 
-- [ ] **Step 6.3: Update `synthesize.j2`**
+- [x] **Step 6.3: Update `synthesize.j2`**
 
 Add to the system block (after the existing `llm_recall` rule, before the SECURITY clause):
 
@@ -1438,7 +1438,7 @@ Add to the Trusted facts block in the user message:
 - deathness_status: {{ deathness_status }}
 ```
 
-- [ ] **Step 6.4: Thread the verdict into `Synthesis`**
+- [x] **Step 6.4: Thread the verdict into `Synthesis`**
 
 ```python
 # slopmortem/models.py — extend Synthesis
@@ -1474,11 +1474,11 @@ return Synthesis.from_llm(
 )
 ```
 
-- [ ] **Step 6.5: Wire the renderer**
+- [x] **Step 6.5: Wire the renderer**
 
 Locate the per-synthesis section header in `slopmortem/render.py`. When `synthesis.deathness_verdict == "struggling"`, the heading reads e.g. `## {name} — currently struggling` rather than the default failure-case framing. Keep the change scoped to the heading + any "failed in YYYY" inline label that would otherwise read wrong on a struggling vendor. Do not restructure the section — synthesis prose carries the rest.
 
-- [ ] **Step 6.6: Run Task 6 tests, expect failures pending cassette**
+- [x] **Step 6.6: Run Task 6 tests, expect failures pending cassette**
 
 Run: `uv run pytest tests/stages/test_synthesize.py tests/test_render.py -v`
 Expected: the synthesis-stage stub-LLM tests PASS; any cassette-backed eval that exercises `synthesize` FAILS with `NoCannedResponseError` because the prompt SHA changed (Step 6.7 fixes).
@@ -1494,12 +1494,12 @@ Cost ceiling: $2 (`justfile:32-37` `--max-cost-usd 2.0`). Confirm the user has a
 
 If `eval-record` overruns the ceiling and aborts mid-record, partial cassettes are committed. Re-run; the cassette layer is replay-or-record, not transactional. A scoped re-record flag remains out of scope (see "What's out of scope").
 
-- [ ] **Step 6.8: Run typecheck, lint, full test suite**
+- [x] **Step 6.8: Run typecheck, lint, full test suite**
 
 Run: `just typecheck && just lint && just test && just eval`
 Expected: all pass. The eval pass at the tail confirms the re-recorded cassettes deserialize cleanly and produce the same eval-pass shape as before.
 
-- [ ] **Step 6.9: Commit**
+- [x] **Step 6.9: Commit**
 
 ```
 synthesize: verdict-aware prompt + Synthesis.deathness_verdict + render

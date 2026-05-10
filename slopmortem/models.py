@@ -148,6 +148,11 @@ class Synthesis(BaseModel):
     # candidates without re-reading the qdrant payload. None on syntheses
     # written before the field existed.
     source: str | None = None
+    # Mirrors ``CandidatePayload.deathness_verdict`` so the renderer can pick
+    # forward-looking framing for ``"struggling"`` admits. None on syntheses
+    # written before the verdict existed (legacy crunchbase/web rows are
+    # already-curated post-mortems and render with the default dead framing).
+    deathness_verdict: Literal["dead", "struggling"] | None = None
 
     @classmethod
     def from_llm(  # noqa: PLR0913 - one kwarg per typed-payload field threaded past the LLM
@@ -159,6 +164,7 @@ class Synthesis(BaseModel):
         sources: list[str],
         injection_detected: bool = False,
         source: str | None = None,
+        deathness_verdict: Literal["dead", "struggling"] | None = None,
     ) -> Synthesis:
         lifespan = _months_between(founding_date, failure_date)
         return cls(
@@ -175,6 +181,7 @@ class Synthesis(BaseModel):
             sources=sources,
             injection_detected=injection_detected,
             source=source,
+            deathness_verdict=deathness_verdict,
         )
 
 

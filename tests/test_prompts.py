@@ -44,6 +44,7 @@ def test_synthesize_renders_inlined_body():
         candidate_name="A",
         candidate_body="<full markdown>",
         source="llm_recall",
+        deathness_status="dead",
         founding_date=None,
         failure_date=None,
         sub_sector=None,
@@ -59,6 +60,7 @@ def test_synthesize_renders_inlined_body():
     assert "Trusted facts" in out
     assert "customer_type: smb" in out
     assert "source: llm_recall" in out
+    assert "deathness_status: dead" in out
     schema = Synthesis.model_json_schema()
     assert "where_diverged" in schema["properties"]
 

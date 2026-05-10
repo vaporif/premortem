@@ -266,6 +266,51 @@ def test_render_omits_recall_tag_when_source_missing() -> None:
     assert "Source: LLM recall" not in out
 
 
+def _synthesis_struggling() -> Synthesis:
+    """Synthesis whose source candidate carries L5 ``deathness_verdict="struggling"``.
+
+    Mirrors ``_synthesis_clean`` (curated obit) so the test only varies the
+    verdict; the renderer's struggling branch is what's under test.
+    """
+    return Synthesis(
+        candidate_id="impaired-co",
+        name="ImpairedCo",
+        one_liner="SMB invoicing vendor mid-restructuring.",
+        failure_date=date(2025, 11, 1),
+        lifespan_months=84,
+        similarity=_scores(6.0),
+        why_similar="Same SMB invoicing motion as the pitch.",
+        where_diverged="Pitch is greenfield; ImpairedCo is mid-pivot.",
+        failure_causes=["active layoffs", "missed Q3 revenue"],
+        lessons_for_input=["watch burn early", "avoid SMB-heavy ARR mix"],
+        sources=["https://news.example/impairedco-layoffs"],
+        deathness_verdict="struggling",
+    )
+
+
+def test_render_struggling_uses_distress_heading() -> None:
+    """Struggling vendors get a forward-looking heading + "Distress observed:" label.
+
+    The default "## Name" + "Failure date:" framing reads as a post-mortem;
+    a still-operating but impaired vendor must not be presented as dead.
+    """
+    out = _render_candidate(_synthesis_struggling())
+    assert "## ImpairedCo — currently struggling" in out
+    assert "Distress observed: 2025-11-01" in out
+    # Lifespan is omitted for struggling vendors — open-ended runway is not
+    # a number worth printing alongside layoff signals.
+    assert "Lifespan:" not in out
+
+
+def test_render_dead_keeps_default_failure_heading() -> None:
+    """Default ``deathness_verdict=None`` (or ``"dead"``) keeps the post-mortem framing."""
+    out = _render_candidate(_synthesis_clean())
+    assert "## Acme" in out
+    assert "currently struggling" not in out
+    assert "Failure date: 2023-01-01" in out
+    assert "Lifespan: 60 months" in out
+
+
 def test_render_is_pure_no_io() -> None:
     """``render`` must not touch the filesystem.
 

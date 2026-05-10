@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from typing import Literal
 
 from conftest import llm_canned_key
 from slopmortem.config import Config
@@ -30,6 +31,7 @@ def _payload(
     body: str = "Acme was a B2B fintech that ran out of runway.",
     sources: list[str] | None = None,
     source: str | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> CandidatePayload:
     return CandidatePayload(
         name=name,
@@ -45,21 +47,29 @@ def _payload(
         sources=sources if sources is not None else ["https://acme.com/postmortem"],
         text_id="abcdef0123456789",
         source=source,
+        deathness_verdict=deathness_verdict,
     )
 
 
-def _candidate(
+def _candidate(  # noqa: PLR0913 — test fixture: every kwarg shapes a candidate field
     *,
     canonical_id: str = "acme-corp",
     name: str = "Acme",
     body: str = "Acme was a B2B fintech that ran out of runway.",
     sources: list[str] | None = None,
     source: str | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> Candidate:
     return Candidate(
         canonical_id=canonical_id,
         score=0.9,
-        payload=_payload(name=name, body=body, sources=sources, source=source),
+        payload=_payload(
+            name=name,
+            body=body,
+            sources=sources,
+            source=source,
+            deathness_verdict=deathness_verdict,
+        ),
     )
 
 
@@ -191,6 +201,87 @@ def test_synthesize_prompt_kwargs_source_unknown_when_payload_missing() -> None:
     cand = _candidate(source=None)
     kwargs = synthesize_prompt_kwargs(cand, pitch="x")
     assert kwargs["source"] == "unknown"
+
+
+def test_synthesize_prompt_kwargs_defaults_deathness_status_to_dead() -> None:
+    """``payload.deathness_verdict=None`` defaults to ``"dead"`` in the prompt context.
+
+    Pre-Task-3 crunchbase/web rows have no verdict and were already-curated
+    post-mortems, so the prompt's post-mortem framing is the right default.
+    """
+    cand = _candidate(deathness_verdict=None)
+    kwargs = synthesize_prompt_kwargs(cand, pitch="x")
+    assert kwargs["deathness_status"] == "dead"
+
+
+def test_synthesize_prompt_kwargs_passes_struggling_verdict() -> None:
+    """L5 ``"struggling"`` admits surface in the prompt context as-is."""
+    cand = _candidate(deathness_verdict="struggling")
+    kwargs = synthesize_prompt_kwargs(cand, pitch="x")
+    assert kwargs["deathness_status"] == "struggling"
+
+
+async def test_synthesize_struggling_candidate_uses_distress_framing() -> None:
+    """A candidate with ``deathness_verdict="struggling"`` round-trips into ``Synthesis``.
+
+    Contract: the rendered prompt carries ``deathness_status: struggling`` and
+    the prompt's struggling-framing rule, and the resulting ``Synthesis``
+    preserves the verdict so the renderer can pick the forward-looking heading.
+    """
+    cand = _candidate(deathness_verdict="struggling")
+    fake_llm = FakeLLMClient(
+        canned=_synthesize_canned(
+            [cand], _ctx(), text=_synthesis_payload(candidate_id=cand.canonical_id)
+        ),
+        default_model=_DEFAULT_MODEL,
+    )
+
+    s = await synthesize(cand, _ctx(), fake_llm, Config(), model=_DEFAULT_MODEL)
+
+    assert s.deathness_verdict == "struggling"
+    rendered_prompt = fake_llm.calls[0].prompt
+    assert "deathness_status: struggling" in rendered_prompt
+    # The struggling-framing rule must reach the system block so the LLM can
+    # condition on it; "currently operating but visibly impaired" is the
+    # rule's load-bearing phrase.
+    assert "still operating but visibly impaired" in rendered_prompt
+
+
+async def test_synthesize_dead_candidate_carries_dead_verdict() -> None:
+    """``deathness_verdict="dead"`` round-trips and the prompt reflects "dead"."""
+    cand = _candidate(deathness_verdict="dead")
+    fake_llm = FakeLLMClient(
+        canned=_synthesize_canned(
+            [cand], _ctx(), text=_synthesis_payload(candidate_id=cand.canonical_id)
+        ),
+        default_model=_DEFAULT_MODEL,
+    )
+
+    s = await synthesize(cand, _ctx(), fake_llm, Config(), model=_DEFAULT_MODEL)
+
+    assert s.deathness_verdict == "dead"
+    assert "deathness_status: dead" in fake_llm.calls[0].prompt
+
+
+async def test_synthesize_legacy_candidate_defaults_verdict_in_prompt() -> None:
+    """Legacy crunchbase/web rows (verdict=None) render as ``deathness_status: dead``.
+
+    The ``Synthesis`` itself keeps ``deathness_verdict=None`` so the renderer
+    can distinguish an explicit "dead" admit from a legacy untyped row if it
+    ever needs to.
+    """
+    cand = _candidate(deathness_verdict=None)
+    fake_llm = FakeLLMClient(
+        canned=_synthesize_canned(
+            [cand], _ctx(), text=_synthesis_payload(candidate_id=cand.canonical_id)
+        ),
+        default_model=_DEFAULT_MODEL,
+    )
+
+    s = await synthesize(cand, _ctx(), fake_llm, Config(), model=_DEFAULT_MODEL)
+
+    assert s.deathness_verdict is None
+    assert "deathness_status: dead" in fake_llm.calls[0].prompt
 
 
 async def test_synthesize_threads_source_into_synthesis() -> None:

@@ -51,6 +51,10 @@ def synthesize_prompt_kwargs(candidate: Candidate, *, pitch: str) -> dict[str, A
         # fallback), so coerce here to keep legacy qdrant rows from emitting
         # ``None`` into the prompt.
         "source": payload.source or "unknown",
+        # Default to "dead" when None: pre-Task-3 crunchbase/web rows were
+        # already-curated post-mortems, and the prompt's post-mortem framing
+        # is correct for them. Only L5 admits ever set "struggling".
+        "deathness_status": payload.deathness_verdict or "dead",
         "founding_date": payload.founding_date.isoformat() if payload.founding_date else None,
         "failure_date": payload.failure_date.isoformat() if payload.failure_date else None,
         "sub_sector": facets.sub_sector,
@@ -127,6 +131,7 @@ async def synthesize(  # noqa: PLR0913 — every dependency is required at the c
         sources=candidate.payload.sources,
         injection_detected=injection_detected,
         source=candidate.payload.source,
+        deathness_verdict=candidate.payload.deathness_verdict,
     )
 
 
