@@ -19,13 +19,23 @@ if TYPE_CHECKING:
     from slopmortem.config import Config
     from slopmortem.corpus import Corpus
     from slopmortem.llm import EmbeddingClient, LLMClient
+    from slopmortem.stages import SparseEncoder
 
 
 def build_deps(
     config: Config,
-) -> tuple[LLMClient, EmbeddingClient, Corpus, Budget]:
-    """Build production deps for the query pipeline: LLM, embedder, corpus, budget."""
+) -> tuple[LLMClient, EmbeddingClient, Corpus, Budget, SparseEncoder]:
+    """Build production deps for the query pipeline: LLM, embedder, corpus, budget, sparse encoder.
+
+    The sparse encoder is the same callable both ``retrieve`` and
+    ``recall_persist`` need; threading it through ``build_deps`` keeps a
+    single owner so the recall branch can't fire without one wired up.
+    The fastembed model itself loads lazily on first call (see
+    ``slopmortem.corpus._embed_sparse``), so this stays cheap at startup.
+    """
     from qdrant_client import AsyncQdrantClient  # noqa: PLC0415 - heavy dep, lazy import
+
+    from slopmortem.corpus._embed_sparse import encode as sparse_encoder  # noqa: PLC0415
 
     budget = Budget(cap_usd=config.max_cost_usd_per_query)
 
@@ -51,4 +61,4 @@ def build_deps(
         recall_score_factor=config.recall_score_factor,
     )
 
-    return llm, embedder, corpus, budget
+    return llm, embedder, corpus, budget, sparse_encoder

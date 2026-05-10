@@ -71,8 +71,8 @@ def _fixture_report() -> Report:
     )
 
 
-def _build_fake_deps(_config: Config) -> tuple[object, object, object, Budget]:
-    return object(), object(), object(), Budget(cap_usd=0.0)
+def _build_fake_deps(_config: Config) -> tuple[object, object, object, Budget, object]:
+    return object(), object(), object(), Budget(cap_usd=0.0), object()
 
 
 def _noop_set_corpus(_corpus: object) -> None:

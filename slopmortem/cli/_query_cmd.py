@@ -147,7 +147,7 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
     # ``Config.model_validate({**config.model_dump(), **overrides})``.
     config = config.model_copy(update={"force_llm_recall": force_llm_recall})
     _maybe_init_tracing(config)
-    llm, embedder, corpus, budget = build_deps(config)
+    llm, embedder, corpus, budget, sparse_encoder = build_deps(config)
     set_query_corpus(corpus)
     ctx = InputContext(name=name or "(unnamed)", description=description, years_filter=years)
     if debug_retrieve:
@@ -169,6 +169,7 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
                 config=config,
                 budget=budget,
                 progress=bar,
+                sparse_encoder=sparse_encoder,
                 recall_deps=recall_deps,
             )
     except KeyboardInterrupt:

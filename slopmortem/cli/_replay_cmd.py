@@ -51,7 +51,7 @@ async def _replay(dataset: str) -> None:
 
     config = load_config()
     _maybe_init_tracing(config)
-    llm, embedder, corpus, budget = build_deps(config)
+    llm, embedder, corpus, budget, sparse_encoder = build_deps(config)
     set_query_corpus(corpus)
 
     progress_ctx: contextlib.AbstractContextManager[RichQueryProgress | None] = (
@@ -75,6 +75,7 @@ async def _replay(dataset: str) -> None:
                 config=config,
                 budget=budget,
                 progress=bar,
+                sparse_encoder=sparse_encoder,
             )
             if bar is not None:
                 _render_query_footer(bar.console, report)

@@ -266,7 +266,7 @@ async def _run_live(rows: list[InputContext], row_ids: list[str]) -> dict[str, d
     from slopmortem.deps import build_deps  # noqa: PLC0415
 
     cfg = load_config()
-    llm, embedder, corpus, budget = build_deps(cfg)
+    llm, embedder, corpus, budget, sparse_encoder = build_deps(cfg)
     set_query_corpus(corpus)
 
     results: dict[str, dict[str, object]] = {}
@@ -278,6 +278,7 @@ async def _run_live(rows: list[InputContext], row_ids: list[str]) -> dict[str, d
             corpus=corpus,
             config=cfg,
             budget=budget,
+            sparse_encoder=sparse_encoder,
         )
         bodies_map: dict[str, str | None] = {}
         for s in report.candidates:
