@@ -107,7 +107,7 @@ Project conventions that bite if missed:
 
 ### Steps
 
-- [ ] **Step 0.1: Capture the fixtures**
+- [x] **Step 0.1: Capture the fixtures**
 
 Pick one representative pitch + one vendor pair. The vendor must:
 - Have a real Wayback snapshot of its homepage (verify via `https://archive.org/wayback/available?url=<homepage>`).
@@ -116,7 +116,7 @@ Pick one representative pitch + one vendor pair. The vendor must:
 
 Save the fetched bodies under `tests/fixtures/recall/` so the test runs offline (no `requires_qdrant`, no live HTTP).
 
-- [ ] **Step 0.2: Write the survival test**
+- [x] **Step 0.2: Write the survival test**
 
 ```python
 # tests/stages/test_recall_retrieval_survival.py
@@ -239,7 +239,7 @@ async def test_recall_entry_lands_in_top_k_after_persist(tmp_path):
     )
 ```
 
-- [ ] **Step 0.3: Run the test**
+- [x] **Step 0.3: Run the test**
 
 Run: `uv run pytest tests/stages/test_recall_retrieval_survival.py -v --runslow`
 Expected: PASS. The pitch+vendor pair is cherry-picked to be a known-good case; if this fails on a known-good case, the construction is broken.
@@ -255,7 +255,7 @@ If the test FAILS:
 If the test PASSES:
 - The body construction's dense+sparse signal is sound. Proceed to Task 1. End-to-end rerank+synthesis behavior will be validated by `just eval` after Task 6.
 
-- [ ] **Step 0.4: Commit**
+- [x] **Step 0.4: Commit**
 
 ```
 recall: pre-flight retrieval-survival test (gates verifier hardening)

@@ -1,0 +1,29 @@
+{
+  "_comment": [
+    "Known-good vendor for the Task 0 retrieval-survival pre-flight.",
+    "Pebble Technology Corp shipped Kickstarter-funded e-paper smartwatches",
+    "from 2013 until December 2016, when the company filed for insolvency",
+    "and sold its software/IP to Fitbit. The pitch fixture mirrors a hardware",
+    "wearable Kickstarter play, so a healthy retrieval pipeline must surface",
+    "this vendor when its body is persisted into an empty corpus.",
+    "",
+    "Wayback snapshot: https://web.archive.org/web/20151001000000/https://getpebble.com/",
+    "  (captured pre-shutdown homepage describing the smartwatch product line)",
+    "Evidence URL:     https://en.wikipedia.org/wiki/Pebble_(watch)",
+    "  (Wikipedia article documenting the December 2016 insolvency filing,",
+    "   Fitbit asset sale, and post-shutdown Rebble community continuation)",
+    "",
+    "Companion fixtures captured on 2026-05-10 from the URLs above:",
+    "  survival_wayback_body.txt  - extract_clean output of the Wayback homepage (~1.2KB)",
+    "  survival_news_body.html    - trimmed Wikipedia article HTML (lead + closure section)",
+    "To re-derive: fetch the Wayback URL above, run it through",
+    "slopmortem.corpus.extract_clean, and overwrite survival_wayback_body.txt.",
+    "The Wayback wrapper chrome drifts between captures, so the raw HTML is",
+    "not pinned in-repo — the URL is the durable artifact."
+  ],
+  "name": "Pebble",
+  "homepage_url": "https://www.getpebble.com/",
+  "evidence_url": "https://en.wikipedia.org/wiki/Pebble_(watch)",
+  "status": "dead",
+  "failure_year": 2016
+}
