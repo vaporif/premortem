@@ -37,6 +37,13 @@ rrf_k = 60
 # and leaves recall-only result sets in their original order.
 recall_score_factor = 0.9
 
+# L5 deathness gate confidence floors. The "dead" floor governs terminal
+# verdicts (shutdown, bankruptcy, fire-sale acquisitions). The "struggling"
+# floor is stricter because Haiku is less calibrated on the fuzzier distress
+# verdict than on the cleaner terminal one.
+recall_deathness_min_confidence = 0.7
+recall_struggling_min_confidence = 0.85
+
 # Slop classifier threshold during ingest. Above this, docs go to
 # post_mortems/quarantine/ instead of canonical/. Higher = more permissive.
 slop_threshold = 0.7

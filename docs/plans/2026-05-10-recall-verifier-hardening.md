@@ -788,7 +788,7 @@ recall: drop homepage HEAD gate; HEAD→GET fallback on evidence URL; direct Way
 
 ### Steps
 
-- [ ] **Step 3.1: Add `recall_struggling_min_confidence` to config**
+- [x] **Step 3.1: Add `recall_struggling_min_confidence` to config**
 
 ```python
 # slopmortem/config.py — in the appropriate Config section
@@ -800,7 +800,7 @@ recall_struggling_min_confidence: float = Field(default=0.85, ge=0.0, le=1.0)
 struggling_min_confidence = 0.85  # higher than dead's threshold; struggling is fuzzier
 ```
 
-- [ ] **Step 3.2: Update `_DeathnessJudgment` to tri-state**
+- [x] **Step 3.2: Update `_DeathnessJudgment` to tri-state**
 
 ```python
 # slopmortem/stages/recall_verify.py
@@ -813,7 +813,7 @@ class _DeathnessJudgment(BaseModel):
     evidence_quote: str
 ```
 
-- [ ] **Step 3.3: Update the prompt template for tri-state output**
+- [x] **Step 3.3: Update the prompt template for tri-state output**
 
 ```jinja
 {# slopmortem/llm/prompts/recall_deathness.j2 — system block #}
@@ -852,7 +852,7 @@ Disambiguation examples:
 
 (User block stays unchanged in shape — pitch + name + status + body.)
 
-- [ ] **Step 3.4: Rename `_l5_admits` → `_l5_decide` returning the verdict**
+- [x] **Step 3.4: Rename `_l5_admits` → `_l5_decide` returning the verdict**
 
 The existing `_l5_admits` returns `bool`, which discards the verdict and prevents downstream synthesis from telling `dead` from `struggling`. Rename to `_l5_decide` and return `Literal["dead","struggling"] | None` (`None` = drop). The verdict propagates through `verify_suggestion`'s return tuple and lands in `CandidatePayload.deathness_verdict`. Synthesis can then weight terminal vs distress citations differently — the whole point of the tri-state.
 
@@ -893,7 +893,7 @@ async def _l5_decide(
 
 Add the new SpanEvent member: `RECALL_REJECTED_L5_ALIVE = "recall.rejected_l5_alive"`. **Remove** `RECALL_REJECTED_L5_NOT_DEAD` (`tracing/events.py:45`) — the tri-state replacement makes it unreachable. Grep-confirm no other emitter references it before deleting.
 
-- [ ] **Step 3.5: Add the body-combiner helper and rewrite the body-selection block**
+- [x] **Step 3.5: Add the body-combiner helper and rewrite the body-selection block**
 
 Add a small helper (module-private to `recall_verify.py`) that joins the news article and the Wayback snapshot under section markers. The news article is the citation L5 verifies against and is therefore always present; Wayback contributes a "Vendor description (archived)" prefix only when it anchored.
 
@@ -962,7 +962,7 @@ final = seed.model_copy(update={"markdown_text": combined})
 return final, tier, verdict
 ```
 
-- [ ] **Step 3.6: Thread `struggling_min_confidence` AND `deathness_verdict` through the call chain**
+- [x] **Step 3.6: Thread `struggling_min_confidence` AND `deathness_verdict` through the call chain**
 
 Two parallel pipes. `struggling_min_confidence` flows downward (config → gate); `deathness_verdict` flows upward (gate → payload). Mirror the existing `verification_tier` thread end-to-end so synthesis sees both axes (anchored-vs-evidence-only AND dead-vs-struggling) per recall entry.
 
@@ -986,7 +986,7 @@ Upward pipe (`deathness_verdict`):
 
 Note: `_AdmitVerdict` is module-private to `recall_verify.py`. To avoid leaking it across import boundaries, declare the field on `CandidatePayload` and the carrier kwargs as the bare `Literal["dead","struggling"] | None` on each layer. The Literal is structurally identical and keeps the leaf module's alias private.
 
-- [ ] **Step 3.7: Write tests for tri-state thresholds**
+- [x] **Step 3.7: Write tests for tri-state thresholds**
 
 ```python
 # tests/stages/test_recall_verify_l5_tristate.py
@@ -1001,7 +1001,7 @@ async def test_l5_tristate_thresholds(verdict, confidence, expect_admit, ...):
     ...
 ```
 
-- [ ] **Step 3.8: Write the test that L5 reads news only and persisted body combines both**
+- [x] **Step 3.8: Write the test that L5 reads news only and persisted body combines both**
 
 ```python
 async def test_l5_news_body_and_persisted_combined_when_anchored(...):
@@ -1059,19 +1059,19 @@ async def test_persisted_body_omits_wayback_section_when_not_anchored(...):
     assert "# Failure citation" in entry.markdown_text
 ```
 
-- [ ] **Step 3.9: Run all Task 3 tests, expect failures pending cassette**
+- [x] **Step 3.9: Run all Task 3 tests, expect failures pending cassette**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l5_tristate.py -v`
 Expected: tri-state threshold tests PASS (they use stub LLM); the news-body test PASSES; any cassette-backed test FAILS with `NoCannedResponseError` because the prompt SHA changed.
 
-- [ ] **Step 3.10: Run typecheck, lint, full non-eval test suite**
+- [x] **Step 3.10: Run typecheck, lint, full non-eval test suite**
 
 Run: `just typecheck && just lint && just test`
 Expected: all pass except cassette-backed eval tests, which will raise `NoCannedResponseError` until Task 6's unified re-record. The non-eval suite (`just test`, which excludes `requires_qdrant` + `slow` markers and offline-cassette evals) should be green.
 
 If `just test` happens to include cassette-backed eval scopes that trip on the prompt-SHA change, mark them with `pytest.skip(reason="cassette pending Task 6 re-record")` for the duration of Tasks 3-5, and remove the skip markers in Task 6 after re-recording.
 
-- [ ] **Step 3.11: Commit**
+- [x] **Step 3.11: Commit**
 
 ```
 recall: L5 tri-state verdict + L5 reads news body when Wayback anchored

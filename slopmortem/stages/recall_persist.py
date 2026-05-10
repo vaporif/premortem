@@ -15,7 +15,8 @@ bypasses the journal.
 
 ``verification_tier`` rides through ``write_phase`` → ``_process_entry`` →
 ``_build_payload`` → ``CandidatePayload.verification_tier`` and lands in the
-qdrant payload via ``model_dump``. No side-channel payload merge.
+qdrant payload via ``model_dump``. ``deathness_verdict`` rides the same
+chain alongside it. No side-channel payload merge.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from slopmortem.ingest import classify_phase, facet_summarize_fanout, write_phas
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Literal
 
     from slopmortem.config import Config
     from slopmortem.corpus import MergeJournal
@@ -47,6 +49,7 @@ async def persist_recall_entry(  # noqa: PLR0913 - mirrors the ingest tail's dep
     entry: RawEntry,
     tier: VerificationTier,
     *,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
     journal: MergeJournal,
     corpus: Corpus,
     embed_client: EmbeddingClient,
@@ -103,4 +106,5 @@ async def persist_recall_entry(  # noqa: PLR0913 - mirrors the ingest tail's dep
         progress=progress,
         result=result,
         verification_tier=tier,
+        deathness_verdict=deathness_verdict,
     )

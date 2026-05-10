@@ -40,10 +40,11 @@ class SpanEvent(StrEnum):
     RECALL_VERIFIED_WAYBACK_ANCHORED = "recall.verified_wayback"
     RECALL_VERIFIED_EVIDENCE_ONLY = "recall.verified_evidence"
     RECALL_PERSISTED = "recall.persisted"
-    # L5 deathness gate (Haiku judges whether the verified body actually
-    # establishes the company died): NOT_DEAD on died=false, LOW_CONFIDENCE
-    # on died=true below threshold OR on transport/parse failure.
-    RECALL_REJECTED_L5_NOT_DEAD = "recall.rejected_l5_not_dead"
+    # L5 deathness gate (Haiku judges whether the verified body establishes
+    # death, distress, or neither): ALIVE on verdict=alive, LOW_CONFIDENCE
+    # on dead/struggling below the matching threshold OR on transport/parse
+    # failure.
+    RECALL_REJECTED_L5_ALIVE = "recall.rejected_l5_alive"
     RECALL_REJECTED_L5_LOW_CONFIDENCE = "recall.rejected_l5_low_confidence"
     # Carries ``slop_score`` and ``effective_threshold`` attributes. Fires only
     # for llm_recall entries scoring within 0.4 ≤ score < threshold so future

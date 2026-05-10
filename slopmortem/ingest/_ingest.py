@@ -293,6 +293,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
     progress: IngestProgress,
     result: IngestResult,
     verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> None:
     """Per-entry: resolve → journal → disk → qdrant → mark_complete.
 
@@ -330,6 +331,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 span_events=result.span_events,
                 sparse_encoder=sparse_encoder,
                 verification_tier=verification_tier,
+                deathness_verdict=deathness_verdict,
             )
         except Exception as exc:  # noqa: BLE001 - per-entry isolation; run continues.
             _record_entry_failure(

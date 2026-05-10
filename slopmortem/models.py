@@ -215,6 +215,12 @@ class CandidatePayload(BaseModel):
     # Carries the verifier's L4 outcome ("wayback_anchored" beats "evidence_only"
     # because a corroborated snapshot is harder to fabricate than a single citation).
     verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None
+    # None for non-recall sources; the L5 verifier sets it on admit. ``"dead"``
+    # is a terminal verdict (shutdown, bankruptcy, fire-sale acquisition);
+    # ``"struggling"`` is ongoing distress (layoffs, restructuring) without
+    # ceased operations. Synthesis weights the two differently — terminal
+    # citations are stronger evidence than distress signals.
+    deathness_verdict: Literal["dead", "struggling"] | None = None
     # Raw ``RawEntry.source`` ("crunchbase_csv", "llm_recall", …). Kept alongside
     # ``provenance`` (curated/scraped/synthesized 3-way) because synthesize and
     # render branch on the finer split — only ``llm_recall`` gets the recall tag.

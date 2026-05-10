@@ -20,10 +20,14 @@ L4 — Wayback enrichment, advisory only. A snapshot whose body still mentions
 L5 — Deathness judgment. L1-L4 only prove a URL exists, serves content,
      and mentions the name + a death-ish word. They don't tell apart "real
      dead company" from "real live company that had layoffs once". Haiku
-     reads the verified body and answers ``died`` + ``confidence``. We
-     drop on died=false, on confidence below threshold, and on any LLM
-     transport/parse failure (conservative — false admits are worse than
-     false drops in the recall fallback).
+     reads the news article body (always — Wayback marketing copy never
+     says "we died") and returns a tri-state ``verdict`` plus
+     ``confidence``. We drop on verdict="alive", on confidence below the
+     verdict-specific threshold, and on any LLM transport/parse failure
+     (conservative — false admits are worse than false drops in the recall
+     fallback). The admitted verdict ("dead" or "struggling") rides through
+     the persistence chain to ``CandidatePayload.deathness_verdict`` so
+     synthesis can weight terminal vs distress citations differently.
 
 The verified ``RawEntry`` rides a ``VerificationTier`` sibling argument to
 the persistence helper (Task 5). ``RawEntry`` itself is unchanged across
@@ -188,16 +192,23 @@ def _log_and_emit_l3_rejection(
 
 
 class _DeathnessJudgment(BaseModel):
-    """L5 verdict: did the verified evidence body actually establish death.
+    """L5 verdict: did the evidence body establish death, distress, or neither.
 
     ``evidence_quote`` rides along for audit trails — it's not consumed by
     the gate, just preserved for diagnostics if a downstream operator wants
     to inspect why a suggestion was admitted or rejected.
     """
 
-    died: bool
+    verdict: Literal["dead", "struggling", "alive"]
     confidence: float = Field(ge=0.0, le=1.0)
     evidence_quote: str
+
+
+# Module-private alias: the bare ``Literal`` is what threads through the
+# persist chain (CandidatePayload, _build_payload, _process_entry, _write_phase,
+# persist_recall_entry, the persist callback) so the leaf alias doesn't leak
+# across import boundaries.
+type _AdmitVerdict = Literal["dead", "struggling"]
 
 
 # Mirrors ``stages._classify_phase``'s 8000-char cap on the slop-classifier
@@ -257,7 +268,7 @@ async def _l5_deathness_judgment(
         return None
 
 
-async def _l5_admits(  # noqa: PLR0913 - mirrors the deathness knob set passed through from config
+async def _l5_decide(  # noqa: PLR0913 - mirrors the deathness knob set passed through from config
     *,
     suggestion: RecallSuggestion,
     body: str,
@@ -265,11 +276,13 @@ async def _l5_admits(  # noqa: PLR0913 - mirrors the deathness knob set passed t
     model: str,
     max_tokens: int,
     min_confidence: float,
-) -> bool:
-    """L5 verdict: ``True`` admits the suggestion, ``False`` drops it.
+    struggling_min_confidence: float,
+) -> _AdmitVerdict | None:
+    """L5 verdict: returns the admitted verdict, or ``None`` to drop.
 
-    Logging + span events live here so ``verify_suggestion`` keeps a single
-    L5 branch and stays under the cyclomatic-complexity cap.
+    ``"alive"`` and any below-threshold or transport/parse failure all map
+    to ``None``. Logging + span events live here so ``verify_suggestion``
+    keeps a single L5 branch and stays under the cyclomatic-complexity cap.
     """
     judgment = await _l5_deathness_judgment(
         suggestion=suggestion,
@@ -280,25 +293,55 @@ async def _l5_admits(  # noqa: PLR0913 - mirrors the deathness knob set passed t
     )
     if judgment is None:
         _emit_event(SpanEvent.RECALL_REJECTED_L5_LOW_CONFIDENCE)
-        return False
-    if not judgment.died:
+        return None
+    if judgment.verdict == "alive":
         logger.info(
-            "recall_verify: L5 ruled %r not dead (confidence=%.2f)",
+            "recall_verify: L5 ruled %r alive (confidence=%.2f)",
             suggestion.name,
             judgment.confidence,
         )
-        _emit_event(SpanEvent.RECALL_REJECTED_L5_NOT_DEAD)
-        return False
-    if judgment.confidence < min_confidence:
+        _emit_event(SpanEvent.RECALL_REJECTED_L5_ALIVE)
+        return None
+    threshold = min_confidence if judgment.verdict == "dead" else struggling_min_confidence
+    if judgment.confidence < threshold:
         logger.info(
-            "recall_verify: L5 confidence %.2f below threshold %.2f for %r",
+            "recall_verify: L5 %s confidence %.2f below threshold %.2f for %r",
+            judgment.verdict,
             judgment.confidence,
-            min_confidence,
+            threshold,
             suggestion.name,
         )
         _emit_event(SpanEvent.RECALL_REJECTED_L5_LOW_CONFIDENCE)
-        return False
-    return True
+        return None
+    return judgment.verdict
+
+
+def _combine_recall_body(
+    *,
+    wayback_body: str | None,
+    evidence_url: str,
+    news_body: str,
+    suggestion: RecallSuggestion,
+) -> str:
+    """Compose the persisted body from the news article and the Wayback snapshot.
+
+    The news article is the citation L5 verifies against and is therefore
+    always present; Wayback contributes a "Vendor description (archived)"
+    section only when it anchored. Section markers preserve semantic
+    boundaries for the chunker so news content and snapshot content don't
+    blur into a single chunk.
+
+    The status/year line is labeled "LLM-suggested" because it comes from
+    the Sonnet recall payload, not the news body — downstream synthesis
+    should treat it as a hint, not a fact.
+    """
+    parts: list[str] = []
+    if wayback_body:
+        parts.append(f"# Vendor description (archived)\n\n{wayback_body}")
+    status_line = f"Status (LLM-suggested): {suggestion.status} ({suggestion.failure_year})"
+    citation = f"# Failure citation\n\nSource: {evidence_url}\n{status_line}\n\n{news_body}"
+    parts.append(citation)
+    return "\n\n---\n\n".join(parts)
 
 
 async def _l3_body_or_drop(*, name: str, evidence: str, body_text: str) -> str | None:
@@ -326,7 +369,7 @@ async def _l3_body_or_drop(*, name: str, evidence: str, body_text: str) -> str |
     return evidence_body
 
 
-async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + three knobs from config
+async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from config
     suggestion: RecallSuggestion,
     *,
     wayback: Enricher,
@@ -334,7 +377,8 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + three knobs from 
     model_recall_deathness: str,
     max_tokens_recall_deathness: int,
     min_confidence: float,
-) -> tuple[RawEntry, VerificationTier] | None:
+    struggling_min_confidence: float,
+) -> tuple[RawEntry, VerificationTier, _AdmitVerdict] | None:
     """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops."""
     homepage = suggestion.homepage_url
     evidence = suggestion.evidence_url
@@ -389,7 +433,6 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + three knobs from 
     # errors by returning the entry unchanged (wayback.py:62-99, 163-202). The
     # outer try/except is a refactor guard for fakes that raise; in production
     # this branch is dead.
-    body = evidence_body
     # markdown_text=None AND raw_html=None matter — WaybackEnricher.enrich
     # short-circuits if either body is already populated.
     seed = RawEntry(
@@ -408,30 +451,39 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + three knobs from 
         logger.info("recall_verify: wayback raised (unexpected — enricher should swallow): %r", exc)
         enriched = seed
     snapshot_body = enriched.markdown_text
-    if snapshot_body and suggestion.name.lower() in snapshot_body.lower():
+    wayback_anchored = bool(snapshot_body and suggestion.name.lower() in snapshot_body.lower())
+    if wayback_anchored:
         tier: VerificationTier = "wayback_anchored"
-        body = snapshot_body
         _emit_event(SpanEvent.RECALL_VERIFIED_WAYBACK_ANCHORED)
     else:
         tier = "evidence_only"
         _emit_event(SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY)
-    # L5: does the body actually prove the company died? Run on the same
-    # body L4 picked (Wayback marketing copy if anchored, else the evidence
-    # article). Conservative on failure — false admits cost more than drops.
-    if not await _l5_admits(
+    # L5 reads the news article only — Wayback marketing copy never says
+    # "we died", so it's the wrong substrate for the deathness judgment.
+    # Conservative on failure: false admits cost more than drops.
+    verdict = await _l5_decide(
         suggestion=suggestion,
-        body=body,
+        body=evidence_body,
         llm=llm,
         model=model_recall_deathness,
         max_tokens=max_tokens_recall_deathness,
         min_confidence=min_confidence,
-    ):
+        struggling_min_confidence=struggling_min_confidence,
+    )
+    if verdict is None:
         return None
-    # Body lands on markdown_text. _entry_summary_text already prefers
-    # markdown_text over raw_html; leaving raw_html=None avoids a second
-    # extract pass downstream.
-    final = seed.model_copy(update={"markdown_text": body})
-    return final, tier
+    # Persisted body: news article (always) + Wayback snapshot (when anchored).
+    # Synthesizer reads both the value-prop and the death narrative from the
+    # same Qdrant entry; verifier and synthesizer agree on which document
+    # represents this vendor.
+    combined = _combine_recall_body(
+        wayback_body=enriched.markdown_text if wayback_anchored else None,
+        evidence_url=str(evidence),
+        news_body=evidence_body,
+        suggestion=suggestion,
+    )
+    final = seed.model_copy(update={"markdown_text": combined})
+    return final, tier, verdict
 
 
 # Decorator lives at the fan-out level so the trace gets one
@@ -448,11 +500,12 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
     suggestions: list[RecallSuggestion],
     *,
     wayback: Enricher,
-    persist: Callable[[RawEntry, VerificationTier], Awaitable[None]],
+    persist: Callable[[RawEntry, VerificationTier, Literal["dead", "struggling"]], Awaitable[None]],
     llm: LLMClient,
     model_recall_deathness: str,
     max_tokens_recall_deathness: int,
     min_confidence: float,
+    struggling_min_confidence: float,
     concurrency: int = _DEFAULT_CONCURRENCY,
 ) -> list[RawEntry]:
     """Verify each suggestion under a capacity limiter; persist accepted entries.
@@ -473,11 +526,12 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
                 model_recall_deathness=model_recall_deathness,
                 max_tokens_recall_deathness=max_tokens_recall_deathness,
                 min_confidence=min_confidence,
+                struggling_min_confidence=struggling_min_confidence,
             )
         if verified is None:
             return None
-        entry, tier = verified
-        await persist(entry, tier)
+        entry, tier, verdict = verified
+        await persist(entry, tier, verdict)
         return entry
 
     results = await gather_resilient(*(_one(s) for s in suggestions))

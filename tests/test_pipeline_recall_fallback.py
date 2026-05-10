@@ -75,7 +75,7 @@ _EMBED_MODEL = "text-embedding-3-small"
 # semantics — they care that recall fires, persists, and surfaces meta flags.
 # Confidence sits well above the default 0.7 threshold so verified suggestions
 # pass the gate and reach the persist tail.
-_RECALL_DEATHNESS_PASS = '{"died": true, "confidence": 0.95, "evidence_quote": "shutdown"}'  # noqa: S105 - JSON literal, not a credential
+_RECALL_DEATHNESS_PASS = '{"verdict": "dead", "confidence": 0.95, "evidence_quote": "shutdown"}'  # noqa: S105 - JSON literal, not a credential
 
 
 # ---------------------------------------------------------------------------

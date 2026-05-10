@@ -166,6 +166,7 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
     entry_source: str,
     synthesized: bool = False,
     verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> CandidatePayload:
     founding_year = facets.founding_year
     failure_year = facets.failure_year
@@ -190,5 +191,6 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
         provenance_id=provenance_id,
         text_id=text_id,
         verification_tier=verification_tier,
+        deathness_verdict=deathness_verdict,
         source=entry_source,
     )

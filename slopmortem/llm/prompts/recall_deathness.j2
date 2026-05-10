@@ -1,10 +1,35 @@
 {% block system -%}
-You judge whether a company is actually defunct based on a verified evidence document. Return a single JSON object with three fields:
-- died: true if the document clearly establishes the company shut down, was acquired in distress (acqui-hire, fire-sale, distressed M&A), wound down operations, or went bankrupt. false if the company is still operating, had only a partial setback (one round of layoffs while still selling), or the document is ambiguous.
-- confidence: 0.0 to 1.0. How sure you are.
-- evidence_quote: a short verbatim quote from the document supporting your judgment, or empty string if you can't pull one.
+You are judging whether an evidence body establishes that a vendor company
+has DIED, is STRUGGLING (still operating but visibly impaired), or is ALIVE
+(continuing operations without material distress).
 
-Set died=false if the document is about an acquisition that the company survived as a going concern. Set died=true if the acquisition was distressed or the brand was wound down post-deal.
+Output JSON matching the schema. Use:
+- "dead" only when the body explicitly states the company shut down,
+  liquidated, dissolved, filed Chapter 7, or otherwise ceased to exist as
+  an operating entity. Acquisitions count as "dead" ONLY when the body
+  describes a fire-sale, distress sale, asset-only purchase after
+  insolvency, or acquisition price materially below total funding raised.
+- "struggling" when the body describes layoffs, restructuring, missed
+  payroll, downsizing, or other ongoing distress — but the company has
+  not ceased operations.
+- "alive" when the body does not establish either of the above. Healthy
+  M&A (strategic acquisition at or above funding raised, talent acqui-hire
+  with no distress signal, portfolio expansion) is "alive" — the company
+  ceased as an independent entity but did not fail. The slopmortem
+  population is failure cases; healthy exits are out of scope.
+
+Confidence is your estimate that the verdict is correct given the body.
+Lower for ambiguous wording, higher for explicit statements with dates.
+evidence_quote is a verbatim short span from the body that supports the
+verdict.
+
+Disambiguation examples:
+- "Acme acquired by Cisco for $400M to expand security portfolio"
+  (Acme had raised $80M total) → "alive" (healthy strategic acquisition).
+- "Acme's assets sold for $500K to a competitor after Chapter 7 filing"
+  → "dead" (fire-sale after insolvency).
+- "Acme cut 40% of staff and is restructuring around a smaller core
+  product" → "struggling" (distress, still operating).
 
 Return JSON only, no prose outside it.
 {%- endblock %}
@@ -17,5 +42,5 @@ Claimed failure year: {{ failure_year }}
 {{ body }}
 </untrusted_document>
 
-Did this company actually die? Return JSON.
+Judge the company's state. Return JSON.
 {%- endblock %}

@@ -78,11 +78,19 @@ class Config(BaseSettings):
 
     # L5 deathness gate: a verified URL with the right keywords still doesn't
     # prove the company actually died (could be a layoff article about a still-
-    # running firm). Haiku reads the body and answers died/confidence; we drop
-    # below ``recall_deathness_min_confidence`` or on died=false.
+    # running firm). Haiku reads the body and returns verdict ∈ {dead,
+    # struggling, alive} + confidence; we drop on alive, on confidence below
+    # the verdict-specific floor, and on transport/parse failure. ``dead``
+    # uses ``recall_deathness_min_confidence``; ``struggling`` uses the
+    # stricter ``recall_struggling_min_confidence`` (below).
     model_recall_deathness: str = "anthropic/claude-haiku-4.5"
     max_tokens_recall_deathness: int = Field(default=128, ge=1)
     recall_deathness_min_confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+    # Stricter than ``recall_deathness_min_confidence`` because Haiku is less
+    # calibrated on the fuzzier "struggling" verdict than on the cleaner
+    # "dead" one — distress signals (layoffs, restructuring) are routinely
+    # ambiguous in news prose, so the gate raises the bar before admitting.
+    recall_struggling_min_confidence: float = Field(default=0.85, ge=0.0, le=1.0)
 
     # Per-stage output caps. OpenRouter holds upfront credit for the model's
     # max output, so leaving these unset reserves the full 64K Anthropic

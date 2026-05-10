@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
 from dateutil.relativedelta import relativedelta
 from lmnr import Laminar, observe
@@ -193,7 +193,11 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
     # use a hybrid fake.
     ingest_corpus = cast("IngestCorpus", corpus)
 
-    async def _persist(entry: RawEntry, tier: VerificationTier) -> None:
+    async def _persist(
+        entry: RawEntry,
+        tier: VerificationTier,
+        verdict: Literal["dead", "struggling"],
+    ) -> None:
         # Per-call progress/result: ``classify_phase`` mutates both for the
         # one entry being persisted; nothing else reads them. Fresh pair per
         # call avoids cross-talk if recall fires multiple suggestions in
@@ -201,6 +205,7 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         await persist_recall_entry(
             entry,
             tier,
+            deathness_verdict=verdict,
             journal=recall_deps.journal,
             corpus=ingest_corpus,
             embed_client=embedding_client,
@@ -215,7 +220,7 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         if Laminar.is_initialized():
             Laminar.event(
                 name=str(SpanEvent.RECALL_PERSISTED),
-                attributes={"tier": tier},
+                attributes={"tier": tier, "deathness_verdict": verdict},
             )
 
     verified = await verify_and_persist_all(
@@ -226,6 +231,7 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         model_recall_deathness=config.model_recall_deathness,
         max_tokens_recall_deathness=config.max_tokens_recall_deathness,
         min_confidence=config.recall_deathness_min_confidence,
+        struggling_min_confidence=config.recall_struggling_min_confidence,
     )
     persisted_count = len(verified)
     if not verified:

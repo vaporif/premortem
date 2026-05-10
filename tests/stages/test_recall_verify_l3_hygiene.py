@@ -21,10 +21,11 @@ if TYPE_CHECKING:
     import pytest
 
 
-_DEATHNESS_PASS = '{"died": true, "confidence": 0.95, "evidence_quote": "shuttered"}'  # noqa: S105 - JSON literal, not a credential
+_DEATHNESS_PASS = '{"verdict": "dead", "confidence": 0.95, "evidence_quote": "shuttered"}'  # noqa: S105 - JSON literal, not a credential
 _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
+_STRUGGLING_MIN_CONFIDENCE = 0.85
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "recall"
 PAYWALL_HTML = (_FIXTURES / "paywall_stub.html").read_text()
@@ -147,6 +148,7 @@ async def test_l3_drops_when_body_under_500_chars(monkeypatch: pytest.MonkeyPatc
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -169,6 +171,7 @@ async def test_l3_rejects_when_name_only_in_sidebar(monkeypatch: pytest.MonkeyPa
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -197,6 +200,7 @@ async def test_l3_does_not_match_substring_inside_word(monkeypatch: pytest.Monke
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -226,6 +230,7 @@ async def test_l3_admits_shuttered_keyword(monkeypatch: pytest.MonkeyPatch) -> N
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
     assert len(llm.calls) == 1
@@ -256,5 +261,6 @@ async def test_l3_admits_chapter_eleven(monkeypatch: pytest.MonkeyPatch) -> None
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None

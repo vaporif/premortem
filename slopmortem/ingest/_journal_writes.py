@@ -78,6 +78,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
     span_events: list[str],
     sparse_encoder: SparseEncoder,
     verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> ProcessOutcome:
     """Resolve, write, and journal one entry.
 
@@ -201,6 +202,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         entry_source=entry.source,
         synthesized=entry.synthesized,
         verification_tier=verification_tier,
+        deathness_verdict=deathness_verdict,
     )
     chunks_written = await _embed_and_upsert(
         canonical_id=canonical_id,

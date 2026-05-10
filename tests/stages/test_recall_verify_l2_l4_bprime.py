@@ -22,10 +22,11 @@ if TYPE_CHECKING:
     import pytest
 
 
-_DEATHNESS_PASS = '{"died": true, "confidence": 0.95, "evidence_quote": "shut down"}'  # noqa: S105 - JSON literal, not a credential
+_DEATHNESS_PASS = '{"verdict": "dead", "confidence": 0.95, "evidence_quote": "shut down"}'  # noqa: S105 - JSON literal, not a credential
 _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
+_STRUGGLING_MIN_CONFIDENCE = 0.85
 
 _FILLER = (
     "The board cited prolonged headwinds, falling renewal rates, and a stalled "
@@ -191,11 +192,15 @@ async def test_homepage_head_does_not_gate_when_wayback_anchors(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, tier = out
+    entry, tier, _verdict = out
     assert tier == "wayback_anchored"
-    assert entry.markdown_text == wayback_body
+    assert entry.markdown_text is not None
+    # Combined body carries the Wayback marketing copy under its section
+    # marker; the news article rides alongside under the failure citation.
+    assert wayback_body in entry.markdown_text
 
 
 async def test_wayback_empty_admits_at_evidence_only_tier(
@@ -216,9 +221,10 @@ async def test_wayback_empty_admits_at_evidence_only_tier(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    _, tier = out
+    _, tier, _verdict = out
     assert tier == "evidence_only"
 
 
@@ -246,9 +252,10 @@ async def test_wayback_transient_failure_does_not_drop(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    _, tier = out
+    _, tier, _verdict = out
     assert tier == "evidence_only"
 
 
@@ -274,6 +281,7 @@ async def test_evidence_head_405_falls_through_to_get(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
 
@@ -293,5 +301,6 @@ async def test_evidence_get_404_drops(monkeypatch: pytest.MonkeyPatch) -> None:
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None

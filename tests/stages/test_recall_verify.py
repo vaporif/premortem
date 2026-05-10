@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 
@@ -25,10 +25,11 @@ if TYPE_CHECKING:
     import pytest
 
 
-_DEATHNESS_PASS = '{"died": true, "confidence": 0.95, "evidence_quote": "shut down"}'  # noqa: S105 - JSON literal, not a credential
+_DEATHNESS_PASS = '{"verdict": "dead", "confidence": 0.95, "evidence_quote": "shut down"}'  # noqa: S105 - JSON literal, not a credential
 _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
+_STRUGGLING_MIN_CONFIDENCE = 0.85
 # Pad sentence used to push trafilatura output past the 500-char ``LENGTH_FLOOR``
 # without changing the load-bearing keyword tokens each test exercises.
 _FILLER_SENTENCE = (
@@ -199,6 +200,7 @@ async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
     assert wb.calls == []
@@ -220,6 +222,7 @@ async def test_l2_rejects_ssrf_evidence(monkeypatch: pytest.MonkeyPatch) -> None
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -240,6 +243,7 @@ async def test_l2_rejects_httpx_error_evidence(monkeypatch: pytest.MonkeyPatch) 
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -267,6 +271,7 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
     assert wb.calls == []
@@ -295,6 +300,7 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -318,6 +324,7 @@ async def test_l3_rejects_evidence_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -344,11 +351,18 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, tier = out
+    entry, tier, verdict = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == extract_clean(html)
+    assert verdict == "dead"
+    assert entry.markdown_text is not None
+    # Persisted body is the combined-section format: failure citation only
+    # (no Wayback section) because the snapshot didn't anchor.
+    assert "# Vendor description (archived)" not in entry.markdown_text
+    assert "# Failure citation" in entry.markdown_text
+    assert extract_clean(html) in entry.markdown_text
     assert entry.source == "llm_recall"
 
 
@@ -377,12 +391,19 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, tier = out
+    entry, tier, verdict = out
     assert tier == "wayback_anchored"
-    # Wayback body wins: it carries marketing copy that vector search prefers.
-    assert entry.markdown_text == wayback_body
+    assert verdict == "dead"
+    # Combined body carries both the Wayback marketing copy (so vector
+    # retrieval gets the value-prop) and the news article (so synthesis
+    # reads the death narrative).
+    assert entry.markdown_text is not None
+    assert "# Vendor description (archived)" in entry.markdown_text
+    assert wayback_body in entry.markdown_text
+    assert "# Failure citation" in entry.markdown_text
 
 
 async def test_l4_wayback_absent_keeps_evidence_only_tier(
@@ -406,11 +427,15 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, tier = out
+    entry, tier, verdict = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == extract_clean(evidence_html)
+    assert verdict == "dead"
+    assert entry.markdown_text is not None
+    assert extract_clean(evidence_html) in entry.markdown_text
+    assert "# Vendor description (archived)" not in entry.markdown_text
 
 
 async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
@@ -436,11 +461,17 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, tier = out
+    entry, tier, verdict = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == extract_clean(evidence_html)
+    assert verdict == "dead"
+    assert entry.markdown_text is not None
+    assert extract_clean(evidence_html) in entry.markdown_text
+    assert "# Vendor description (archived)" not in entry.markdown_text
+    # Squatter copy must not leak in — Wayback didn't anchor.
+    assert "Buy this domain" not in entry.markdown_text
 
 
 async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -462,11 +493,14 @@ async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) 
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, tier = out
+    entry, tier, verdict = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == extract_clean(evidence_html)
+    assert verdict == "dead"
+    assert entry.markdown_text is not None
+    assert extract_clean(evidence_html) in entry.markdown_text
 
 
 async def test_verify_all_via_gather_resilient_isolates_failures(
@@ -496,12 +530,18 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         get_responses=get_responses,
     )
     wb = _FakeWayback(enriched_text=None)
-    persisted: list[tuple[RawEntry, VerificationTier]] = []
+    persisted: list[tuple[RawEntry, VerificationTier, Literal["dead", "struggling"]]] = []
 
-    async def persist(entry: RawEntry, tier: VerificationTier) -> None:
-        persisted.append((entry, tier))
+    async def persist(
+        entry: RawEntry,
+        tier: VerificationTier,
+        verdict: Literal["dead", "struggling"],
+    ) -> None:
+        persisted.append((entry, tier, verdict))
 
-    typed_persist: Callable[[RawEntry, VerificationTier], Awaitable[None]] = persist
+    typed_persist: Callable[
+        [RawEntry, VerificationTier, Literal["dead", "struggling"]], Awaitable[None]
+    ] = persist
     out = await verify_and_persist_all(
         sugs,
         wayback=wb,
@@ -510,10 +550,11 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
-    assert {e.source_id for e in out} == {e.source_id for e in [persisted[0][0], persisted[1][0]]}
+    assert {e.source_id for e in out} == {p[0].source_id for p in persisted}
     assert len(out) == 2
-    names_in_bodies = {(entry.markdown_text or "").lower() for entry, _ in persisted}
+    names_in_bodies = {(entry.markdown_text or "").lower() for entry, _, _ in persisted}
     assert any("alphaco" in body for body in names_in_bodies)
     assert any("gammaco" in body for body in names_in_bodies)
 
@@ -537,7 +578,11 @@ async def test_verify_skips_persist_for_dropped_suggestions(
     wb = _FakeWayback()
     persisted: list[RawEntry] = []
 
-    async def persist(entry: RawEntry, _tier: VerificationTier) -> None:
+    async def persist(
+        entry: RawEntry,
+        _tier: VerificationTier,
+        _verdict: Literal["dead", "struggling"],
+    ) -> None:
         persisted.append(entry)
 
     out = await verify_and_persist_all(
@@ -548,6 +593,7 @@ async def test_verify_skips_persist_for_dropped_suggestions(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out == []
     assert persisted == []
@@ -573,9 +619,10 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, _tier = out
+    entry, _tier, _verdict = out
     assert entry.source == "llm_recall"
     assert entry.url == str(sug.homepage_url)
     assert isinstance(entry.fetched_at, datetime)
@@ -624,6 +671,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     second = await verify_suggestion(
         same_vendor_other_citation,
@@ -632,6 +680,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     third = await verify_suggestion(
         diff_vendor,
@@ -640,6 +689,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert first is not None
     assert second is not None
@@ -664,8 +714,8 @@ def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *,
     )
 
 
-async def test_l5_drops_when_not_dead(monkeypatch: pytest.MonkeyPatch) -> None:
-    """L5 deathness=false rejects the suggestion even though L1-L4 passed.
+async def test_l5_drops_when_alive(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L5 verdict="alive" rejects the suggestion even though L1-L4 passed.
 
     The body would otherwise survive L3 (name + "shutdown" both present),
     but Haiku's reading of the full passage says the company is alive.
@@ -675,7 +725,7 @@ async def test_l5_drops_when_not_dead(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_l1_l4_pass(monkeypatch, sug, body=body)
     wb = _FakeWayback()
     llm = _FakeLLM(
-        responses=['{"died": false, "confidence": 0.95, "evidence_quote": "raised series C"}'],
+        responses=['{"verdict": "alive", "confidence": 0.95, "evidence_quote": "raised series C"}'],
     )
     out = await verify_suggestion(
         sug,
@@ -684,6 +734,7 @@ async def test_l5_drops_when_not_dead(monkeypatch: pytest.MonkeyPatch) -> None:
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
     assert len(llm.calls) == 1
@@ -692,13 +743,13 @@ async def test_l5_drops_when_not_dead(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``died=true`` but confidence below threshold → drop (avoid noisy admits)."""
+    """``verdict=dead`` but confidence below threshold → drop (avoid noisy admits)."""
     sug = _suggestion()
     body = "Hexagate shutdown rumored, sources unconfirmed."
     _patch_l1_l4_pass(monkeypatch, sug, body=body)
     wb = _FakeWayback()
     llm = _FakeLLM(
-        responses=['{"died": true, "confidence": 0.5, "evidence_quote": "rumored"}'],
+        responses=['{"verdict": "dead", "confidence": 0.5, "evidence_quote": "rumored"}'],
     )
     out = await verify_suggestion(
         sug,
@@ -707,19 +758,20 @@ async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> 
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
 
 async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``died=true`` with confidence ≥ threshold returns the entry+tier tuple."""
+    """``verdict=dead`` with confidence ≥ threshold returns the entry+tier+verdict tuple."""
     sug = _suggestion()
     lead = "Hexagate shutdown its operations in 2024 after losing key clients."
     _patch_l1_l4_pass(monkeypatch, sug, body=lead)
     wb = _FakeWayback(enriched_text=None)
     llm = _FakeLLM(
         responses=[
-            '{"died": true, "confidence": 0.85, "evidence_quote": "shutdown its operations"}',
+            '{"verdict": "dead", "confidence": 0.85, "evidence_quote": "shutdown its operations"}',
         ],
     )
     out = await verify_suggestion(
@@ -729,11 +781,14 @@ async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> 
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
-    entry, tier = out
+    entry, tier, verdict = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == extract_clean(_article_html(lead))
+    assert verdict == "dead"
+    assert entry.markdown_text is not None
+    assert extract_clean(_article_html(lead)) in entry.markdown_text
 
 
 async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -750,6 +805,7 @@ async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> Non
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
 
@@ -768,5 +824,6 @@ async def test_l5_drops_on_transport_failure(monkeypatch: pytest.MonkeyPatch) ->
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is None
