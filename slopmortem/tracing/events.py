@@ -36,6 +36,7 @@ class SpanEvent(StrEnum):
     RECALL_REJECTED_L2 = "recall.rejected_l2"
     RECALL_REJECTED_L3_NAME_MISSING = "recall.rejected_l3_name"
     RECALL_REJECTED_L3_KEYWORD_MISSING = "recall.rejected_l3_kw"
+    RECALL_REJECTED_L3_BODY_TOO_SHORT = "recall.rejected_l3_body_too_short"
     RECALL_VERIFIED_WAYBACK_ANCHORED = "recall.verified_wayback"
     RECALL_VERIFIED_EVIDENCE_ONLY = "recall.verified_evidence"
     RECALL_PERSISTED = "recall.persisted"

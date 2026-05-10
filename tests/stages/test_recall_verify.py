@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from slopmortem.corpus import extract_clean
 from slopmortem.http import SSRFBlockedError
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
@@ -28,6 +29,29 @@ _DEATHNESS_PASS = '{"died": true, "confidence": 0.95, "evidence_quote": "shut do
 _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
+# Pad sentence used to push trafilatura output past the 500-char ``LENGTH_FLOOR``
+# without changing the load-bearing keyword tokens each test exercises.
+_FILLER_SENTENCE = (
+    "The board cited prolonged headwinds, falling renewal rates, and a stalled "
+    "fundraising process as the proximate causes. Customers were notified by "
+    "email and given ninety days to migrate. Vendors and contractors were "
+    "instructed to file claims through the trustee. "
+)
+
+
+def _article_html(lead: str) -> str:
+    """Build a ``<main><article>`` body that trafilatura keeps as main content.
+
+    ``lead`` is the sentence(s) carrying the test's keyword surface; the
+    filler runs five times so the extracted body stays well above 500 chars.
+    """
+    return (
+        "<html><body><main><article><p>"
+        + lead
+        + " "
+        + (_FILLER_SENTENCE * 5)
+        + "</p></article></main></body></html>"
+    )
 
 
 @dataclass
@@ -253,7 +277,7 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
         get_responses={
             str(sug.evidence_url): _FakeResp(
                 status=200,
-                text="A small startup quietly shutdown last week, no other details.",
+                text=_article_html("A small startup quietly shutdown last week."),
             ),
         },
     )
@@ -281,7 +305,7 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
         get_responses={
             str(sug.evidence_url): _FakeResp(
                 status=200,
-                text="Hexagate just announced a Series B and is hiring engineers.",
+                text=_article_html("Hexagate just announced a Series B and is hiring engineers."),
             ),
         },
     )
@@ -324,14 +348,14 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sug = _suggestion()
-    body = "HEXAGATE shutdown its operations in late 2024 after losing key clients."
+    html = _article_html("HEXAGATE shutdown its operations in late 2024 after losing key clients.")
     _patch_http(
         monkeypatch,
         head_responses={
             str(sug.homepage_url): _FakeResp(status=200),
             str(sug.evidence_url): _FakeResp(status=200),
         },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=html)},
     )
     # Wayback returns nothing → tier stays evidence_only, evidence body retained.
     wb = _FakeWayback(enriched_text=None)
@@ -346,7 +370,7 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == body
+    assert entry.markdown_text == extract_clean(html)
     assert entry.source == "llm_recall"
 
 
@@ -354,7 +378,7 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sug = _suggestion()
-    evidence_body = "Hexagate shut down in 2024 per court filings."
+    evidence_html = _article_html("Hexagate shut down in 2024 per court filings.")
     wayback_body = (
         "Hexagate is a Web3 security firm offering smart-contract auditing, "
         "intrusion detection, and runtime monitoring across major chains."
@@ -365,7 +389,7 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
             str(sug.homepage_url): _FakeResp(status=200),
             str(sug.evidence_url): _FakeResp(status=200),
         },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(enriched_text=wayback_body)
     out = await verify_suggestion(
@@ -387,14 +411,14 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sug = _suggestion()
-    evidence_body = "Hexagate filed for bankruptcy yesterday."
+    evidence_html = _article_html("Hexagate filed for bankruptcy yesterday.")
     _patch_http(
         monkeypatch,
         head_responses={
             str(sug.homepage_url): _FakeResp(status=200),
             str(sug.evidence_url): _FakeResp(status=200),
         },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(enriched_text=None)
     out = await verify_suggestion(
@@ -408,7 +432,7 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == evidence_body
+    assert entry.markdown_text == extract_clean(evidence_html)
 
 
 async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
@@ -416,7 +440,7 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
 ) -> None:
     """Wayback grabbed *some* page (post-acquisition squatter) but the name is gone."""
     sug = _suggestion()
-    evidence_body = "Hexagate was acquired by Chainalysis in 2024."
+    evidence_html = _article_html("Hexagate was acquired by Chainalysis in 2024.")
     squatter_body = "Buy this domain! Premium .com domains for sale."
     _patch_http(
         monkeypatch,
@@ -424,7 +448,7 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
             str(sug.homepage_url): _FakeResp(status=200),
             str(sug.evidence_url): _FakeResp(status=200),
         },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(enriched_text=squatter_body)
     out = await verify_suggestion(
@@ -438,19 +462,19 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == evidence_body
+    assert entry.markdown_text == extract_clean(evidence_html)
 
 
 async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) -> None:
     sug = _suggestion()
-    evidence_body = "Hexagate has been wound down per filings."
+    evidence_html = _article_html("Hexagate has been wound down per filings.")
     _patch_http(
         monkeypatch,
         head_responses={
             str(sug.homepage_url): _FakeResp(status=200),
             str(sug.evidence_url): _FakeResp(status=200),
         },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_body)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(raises=httpx.ReadTimeout("ia is down"))
     out = await verify_suggestion(
@@ -464,7 +488,7 @@ async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) 
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == evidence_body
+    assert entry.markdown_text == extract_clean(evidence_html)
 
 
 async def test_verify_all_via_gather_resilient_isolates_failures(
@@ -478,7 +502,7 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         head_responses[str(s.homepage_url)] = _FakeResp(status=200)
         head_responses[str(s.evidence_url)] = _FakeResp(status=200)
     get_responses[str(sugs[0].evidence_url)] = _FakeResp(
-        status=200, text=f"{sugs[0].name} shutdown today."
+        status=200, text=_article_html(f"{sugs[0].name} shutdown today.")
     )
     # BetaCo: GET blows up with a non-HTTP error to simulate a parse-side bug
     # in a hypothetical L3 helper. ValueError isn't in the (SSRF, HTTPError)
@@ -486,7 +510,7 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
     # entry in gather_resilient's results list.
     get_responses[str(sugs[1].evidence_url)] = ValueError("decoding blew up")
     get_responses[str(sugs[2].evidence_url)] = _FakeResp(
-        status=200, text=f"{sugs[2].name} declared bankruptcy."
+        status=200, text=_article_html(f"{sugs[2].name} declared bankruptcy.")
     )
     _patch_http(
         monkeypatch,
@@ -554,7 +578,7 @@ async def test_verify_skips_persist_for_dropped_suggestions(
 async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
     """Returned ``RawEntry`` is tagged so persistence can route it correctly."""
     sug = _suggestion()
-    body = "Hexagate ceased operations in 2024."
+    body = _article_html("Hexagate ceased operations in 2024.")
     _patch_http(
         monkeypatch,
         head_responses={
@@ -590,7 +614,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
     about the same dead vendor produce one qdrant point.
     """
     sug = _suggestion()
-    body = "Hexagate ceased operations in 2024."
+    body = _article_html("Hexagate ceased operations in 2024.")
     # Same name + same homepage but a *different* evidence article.
     same_vendor_other_citation = sug.model_copy(
         update={"evidence_url": "https://other-news.example.com/hexagate-update"},
@@ -649,8 +673,8 @@ async def test_recall_source_id_collapses_on_same_homepage(
 def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *, body: str) -> None:
     """Wire HEAD/GET so the suggestion sails through L1-L4 cleanly.
 
-    Lets the L5 tests focus on the deathness gate without re-stating the
-    L1-L4 plumbing each time.
+    ``body`` is the lead sentence(s); ``_article_html`` wraps it in a
+    long-enough ``<article>`` so the L3 extract-clean floor admits.
     """
     _patch_http(
         monkeypatch,
@@ -658,7 +682,7 @@ def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *,
             str(sug.homepage_url): _FakeResp(status=200),
             str(sug.evidence_url): _FakeResp(status=200),
         },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
+        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=_article_html(body))},
     )
 
 
@@ -712,8 +736,8 @@ async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> 
 async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> None:
     """``died=true`` with confidence ≥ threshold returns the entry+tier tuple."""
     sug = _suggestion()
-    body = "Hexagate shutdown its operations in 2024 after losing key clients."
-    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    lead = "Hexagate shutdown its operations in 2024 after losing key clients."
+    _patch_l1_l4_pass(monkeypatch, sug, body=lead)
     wb = _FakeWayback(enriched_text=None)
     llm = _FakeLLM(
         responses=[
@@ -731,7 +755,7 @@ async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> 
     assert out is not None
     entry, tier = out
     assert tier == "evidence_only"
-    assert entry.markdown_text == body
+    assert entry.markdown_text == extract_clean(_article_html(lead))
 
 
 async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -283,7 +283,7 @@ recall: pre-flight retrieval-survival test (gates verifier hardening)
 
 ### Steps
 
-- [ ] **Step 1.1: Write the failing test for body-length sanity gate**
+- [x] **Step 1.1: Write the failing test for body-length sanity gate**
 
 ```python
 # tests/stages/test_recall_verify_l3_hygiene.py
@@ -317,7 +317,7 @@ async def test_l3_drops_when_body_under_500_chars(httpx_mock, fake_wayback, llm_
     assert result is None
 ```
 
-- [ ] **Step 1.2: Create the paywall fixture**
+- [x] **Step 1.2: Create the paywall fixture**
 
 ```html
 <!-- tests/fixtures/recall/paywall_stub.html -->
@@ -327,19 +327,19 @@ async def test_l3_drops_when_body_under_500_chars(httpx_mock, fake_wayback, llm_
 </html>
 ```
 
-- [ ] **Step 1.3: Run the test, confirm it fails for the right reason**
+- [x] **Step 1.3: Run the test, confirm it fails for the right reason**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l3_hygiene.py::test_l3_drops_when_body_under_500_chars -v`
 Expected: FAIL — current code admits the suggestion or fails L3 with the wrong span event.
 
-- [ ] **Step 1.4: Add `RECALL_REJECTED_L3_BODY_TOO_SHORT` to the SpanEvent StrEnum**
+- [x] **Step 1.4: Add `RECALL_REJECTED_L3_BODY_TOO_SHORT` to the SpanEvent StrEnum**
 
 ```python
 # slopmortem/tracing/events.py — add inside class SpanEvent(StrEnum):
 RECALL_REJECTED_L3_BODY_TOO_SHORT = "recall.rejected_l3_body_too_short"
 ```
 
-- [ ] **Step 1.5: Replace L3 body fetch with extract-then-length-gate-then-scan**
+- [x] **Step 1.5: Replace L3 body fetch with extract-then-length-gate-then-scan**
 
 `extract_clean` already returns `""` below its `LENGTH_FLOOR=500` (`slopmortem/corpus/_extract.py:111-121`). Treat the empty string as a hard reject — no fallback to raw HTML, since (a) the sidebar-bleed test relies on trafilatura's `<aside>` strip and the fallback would reintroduce noise, and (b) the import-linter contract forbids reaching into `corpus._extract` from `stages`, so import via the public `slopmortem.corpus` re-export.
 
@@ -362,12 +362,12 @@ if len(evidence_body) < _L3_MIN_BODY_CHARS:
     return None
 ```
 
-- [ ] **Step 1.6: Run the body-length test, confirm it passes**
+- [x] **Step 1.6: Run the body-length test, confirm it passes**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l3_hygiene.py::test_l3_drops_when_body_under_500_chars -v`
 Expected: PASS.
 
-- [ ] **Step 1.7: Write the failing test for HTML sidebar-bleed rejection**
+- [x] **Step 1.7: Write the failing test for HTML sidebar-bleed rejection**
 
 ```python
 SIDEBAR_HTML = (Path(__file__).parent.parent / "fixtures/recall/sidebar_bleed.html").read_text()
@@ -393,7 +393,7 @@ async def test_l3_rejects_when_name_only_in_sidebar(httpx_mock, fake_wayback, ll
     assert result is None
 ```
 
-- [ ] **Step 1.8: Create the sidebar-bleed fixture**
+- [x] **Step 1.8: Create the sidebar-bleed fixture**
 
 ```html
 <!-- tests/fixtures/recall/sidebar_bleed.html -->
@@ -415,12 +415,12 @@ async def test_l3_rejects_when_name_only_in_sidebar(httpx_mock, fake_wayback, ll
 
 (Trafilatura extracts the `<main>` content and drops the `<aside>` — body will mention `Northwind` and `Chapter 7`/`bankruptcy`/`shutdown` but never `Acme`. L3 must reject.)
 
-- [ ] **Step 1.9: Run the sidebar test, confirm it passes given Step 1.5 already strips HTML**
+- [x] **Step 1.9: Run the sidebar test, confirm it passes given Step 1.5 already strips HTML**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l3_hygiene.py::test_l3_rejects_when_name_only_in_sidebar -v`
 Expected: PASS (the F1.1 strip from Step 1.5 already handles this).
 
-- [ ] **Step 1.10: Write the failing test for word-boundary regex**
+- [x] **Step 1.10: Write the failing test for word-boundary regex**
 
 ```python
 async def test_l3_does_not_match_substring_inside_word(httpx_mock, fake_wayback, llm_call_blocker):
@@ -451,12 +451,12 @@ async def test_l3_does_not_match_substring_inside_word(httpx_mock, fake_wayback,
     assert result is None
 ```
 
-- [ ] **Step 1.11: Run the substring test, confirm it fails (current code admits via substring)**
+- [x] **Step 1.11: Run the substring test, confirm it fails (current code admits via substring)**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l3_hygiene.py::test_l3_does_not_match_substring_inside_word -v`
 Expected: FAIL — current substring scan matches `closed` inside `enclosed`/`disclosed`.
 
-- [ ] **Step 1.12: Replace the substring scan with a precompiled word-boundary regex**
+- [x] **Step 1.12: Replace the substring scan with a precompiled word-boundary regex**
 
 In `slopmortem/stages/recall_verify.py`, replace `_DEATH_KEYWORDS: Final[frozenset[str]]` and `_body_anchors_name_and_death`:
 
@@ -494,12 +494,12 @@ def _body_anchors_name_and_death(name: str, body: str) -> _AnchorResult:
     return "ok"
 ```
 
-- [ ] **Step 1.13: Run the substring test, confirm it now passes**
+- [x] **Step 1.13: Run the substring test, confirm it now passes**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l3_hygiene.py::test_l3_does_not_match_substring_inside_word -v`
 Expected: PASS.
 
-- [ ] **Step 1.14: Write the test for expanded keyword admits (`shuttered`, `Chapter 11`)**
+- [x] **Step 1.14: Write the test for expanded keyword admits (`shuttered`, `Chapter 11`)**
 
 ```python
 async def test_l3_admits_shuttered_keyword(httpx_mock, fake_wayback, fake_llm_admits):
@@ -516,17 +516,17 @@ async def test_l3_admits_shuttered_keyword(httpx_mock, fake_wayback, fake_llm_ad
 
 (`fake_llm_admits` is a tiny test helper LLM that returns `{"died": true, "confidence": 0.9, ...}` — it lives in this test file or the existing `slopmortem/llm/fake.py` if a similar helper already exists.)
 
-- [ ] **Step 1.15: Run all Task 1 tests, confirm green**
+- [x] **Step 1.15: Run all Task 1 tests, confirm green**
 
 Run: `uv run pytest tests/stages/test_recall_verify_l3_hygiene.py -v`
 Expected: all PASS.
 
-- [ ] **Step 1.16: Run typecheck and lint**
+- [x] **Step 1.16: Run typecheck and lint**
 
 Run: `just typecheck && just lint`
 Expected: both pass.
 
-- [ ] **Step 1.17: Commit**
+- [x] **Step 1.17: Commit**
 
 ```
 recall: L3 hygiene — extract_clean, body-length gate, word-boundary regex, expanded vocab

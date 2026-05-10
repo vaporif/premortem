@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Final, Literal
 
@@ -40,6 +41,7 @@ from lmnr import Laminar, observe
 from pydantic import BaseModel, Field, ValidationError
 
 from slopmortem.concurrency import gather_resilient
+from slopmortem.corpus import extract_clean
 from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.http import SSRFBlockedError, safe_get, safe_head
 from slopmortem.llm import prompt_template_sha, render_blocks, to_strict_response_schema
@@ -71,31 +73,64 @@ _FETCH_TIMEOUT_S: Final = 40.0
 # single host's limit while keeping the wall clock reasonable.
 _DEFAULT_CONCURRENCY: Final = 3
 
-_DEATH_KEYWORDS: Final[frozenset[str]] = frozenset(
-    {
-        # Terminal: the company is gone.
-        "shutdown",
-        "shut down",
-        "closed",
-        "defunct",
-        "dissolved",
-        "bankrupt",
-        "bankruptcy",
-        "acquired",
-        "acquisition",
-        "wound down",
-        "ceased",
-        "going out of business",
-        # Distress: still operating but visibly hurting.
-        "layoffs",
-        "layoff",
-        "restructuring",
-        "struggling",
-        "missed payroll",
-        "downsizing",
-        "troubled",
-    }
+# Tuple, not frozenset: the order is irrelevant for membership but the regex
+# build needs a stable longest-first sort so "Chapter 11" wins over a stray
+# "Chapter" prefix and "shut down" wins over "shut". `acquired`/`acquisition`
+# stay in — the false-positive cost is one Haiku call at L5; the false-negative
+# would silently drop real fire-sale exits.
+_DEATH_KEYWORDS: Final[tuple[str, ...]] = (
+    # Terminal: the company is gone.
+    "shutdown",
+    "shut down",
+    "shuttered",
+    "closed",
+    "ceased",
+    "defunct",
+    "dissolved",
+    "bankrupt",
+    "bankruptcy",
+    "Chapter 11",
+    "Chapter 7",
+    "liquidation",
+    "wound down",
+    "wind-down",
+    "wind down",
+    "going out of business",
+    "out of business",
+    "obituary",
+    "delisted",
+    "cease operations",
+    "acquired",
+    "acquisition",
+    # Distress: still operating but visibly hurting.
+    "layoffs",
+    "layoff",
+    "restructuring",
+    "struggling",
+    "missed payroll",
+    "downsizing",
+    "troubled",
 )
+
+
+def _build_death_regex() -> re.Pattern[str]:
+    r"""Compile one word-boundary regex covering every keyword.
+
+    Longest-first sort avoids prefix shadowing (``shut`` swallowing
+    ``shut down``). Spaces in multi-word entries become ``\s+`` so HTML
+    whitespace runs and newlines still match.
+    """
+    parts = sorted(_DEATH_KEYWORDS, key=len, reverse=True)
+    escaped = [re.escape(p).replace(r"\ ", r"\s+") for p in parts]
+    return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
+
+
+_DEATH_REGEX: Final = _build_death_regex()
+
+# Mirrors ``corpus._extract.LENGTH_FLOOR``: ``extract_clean`` already returns
+# ``""`` below 500 chars, so the verifier rejecting at the same floor means
+# we only admit bodies that produced a real article extraction.
+_L3_MIN_BODY_CHARS: Final = 500
 
 
 type VerificationTier = Literal["wayback_anchored", "evidence_only"]
@@ -126,10 +161,9 @@ type _AnchorResult = Literal["ok", "name_missing", "keyword_missing"]
 
 
 def _body_anchors_name_and_death(name: str, body: str) -> _AnchorResult:
-    haystack = body.lower()
-    if name.lower() not in haystack:
+    if name.lower() not in body.lower():
         return "name_missing"
-    if not any(kw in haystack for kw in _DEATH_KEYWORDS):
+    if not _DEATH_REGEX.search(body):
         return "keyword_missing"
     return "ok"
 
@@ -264,7 +298,52 @@ async def _l5_admits(  # noqa: PLR0913 - mirrors the deathness knob set passed t
     return True
 
 
-async def verify_suggestion(  # noqa: PLR0913, PLR0911 - L5 needs LLM + three knobs from config; each gate carries its own return path so audit logs split cleanly
+async def _fetch_l3_body(*, name: str, evidence: str) -> str | None:
+    """GET the evidence URL and return an extracted body, or ``None`` to drop.
+
+    Folds the three L3 failure modes (transport, HTTP status, body too short
+    or anchor missing) into one helper. Each rejection path emits its own
+    span event so the audit dashboard keeps the granularity. Pulled out of
+    ``verify_suggestion`` to stay under the cyclomatic-complexity cap.
+    """
+    # ``safe_get`` does NOT consult robots.txt (unlike Wayback's ``_fetch``).
+    # Recall surfaces vendors whose own sites are robots-blocked or vanished;
+    # the evidence URL is a third-party citation, so vendor robots policy
+    # doesn't apply.
+    try:
+        evidence_resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
+    except (SSRFBlockedError, httpx.HTTPError) as exc:
+        logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
+        # GET-level failure on the evidence URL is functionally an L2 outcome:
+        # the URL didn't deliver a body. Fold into RECALL_REJECTED_L2 with
+        # ``stage="get"`` so the audit dashboard can still split HEAD-probe
+        # failures from GET-body transport failures.
+        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
+        return None
+    if evidence_resp.status_code >= _HTTP_BAD_REQUEST:
+        logger.info("recall_verify: L3 GET %s for %s", evidence_resp.status_code, evidence)
+        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
+        return None
+    # ``extract_clean`` strips HTML, runs trafilatura/readability, and returns
+    # ``""`` below its 500-char floor. Treating empty as a hard reject means
+    # paywalls, JS shells, and any page where main-article extraction failed
+    # get dropped — no fallback to raw HTML, which would reintroduce the
+    # sidebar-bleed and nav-link false positives the strip prevents.
+    evidence_body = extract_clean(evidence_resp.text)
+    if len(evidence_body) < _L3_MIN_BODY_CHARS:
+        logger.info(
+            "recall_verify: L3 body too short (%d chars) for %s", len(evidence_body), evidence
+        )
+        _emit_event(SpanEvent.RECALL_REJECTED_L3_BODY_TOO_SHORT)
+        return None
+    anchor = _body_anchors_name_and_death(name, evidence_body)
+    if anchor != "ok":
+        _log_and_emit_l3_rejection(anchor, name=name, evidence=evidence)
+        return None
+    return evidence_body
+
+
+async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + three knobs from config
     suggestion: RecallSuggestion,
     *,
     wayback: Enricher,
@@ -290,29 +369,8 @@ async def verify_suggestion(  # noqa: PLR0913, PLR0911 - L5 needs LLM + three kn
             logger.info("recall_verify: L2 HEAD %s for %s", head_resp.status_code, url)
             _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "head"})
             return None
-    # L3: GET evidence body — primary anchor.
-    # Note: ``safe_get`` does NOT consult robots.txt (unlike Wayback's
-    # ``_fetch``). Recall's reason for existence is to surface vendors whose
-    # own sites are robots-blocked or vanished; the evidence URL is a
-    # third-party citation, so robots policy on the *vendor* doesn't apply.
-    try:
-        evidence_resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
-    except (SSRFBlockedError, httpx.HTTPError) as exc:
-        logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
-        # GET-level failure on the evidence URL is functionally an L2 outcome:
-        # the URL didn't deliver a body. Fold into RECALL_REJECTED_L2 with
-        # ``stage="get"`` so the audit dashboard can still split HEAD-probe
-        # failures from GET-body transport failures.
-        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
-        return None
-    if evidence_resp.status_code >= _HTTP_BAD_REQUEST:
-        logger.info("recall_verify: L3 GET %s for %s", evidence_resp.status_code, evidence)
-        _emit_event(SpanEvent.RECALL_REJECTED_L2, attributes={"stage": "get"})
-        return None
-    evidence_body = evidence_resp.text
-    anchor = _body_anchors_name_and_death(suggestion.name, evidence_body)
-    if anchor != "ok":
-        _log_and_emit_l3_rejection(anchor, name=suggestion.name, evidence=evidence)
+    evidence_body = await _fetch_l3_body(name=suggestion.name, evidence=evidence)
+    if evidence_body is None:
         return None
     # L4: optional Wayback corroboration.
     tier: VerificationTier = "evidence_only"
