@@ -29,6 +29,7 @@ from slopmortem.corpus import (
     write_canonical_atomic,
     write_raw_atomic,
 )
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.ingest._fan_out import _embed_and_upsert
 from slopmortem.ingest._helpers import (
     _build_payload,
@@ -101,6 +102,14 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         tiebreaker_max_tokens=config.max_tokens_tiebreaker,
     )
     span_events.extend(res.span_events)
+    # resolver_flipped already emits RESOLVER_FLIP_DETECTED via res.span_events;
+    # alias_blocked is the only canonical-merge path without its own dedicated
+    # trace event, so the audit dashboard learns about recall-side dedup here.
+    if res.action == "alias_blocked" and entry.source == SOURCE_LLM_RECALL:
+        Laminar.event(
+            name=SpanEvent.RECALL_DEDUPED_EXISTING.value,
+            attributes={"action": res.action, "source_id": entry.source_id},
+        )
     if res.action in ("alias_blocked", "resolver_flipped"):
         return ProcessOutcome.SKIPPED
     canonical_id = res.canonical_id

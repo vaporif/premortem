@@ -51,3 +51,9 @@ class SpanEvent(StrEnum):
     # tuning has the data to retune ``recall_slop_threshold`` without
     # re-classifying the corpus.
     RECALL_SLOP_BORDERLINE = "recall.slop_borderline"
+    # Fires when the three-tier resolver merges an ``llm_recall`` row into an
+    # existing canonical via ``alias_blocked`` — pure observability so the
+    # audit dashboard can count how often recall surfaces something the
+    # corpus already has. ``resolver_flipped`` is intentionally not covered
+    # here; ``RESOLVER_FLIP_DETECTED`` already fires on that path.
+    RECALL_DEDUPED_EXISTING = "recall.deduped_existing"
