@@ -1,21 +1,30 @@
-"""Verifier for LLM-recalled suggestions: gates L1-L5 before persistence.
+"""Verifier for LLM-recalled suggestions: gates L0-L5 before persistence.
 
 The recall stage (``stages.llm_recall``) returns ``RecallSuggestion`` rows
 the LLM thinks failed. None of them have been verified, and a fraction will
 be hallucinated. This module gates each one through:
 
+L0 — Search head. One Tavily search per suggestion, shaped by ``status`` and
+     ``failure_year``. Drops the suggestion when no hit's title or snippet
+     mentions the company name — equivalent to "the article URL would have
+     404'd anyway, save the L2 round-trip". The selected URL replaces what
+     used to be ``suggestion.evidence_url`` and threads through L2-L5 as
+     ``discovered_url``.
 L1 — Pydantic schema (already enforced at ``RecallSuggestion`` parse time;
      no work here).
-L2 — Liveness on the evidence URL only. HEAD->GET fallthrough: HEAD is the
+L2 — Liveness on the discovered URL only. HEAD->GET fallthrough: HEAD is the
      cheap first probe, but paywalled/anti-bot citations routinely 401/403/405
      on HEAD while serving GET. The GET status code is the authoritative gate.
      The homepage URL is provenance, not corroboration — its liveness isn't
      load-bearing here.
 L3 — Body extraction on the GET response. Drops if the body doesn't contain
      both the company name AND a death/distress keyword (case-insensitive).
-L4 — Wayback enrichment, advisory only. A snapshot whose body still mentions
-     the name promotes the suggestion to ``wayback_anchored`` and replaces
-     the body with the snapshot text (richer marketing copy wins for vector
+L4 — Wayback enrichment, advisory only. Short-circuits when
+     ``suggestion.homepage_url is None`` — no Wayback round-trip happens and
+     the tier stays ``evidence_only`` with ``wayback_attempted="false"`` on
+     the verified event. When a homepage is present, a snapshot whose body
+     still mentions the name promotes the suggestion to ``wayback_anchored``
+     and appends the snapshot text (richer marketing copy wins for vector
      retrieval). Failure or empty result never drops the suggestion.
 L5 — Deathness judgment. L1-L4 only prove a URL exists, serves content,
      and mentions the name + a death-ish word. They don't tell apart "real
@@ -59,7 +68,15 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping
 
     from slopmortem.corpus.sources import Enricher
+    from slopmortem.corpus.tavily import TavilyHit
     from slopmortem.llm import LLMClient
+
+
+# Callable shape of ``tavily_search_structured``: ``(query, limit) -> hits``.
+# Defined as a top-level ``type`` alias so the pipeline can plumb whatever
+# concrete (live Tavily, eval-mode fake, recording wrapper) it builds
+# without recall_verify importing the corpus-leaf implementation.
+type TavilySearchFn = Callable[[str, int], Awaitable[list[TavilyHit]]]
 
 
 logger = logging.getLogger(__name__)
@@ -144,14 +161,18 @@ type VerificationTier = Literal["wayback_anchored", "evidence_only"]
 
 
 def _recall_source_id(suggestion: RecallSuggestion) -> str:
-    """Stable id keyed on (name, homepage_url).
+    """Stable id keyed on (name, homepage_url) when present, (name,) otherwise.
 
     Two suggestions for the same vendor (same homepage) collapse to one
-    ``source_id`` regardless of which article cited them; a different
-    homepage diverges. 16 hex chars is enough for the recall stage's
-    per-pitch cap (~8 suggestions).
+    source_id. When the recall LLM didn't supply a homepage, fall back to
+    name-only — across runs the same homepage-less vendor surfaces via
+    different citation hosts, and a domain-keyed fallback would create
+    duplicate Qdrant points. Name-only fallback risks merging two distinct
+    startups with the same name, but that's vanishingly rare per pitch and
+    alias_graph collapses obvious name collisions at persist time.
     """
-    fingerprint = f"{suggestion.name}|{suggestion.homepage_url}"
+    homepage = suggestion.homepage_url
+    fingerprint = f"{suggestion.name}|{homepage}" if homepage is not None else suggestion.name
     return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]
 
 
@@ -388,9 +409,109 @@ async def _l3_body_or_drop(*, name: str, evidence: str, body_text: str) -> str |
     return evidence_body
 
 
+def _hit_mentions(hit: TavilyHit, needle: str) -> bool:
+    """Case-insensitive substring check across title and snippet.
+
+    Title-or-snippet (not snippet alone): Tavily snippets cap at ~150-200
+    chars and routinely drop the company name even when the article body
+    is on-topic. The title carries the editorial framing and almost always
+    names the subject.
+    """
+    needle_lower = needle.lower()
+    return needle_lower in hit.title.lower() or needle_lower in hit.snippet.lower()
+
+
+def _has_death_keyword(text: str) -> bool:
+    """Reuse the L3 death-keyword regex on title+snippet to rank primary vs fallback."""
+    return _DEATH_REGEX.search(text) is not None
+
+
+async def _search_for_evidence(
+    suggestion: RecallSuggestion,
+    *,
+    tavily_search: TavilySearchFn,
+    limit: int,
+) -> str | None:
+    """L0: ask Tavily for a citation URL. Return None to drop.
+
+    Status-shaped query. Prose syntax (the Task 0 winner). Selection:
+    primary = first hit whose title-or-snippet contains the name AND a
+    death keyword from ``_DEATH_KEYWORDS``; fallback = first hit whose
+    title-or-snippet contains the name. ``None`` means the article URL
+    would have 404'd anyway, save the L2 round-trip.
+    """
+    if suggestion.status in ("dead", "absorbed"):
+        q = (
+            f'"{suggestion.name}" shutdown or closed or bankrupt or "Chapter 11" '
+            f"{suggestion.failure_year}"
+        )
+    else:  # "struggling" or "bruised"
+        q = f'"{suggestion.name}" layoffs or restructuring or struggling {suggestion.failure_year}'
+    hits = await tavily_search(q, limit)
+    if not hits:
+        logger.info("recall_verify: L0 dropped %r — no_hits", suggestion.name)
+        _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": "no_hits"})
+        return None
+    primary: TavilyHit | None = None
+    fallback: TavilyHit | None = None
+    for hit in hits:
+        if not _hit_mentions(hit, suggestion.name):
+            continue
+        if fallback is None:
+            fallback = hit
+        if primary is None and _has_death_keyword(hit.title + " " + hit.snippet):
+            primary = hit
+            break
+    chosen = primary or fallback
+    if chosen is None:
+        logger.info("recall_verify: L0 dropped %r — no_name_match", suggestion.name)
+        _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": "no_name_match"})
+        return None
+    return chosen.url
+
+
+async def _run_l4_wayback(
+    *,
+    suggestion: RecallSuggestion,
+    seed: RawEntry,
+    wayback: Enricher,
+) -> tuple[VerificationTier, str | None]:
+    """L4: enrich via Wayback when a homepage is present. Emit the verified event.
+
+    Returns ``(tier, wayback_body)``: the body is non-None only when the
+    snapshot anchored on the company name. Skipped entirely when
+    ``suggestion.homepage_url is None`` — the news URL would archive an
+    unrelated article, so we record ``wayback_attempted="false"`` and move
+    on.
+    """
+    if suggestion.homepage_url is None:
+        _emit_event(
+            SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY,
+            attributes={"wayback_attempted": "false"},
+        )
+        return "evidence_only", None
+    try:
+        enriched = await wayback.enrich(seed)
+    except (httpx.HTTPError, RuntimeError) as exc:
+        # Real WaybackEnricher catches these internally. Logged so a future
+        # Wayback change that starts surfacing exceptions doesn't go unnoticed.
+        logger.info("recall_verify: wayback raised (unexpected — enricher should swallow): %r", exc)
+        enriched = seed
+    snapshot_body = enriched.markdown_text
+    if snapshot_body and suggestion.name.lower() in snapshot_body.lower():
+        _emit_event(SpanEvent.RECALL_VERIFIED_WAYBACK_ANCHORED)
+        return "wayback_anchored", snapshot_body
+    _emit_event(
+        SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY,
+        attributes={"wayback_attempted": "true"},
+    )
+    return "evidence_only", None
+
+
 async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from config
     suggestion: RecallSuggestion,
     *,
+    discovered_url: str,
     wayback: Enricher,
     llm: LLMClient,
     model_recall_deathness: str,
@@ -398,10 +519,17 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
     min_confidence: float,
     struggling_min_confidence: float,
 ) -> tuple[RawEntry, VerificationTier, _AdmitVerdict] | None:
-    """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops."""
+    """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops.
+
+    ``discovered_url`` is the L0 Tavily output — the article URL that the
+    L2/L3 ladder probes. ``RawEntry.url`` falls back to the discovered URL
+    when ``suggestion.homepage_url`` is None so the persisted point always
+    has provenance.
+    """
     homepage = suggestion.homepage_url
-    evidence = suggestion.evidence_url
-    # L2: gate the evidence URL only. The homepage is provenance, not
+    evidence = discovered_url
+    seed_url = homepage if homepage is not None else discovered_url
+    # L2: gate the discovered URL only. The homepage is provenance, not
     # corroboration — its liveness isn't load-bearing. HEAD->GET fallthrough
     # because many real news sites (paywalls, CDNs, anti-bot) return 401/403/405
     # on HEAD even when GET works. Try HEAD first because it's cheap; on any
@@ -447,36 +575,23 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
     )
     if evidence_body is None:
         return None
-    # L4: Wayback enrichment, advisory only. Direct call — WaybackEnricher.enrich
-    # already retries 3x internally with exponential backoff and swallows transient
-    # errors by returning the entry unchanged (wayback.py:62-99, 163-202). The
-    # outer try/except is a refactor guard for fakes that raise; in production
-    # this branch is dead.
+    # L4: Wayback enrichment, advisory only. Gated on a homepage being present —
+    # when the recall LLM didn't supply one, Wayback against the news URL
+    # would archive an unrelated news page, so we skip the round-trip entirely.
+    # WaybackEnricher.enrich already retries 3x internally with exponential
+    # backoff and swallows transient errors by returning the entry unchanged
+    # (wayback.py:62-99, 163-202).
     # markdown_text=None AND raw_html=None matter — WaybackEnricher.enrich
     # short-circuits if either body is already populated.
     seed = RawEntry(
         source=SOURCE_LLM_RECALL,
         source_id=_recall_source_id(suggestion),
-        url=homepage,
+        url=seed_url,
         markdown_text=None,
         raw_html=None,
         fetched_at=datetime.now(UTC),
     )
-    try:
-        enriched = await wayback.enrich(seed)
-    except (httpx.HTTPError, RuntimeError) as exc:
-        # Real WaybackEnricher catches these internally. Logged so a future
-        # Wayback change that starts surfacing exceptions doesn't go unnoticed.
-        logger.info("recall_verify: wayback raised (unexpected — enricher should swallow): %r", exc)
-        enriched = seed
-    snapshot_body = enriched.markdown_text
-    wayback_anchored = bool(snapshot_body and suggestion.name.lower() in snapshot_body.lower())
-    if wayback_anchored:
-        tier: VerificationTier = "wayback_anchored"
-        _emit_event(SpanEvent.RECALL_VERIFIED_WAYBACK_ANCHORED)
-    else:
-        tier = "evidence_only"
-        _emit_event(SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY)
+    tier, wayback_body = await _run_l4_wayback(suggestion=suggestion, seed=seed, wayback=wayback)
     # L5 reads the news article only — Wayback marketing copy never says
     # "we died", so it's the wrong substrate for the deathness judgment.
     # Conservative on failure: false admits cost more than drops.
@@ -503,8 +618,8 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
     # same Qdrant entry; verifier and synthesizer agree on which document
     # represents this vendor.
     combined = _combine_recall_body(
-        wayback_body=enriched.markdown_text if wayback_anchored else None,
-        evidence_url=str(evidence),
+        wayback_body=wayback_body,
+        evidence_url=evidence,
         news_body=evidence_body,
         suggestion=suggestion,
     )
@@ -519,7 +634,7 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
 # evidence body can be sizeable.
 @observe(
     name="stage.recall_verify",
-    ignore_inputs=["suggestions", "persist", "wayback", "llm"],
+    ignore_inputs=["suggestions", "persist", "wayback", "llm", "tavily_search"],
     ignore_output=True,
 )
 async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knobs flow through from pipeline
@@ -528,6 +643,8 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
     wayback: Enricher,
     persist: Callable[[RawEntry, VerificationTier, Literal["dead", "struggling"]], Awaitable[None]],
     llm: LLMClient,
+    tavily_search: TavilySearchFn,
+    tavily_recall_max_results: int,
     model_recall_deathness: str,
     max_tokens_recall_deathness: int,
     min_confidence: float,
@@ -538,15 +655,21 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
 
     ``gather_resilient`` keeps a sibling failure from cancelling the rest —
     a transient outage on one citation host shouldn't poison the whole batch.
-    Returned list contains only the entries that passed L1-L5 AND persisted
+    Returned list contains only the entries that passed L0-L5 AND persisted
     cleanly; per-suggestion exceptions land in the logs instead.
     """
     limiter = anyio.CapacityLimiter(concurrency)
 
     async def _one(s: RecallSuggestion) -> RawEntry | None:
         async with limiter:
+            discovered = await _search_for_evidence(
+                s, tavily_search=tavily_search, limit=tavily_recall_max_results
+            )
+            if discovered is None:
+                return None
             verified = await verify_suggestion(
                 s,
+                discovered_url=discovered,
                 wayback=wayback,
                 llm=llm,
                 model_recall_deathness=model_recall_deathness,

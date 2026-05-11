@@ -9,15 +9,19 @@ from typing import TYPE_CHECKING, Any, Literal
 import httpx
 
 from slopmortem.corpus import extract_clean
+from slopmortem.corpus.tavily import TavilyHit
 from slopmortem.http import SSRFBlockedError
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
+from slopmortem.stages import recall_verify as _rv
 from slopmortem.stages.recall_verify import (
     _DEATH_KEYWORDS,
     VerificationTier,
     verify_and_persist_all,
     verify_suggestion,
 )
+from slopmortem.tracing import SpanEvent
+from tests.stages.test_recall_search_head import FakeTavilySearch
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -109,9 +113,19 @@ def _suggestion(name: str = "Hexagate") -> RecallSuggestion:
         status="dead",
         homepage_url=f"https://{name.lower()}.example.com/",
         failure_year=2024,
-        evidence_url=f"https://news.example.com/{name.lower()}-shutdown",
         one_liner=f"{name} shut down in 2024.",
     )
+
+
+def _discovered(name: str = "Hexagate") -> str:
+    """Stand-in for the L0 Tavily-discovered article URL.
+
+    The Task 3 cutover stripped ``RecallSuggestion.evidence_url``; tests
+    that used to read ``sug.evidence_url`` now compute the same shape from
+    the suggestion name so fixtures key off the same string the verifier
+    receives via ``discovered_url=``.
+    """
+    return f"https://news.example.com/{name.lower()}-shutdown"
 
 
 class _FakeWayback:
@@ -187,14 +201,16 @@ def _patch_http(
 async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     """HEAD 404 falls through to GET; GET 404 drops at the L2 GET stage."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=404)},
-        get_responses={str(sug.evidence_url): _FakeResp(status=404)},
+        head_responses={discovered: _FakeResp(status=404)},
+        get_responses={discovered: _FakeResp(status=404)},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -209,14 +225,16 @@ async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_l2_rejects_ssrf_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     """SSRFBlockedError on the evidence URL drops at the L2 GET stage."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): SSRFBlockedError("nope")},
-        get_responses={str(sug.evidence_url): SSRFBlockedError("nope")},
+        head_responses={discovered: SSRFBlockedError("nope")},
+        get_responses={discovered: SSRFBlockedError("nope")},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -230,14 +248,16 @@ async def test_l2_rejects_ssrf_evidence(monkeypatch: pytest.MonkeyPatch) -> None
 async def test_l2_rejects_httpx_error_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     """Transport error (DNS, connect, timeout) on the evidence URL drops at L2 GET."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): httpx.ConnectError("dns")},
-        get_responses={str(sug.evidence_url): httpx.ConnectError("dns")},
+        head_responses={discovered: httpx.ConnectError("dns")},
+        get_responses={discovered: httpx.ConnectError("dns")},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -250,14 +270,12 @@ async def test_l2_rejects_httpx_error_evidence(monkeypatch: pytest.MonkeyPatch) 
 
 async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch) -> None:
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
+        head_responses={discovered: _FakeResp(status=200)},
         get_responses={
-            str(sug.evidence_url): _FakeResp(
+            discovered: _FakeResp(
                 status=200,
                 text=_article_html("A small startup quietly shutdown last week."),
             ),
@@ -266,6 +284,7 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -279,14 +298,12 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
 
 async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.MonkeyPatch) -> None:
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
+        head_responses={discovered: _FakeResp(status=200)},
         get_responses={
-            str(sug.evidence_url): _FakeResp(
+            discovered: _FakeResp(
                 status=200,
                 text=_article_html("Hexagate just announced a Series B and is hiring engineers."),
             ),
@@ -295,6 +312,7 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -306,19 +324,18 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
 
 
 async def test_l3_rejects_evidence_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Both HEADs OK but evidence GET returns 5xx → drop."""
+    """HEAD OK but evidence GET returns 5xx → drop."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=500)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=500)},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -333,19 +350,18 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     html = _article_html("HEXAGATE shutdown its operations in late 2024 after losing key clients.")
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=html)},
     )
     # Wayback returns nothing → tier stays evidence_only, evidence body retained.
     wb = _FakeWayback(enriched_text=None)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -370,6 +386,7 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Hexagate shut down in 2024 per court filings.")
     wayback_body = (
         "Hexagate is a Web3 security firm offering smart-contract auditing, "
@@ -377,15 +394,13 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
     )
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(enriched_text=wayback_body)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -410,18 +425,17 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Hexagate filed for bankruptcy yesterday.")
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(enriched_text=None)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -443,19 +457,18 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
 ) -> None:
     """Wayback grabbed *some* page (post-acquisition squatter) but the name is gone."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Hexagate was acquired by Chainalysis in 2024.")
     squatter_body = "Buy this domain! Premium .com domains for sale."
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(enriched_text=squatter_body)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -476,18 +489,17 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
 
 async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) -> None:
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Hexagate has been wound down per filings.")
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     wb = _FakeWayback(raises=httpx.ReadTimeout("ia is down"))
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -503,6 +515,63 @@ async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) 
     assert extract_clean(evidence_html) in entry.markdown_text
 
 
+async def test_l4_wayback_short_circuits_when_homepage_is_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``homepage_url is None`` skips Wayback entirely; tier stays ``evidence_only``.
+
+    The verified event must carry ``wayback_attempted="false"`` so trace
+    consumers can distinguish skipped (no homepage) from attempted-but-empty.
+    """
+    events: list[tuple[SpanEvent, dict[str, str]]] = []
+
+    def capture(event: SpanEvent, attributes: dict[str, str] | None = None) -> None:
+        events.append((event, dict(attributes) if attributes else {}))
+
+    monkeypatch.setattr(_rv, "_emit_event", capture)
+    sug = _suggestion().model_copy(update={"homepage_url": None})
+    discovered = _discovered(sug.name)
+    evidence_html = _article_html("Hexagate ceased operations in 2024 per court filings.")
+    _patch_http(
+        monkeypatch,
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
+    )
+    wb = _FakeWayback(enriched_text="should not be read")
+    out = await verify_suggestion(
+        sug,
+        discovered_url=discovered,
+        wayback=wb,
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+    )
+    assert out is not None
+    entry, tier, verdict = out
+    assert tier == "evidence_only"
+    assert verdict == "dead"
+    assert wb.calls == []
+    # Seed RawEntry falls back to the discovered URL when no homepage.
+    assert entry.url == discovered
+    assert (SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY, {"wayback_attempted": "false"}) in events
+
+
+def _hit_for(sug: RecallSuggestion) -> TavilyHit:
+    """Canned Tavily hit whose URL the L2/L3 fakes are also keyed on."""
+    return TavilyHit(
+        title=f"{sug.name} shuts down operations",
+        url=_discovered(sug.name),
+        snippet=f"{sug.name} announced its shutdown in {sug.failure_year}.",
+    )
+
+
+def _tavily_for(sugs: list[RecallSuggestion]) -> FakeTavilySearch:
+    """One canned hit per suggestion, returned regardless of query string."""
+    return FakeTavilySearch(default=[_hit_for(s) for s in sugs])
+
+
 async def test_verify_all_via_gather_resilient_isolates_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -511,17 +580,16 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
     head_responses: dict[str, _FakeResp | BaseException] = {}
     get_responses: dict[str, _FakeResp | BaseException] = {}
     for s in sugs:
-        head_responses[str(s.homepage_url)] = _FakeResp(status=200)
-        head_responses[str(s.evidence_url)] = _FakeResp(status=200)
-    get_responses[str(sugs[0].evidence_url)] = _FakeResp(
+        head_responses[_discovered(s.name)] = _FakeResp(status=200)
+    get_responses[_discovered(sugs[0].name)] = _FakeResp(
         status=200, text=_article_html(f"{sugs[0].name} shutdown today.")
     )
     # BetaCo: GET blows up with a non-HTTP error to simulate a parse-side bug
     # in a hypothetical L3 helper. ValueError isn't in the (SSRF, HTTPError)
     # except — it'll bubble out of verify_suggestion and become an Exception
     # entry in gather_resilient's results list.
-    get_responses[str(sugs[1].evidence_url)] = ValueError("decoding blew up")
-    get_responses[str(sugs[2].evidence_url)] = _FakeResp(
+    get_responses[_discovered(sugs[1].name)] = ValueError("decoding blew up")
+    get_responses[_discovered(sugs[2].name)] = _FakeResp(
         status=200, text=_article_html(f"{sugs[2].name} declared bankruptcy.")
     )
     _patch_http(
@@ -529,6 +597,13 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         head_responses=head_responses,
         get_responses=get_responses,
     )
+    # FakeTavilySearch keys each suggestion to one hit whose URL matches the
+    # L2/L3 fakes above, so the L0 head feeds the right URL into L2.
+    tavily = FakeTavilySearch(default=[])
+    tavily.response_map = {
+        f'"{s.name}" shutdown or closed or bankrupt or "Chapter 11" {s.failure_year}': [_hit_for(s)]
+        for s in sugs
+    }
     wb = _FakeWayback(enriched_text=None)
     persisted: list[tuple[RawEntry, VerificationTier, Literal["dead", "struggling"]]] = []
 
@@ -547,6 +622,8 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         wayback=wb,
         persist=typed_persist,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        tavily_search=tavily,
+        tavily_recall_max_results=5,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -570,10 +647,11 @@ async def test_verify_skips_persist_for_dropped_suggestions(
 ) -> None:
     """``verify_and_persist_all`` only invokes ``persist`` on accepted entries."""
     sug = _suggestion("DroppedCo")
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=404)},
-        get_responses={str(sug.evidence_url): _FakeResp(status=404)},
+        head_responses={discovered: _FakeResp(status=404)},
+        get_responses={discovered: _FakeResp(status=404)},
     )
     wb = _FakeWayback()
     persisted: list[RawEntry] = []
@@ -590,6 +668,8 @@ async def test_verify_skips_persist_for_dropped_suggestions(
         wayback=wb,
         persist=persist,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        tavily_search=_tavily_for([sug]),
+        tavily_recall_max_results=5,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -602,18 +682,17 @@ async def test_verify_skips_persist_for_dropped_suggestions(
 async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
     """Returned ``RawEntry`` is tagged so persistence can route it correctly."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     body = _article_html("Hexagate ceased operations in 2024.")
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=body)},
     )
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -624,7 +703,7 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
     assert out is not None
     entry, _tier, _verdict = out
     assert entry.source == "llm_recall"
-    assert entry.url == str(sug.homepage_url)
+    assert entry.url == sug.homepage_url
     assert isinstance(entry.fetched_at, datetime)
     assert entry.fetched_at.tzinfo == UTC
 
@@ -639,33 +718,31 @@ async def test_recall_source_id_collapses_on_same_homepage(
     about the same dead vendor produce one qdrant point.
     """
     sug = _suggestion()
-    body = _article_html("Hexagate ceased operations in 2024.")
-    # Same name + same homepage but a *different* evidence article.
-    same_vendor_other_citation = sug.model_copy(
-        update={"evidence_url": "https://other-news.example.com/hexagate-update"},
-    )
+    first_url = _discovered(sug.name)
+    other_url = "https://other-news.example.com/hexagate-update"
+    diff_vendor_url = "https://news.example.com/hexagate-different-vendor"
     diff_vendor = sug.model_copy(
         update={"homepage_url": "https://hexagate.different-tld.example.org/"},
     )
+    body = _article_html("Hexagate ceased operations in 2024.")
     _patch_http(
         monkeypatch,
         head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-            str(same_vendor_other_citation.evidence_url): _FakeResp(status=200),
-            str(diff_vendor.homepage_url): _FakeResp(status=200),
-            str(diff_vendor.evidence_url): _FakeResp(status=200),
+            first_url: _FakeResp(status=200),
+            other_url: _FakeResp(status=200),
+            diff_vendor_url: _FakeResp(status=200),
         },
         get_responses={
-            str(sug.evidence_url): _FakeResp(status=200, text=body),
-            str(same_vendor_other_citation.evidence_url): _FakeResp(status=200, text=body),
-            str(diff_vendor.evidence_url): _FakeResp(status=200, text=body),
+            first_url: _FakeResp(status=200, text=body),
+            other_url: _FakeResp(status=200, text=body),
+            diff_vendor_url: _FakeResp(status=200, text=body),
         },
     )
     wb = _FakeWayback()
     llm = _FakeLLM(default=_DEATHNESS_PASS)
     first = await verify_suggestion(
         sug,
+        discovered_url=first_url,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -674,7 +751,8 @@ async def test_recall_source_id_collapses_on_same_homepage(
         struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     second = await verify_suggestion(
-        same_vendor_other_citation,
+        sug,
+        discovered_url=other_url,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -684,6 +762,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
     )
     third = await verify_suggestion(
         diff_vendor,
+        discovered_url=diff_vendor_url,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -698,20 +777,19 @@ async def test_recall_source_id_collapses_on_same_homepage(
     assert first[0].source_id != third[0].source_id
 
 
-def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *, body: str) -> None:
-    """Wire HEAD/GET so the suggestion sails through L1-L4 cleanly.
+def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *, body: str) -> str:
+    """Wire HEAD/GET so the suggestion sails through L1-L4 cleanly. Returns the discovered URL.
 
     ``body`` is the lead sentence(s); ``_article_html`` wraps it in a
     long-enough ``<article>`` so the L3 extract-clean floor admits.
     """
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=_article_html(body))},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=_article_html(body))},
     )
+    return discovered
 
 
 async def test_l5_drops_when_alive(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -722,13 +800,14 @@ async def test_l5_drops_when_alive(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     sug = _suggestion()
     body = "Hexagate had a shutdown of one product line, then raised a Series C."
-    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    discovered = _patch_l1_l4_pass(monkeypatch, sug, body=body)
     wb = _FakeWayback()
     llm = _FakeLLM(
         responses=['{"verdict": "alive", "confidence": 0.95, "evidence_quote": "raised series C"}'],
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -746,13 +825,14 @@ async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> 
     """``verdict=dead`` but confidence below threshold → drop (avoid noisy admits)."""
     sug = _suggestion()
     body = "Hexagate shutdown rumored, sources unconfirmed."
-    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    discovered = _patch_l1_l4_pass(monkeypatch, sug, body=body)
     wb = _FakeWayback()
     llm = _FakeLLM(
         responses=['{"verdict": "dead", "confidence": 0.5, "evidence_quote": "rumored"}'],
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -767,7 +847,7 @@ async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> 
     """``verdict=dead`` with confidence ≥ threshold returns the entry+tier+verdict tuple."""
     sug = _suggestion()
     lead = "Hexagate shutdown its operations in 2024 after losing key clients."
-    _patch_l1_l4_pass(monkeypatch, sug, body=lead)
+    discovered = _patch_l1_l4_pass(monkeypatch, sug, body=lead)
     wb = _FakeWayback(enriched_text=None)
     llm = _FakeLLM(
         responses=[
@@ -776,6 +856,7 @@ async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> 
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -795,11 +876,12 @@ async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> Non
     """LLM returns malformed JSON → drop conservatively (no false admits)."""
     sug = _suggestion()
     body = "Hexagate shutdown its operations in 2024."
-    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    discovered = _patch_l1_l4_pass(monkeypatch, sug, body=body)
     wb = _FakeWayback()
     llm = _FakeLLM(responses=["this is not json"])
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -814,11 +896,12 @@ async def test_l5_drops_on_transport_failure(monkeypatch: pytest.MonkeyPatch) ->
     """LLM raises httpx.HTTPError → drop conservatively (parity with parse failure)."""
     sug = _suggestion()
     body = "Hexagate shutdown its operations in 2024."
-    _patch_l1_l4_pass(monkeypatch, sug, body=body)
+    discovered = _patch_l1_l4_pass(monkeypatch, sug, body=body)
     wb = _FakeWayback()
     llm = _FakeLLM(responses=[httpx.ConnectError("boom")])
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
