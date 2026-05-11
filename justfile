@@ -25,12 +25,12 @@ smoke-live:
 
 # Default eval runs against cassettes via FakeLLMClient + FakeEmbeddingClient (no live API calls, deterministic).
 eval:
-    uv run python -m slopmortem.evals.runner --dataset tests/evals/datasets/seed.jsonl --baseline tests/evals/baseline.json
+    ENABLE_TAVILY_RECALL_SEARCH=false uv run python -m slopmortem.evals.runner --dataset tests/evals/datasets/seed.jsonl --baseline tests/evals/baseline.json
 
 # Re-record cassettes against live OpenRouter + local fastembed; LLM-side cost only.
 # Run sparingly. Default cost ceiling --max-cost-usd=2.0 in the runner.
 eval-record:
-    RUN_LIVE=1 uv run python -m slopmortem.evals.runner \
+    ENABLE_TAVILY_RECALL_SEARCH=false RUN_LIVE=1 uv run python -m slopmortem.evals.runner \
         --dataset tests/evals/datasets/seed.jsonl \
         --baseline tests/evals/baseline.json \
         --record \
