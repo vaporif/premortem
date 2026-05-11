@@ -105,7 +105,11 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
     # resolver_flipped already emits RESOLVER_FLIP_DETECTED via res.span_events;
     # alias_blocked is the only canonical-merge path without its own dedicated
     # trace event, so the audit dashboard learns about recall-side dedup here.
-    if res.action == "alias_blocked" and entry.source == SOURCE_LLM_RECALL:
+    if (
+        res.action == "alias_blocked"
+        and entry.source == SOURCE_LLM_RECALL
+        and Laminar.is_initialized()
+    ):
         Laminar.event(
             name=SpanEvent.RECALL_DEDUPED_EXISTING.value,
             attributes={"action": res.action, "source_id": entry.source_id},
@@ -185,14 +189,15 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
             await corpus.delete_chunks_for_canonical(canonical_id)
         except Exception as exc:  # noqa: BLE001 - qdrant-client raises many transport/auth/validation shapes; recovery is the same for all.
             # Abort the entry; reconcile picks up the drift on a later pass.
-            Laminar.event(
-                name=SpanEvent.INGEST_ENTRY_FAILED.value,
-                attributes={
-                    "canonical_id": canonical_id,
-                    "stage": "delete_chunks",
-                    "error": str(exc),
-                },
-            )
+            if Laminar.is_initialized():
+                Laminar.event(
+                    name=SpanEvent.INGEST_ENTRY_FAILED.value,
+                    attributes={
+                        "canonical_id": canonical_id,
+                        "stage": "delete_chunks",
+                        "error": str(exc),
+                    },
+                )
             logger.warning(
                 "ingest aborted entry: delete_chunks_for_canonical failed for %s: %r",
                 canonical_id,
@@ -226,10 +231,11 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         # A "complete" row with zero Qdrant points is silent corpus drift. Leave
         # the row pending and surface the empty chunk count; reconcile catches
         # this class of drift retroactively.
-        Laminar.event(
-            name=SpanEvent.INGEST_ENTRY_EMPTY_CHUNKS.value,
-            attributes={"canonical_id": canonical_id},
-        )
+        if Laminar.is_initialized():
+            Laminar.event(
+                name=SpanEvent.INGEST_ENTRY_EMPTY_CHUNKS.value,
+                attributes={"canonical_id": canonical_id},
+            )
         logger.warning(
             "ingest skipped mark_complete: zero chunks for canonical_id=%s",
             canonical_id,

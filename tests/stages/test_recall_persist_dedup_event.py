@@ -82,6 +82,10 @@ def _capture_events(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     ) -> None:
         captured.append(name)
 
+    # Production guards every Laminar.event() behind ``is_initialized()``; the
+    # tracer is inert under default test fakes, so pin it true to exercise the
+    # emit wiring.
+    monkeypatch.setattr(Laminar, "is_initialized", staticmethod(lambda: True))
     monkeypatch.setattr(Laminar, "event", _fake_event)
     return captured
 

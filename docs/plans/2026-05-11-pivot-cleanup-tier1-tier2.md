@@ -70,7 +70,7 @@ Task number 1 retained as a label for traceability; nothing to execute here.
 **Pros:** Matches the established pattern. No behavior change in traced runs. Removes one of two reasons a non-traced ingest could crash.
 **Cons:** None — pure defensive consistency.
 
-- [ ] **Step 1: Wrap each call in the existing guard**
+- [x] **Step 1: Wrap each call in the existing guard**
 
 At each of the three sites, change:
 
@@ -93,12 +93,12 @@ if Laminar.is_initialized():
 
 If a small helper already lives near the top of `_journal_writes.py` for guarded emits, prefer reusing it; otherwise inline the guard at each site. Do not introduce a new helper unless one already exists in the file — `synthesize.py:75-77` has its own `_emit_event`, but module-private helpers in this codebase are not shared across modules.
 
-- [ ] **Step 2: Verify tests + typecheck + lint**
+- [x] **Step 2: Verify tests + typecheck + lint**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add slopmortem/ingest/_journal_writes.py
