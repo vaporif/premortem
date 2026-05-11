@@ -206,7 +206,7 @@ The `match` in `_build_status_shaped_query` (`recall_verify.py:481-491`) covers 
 **Pros:** Future-proofs the function against status taxonomy growth. `assert_never` is idiomatic exhaustiveness in modern Python — basedpyright understands it and will emit a **type error at the point of incompleteness** the moment a new literal is added to `RecallSuggestion.status`, instead of a runtime-only `AssertionError`.
 **Cons:** None — `assert_never` is in stdlib `typing` since 3.11, this project is 3.13+.
 
-- [ ] **Step 1: Add the exhaustiveness check**
+- [x] **Step 1: Add the exhaustiveness check**
 
 Add `from typing import assert_never` to the imports if not already present.
 
@@ -219,12 +219,12 @@ In `slopmortem/stages/recall_verify.py:481-491`, append after the `"struggling" 
 
 Do not add a runtime `AssertionError` arm — `assert_never` already raises at runtime if reached (defensive) and, more importantly, makes basedpyright fail the build the moment the literal grows without this arm being updated.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass. `basedpyright` should remain green; if it reports `assert_never` as unreachable, the match was already exhaustive — that's the design.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add slopmortem/stages/recall_verify.py

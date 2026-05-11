@@ -55,7 +55,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Literal, cast
+from typing import TYPE_CHECKING, Final, Literal, assert_never, cast
 
 import anyio
 import httpx
@@ -487,6 +487,8 @@ def _build_status_shaped_query(suggestion: RecallSuggestion) -> str:
                 f'"{suggestion.name}" layoffs or restructuring or struggling '
                 f"{suggestion.failure_year}"
             )
+        case _:
+            assert_never(suggestion.status)
 
 
 def _select_hit(hits: list[TavilyHit], name: str) -> TavilyHit | None:
