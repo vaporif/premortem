@@ -1,0 +1,21 @@
+{
+  "key": {
+    "model": "anthropic/claude-haiku-4.5",
+    "prompt_hash": "495a3b46098e6a0d",
+    "template_sha": "0a05e16b1fed1ad4"
+  },
+  "request_debug": {
+    "prompt_preview": "You classify startup pitches into a fixed taxonomy. The output is consumed by a retrieval pipeline that boosts results matching these facets, so accuracy on the closed enums matters more than nuance.\n\nClosed enums (pick exactly one value per facet; use `other` only when none of the listed values fit):\n- sector: fintech, crypto_web3, healthtech, edtech, climate_energy, biotech, devtools, infra_devops, ai_ml_platform, data_analytics, security, hardware, robotics, logistics_supply_chain, mobility_t",
+    "response_format_present": true,
+    "system_preview": "",
+    "tools_present": []
+  },
+  "response": {
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "cost_usd": 0.002293,
+    "stop_reason": "stop",
+    "text": "{\"sector\": \"edtech\", \"business_model\": \"b2c_subscription\", \"customer_type\": \"consumer\", \"geography\": \"apac\", \"monetization\": \"tiered_freemium\", \"sub_sector\": \"K-12 AI tutoring\", \"product_type\": \"mobile app\", \"price_point\": null, \"founding_year\": null, \"failure_year\": null}"
+  },
+  "schema_version": "1.0"
+}

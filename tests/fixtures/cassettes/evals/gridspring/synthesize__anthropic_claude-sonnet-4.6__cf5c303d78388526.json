@@ -1,0 +1,21 @@
+{
+  "key": {
+    "model": "anthropic/claude-sonnet-4.6",
+    "prompt_hash": "cf5c303d78388526",
+    "template_sha": "5d6cef413150ca6a"
+  },
+  "request_debug": {
+    "prompt_preview": "You rerank dead-startup candidates for a slopmortem pipeline. Given a fresh pitch and K candidates retrieved by hybrid search, score each candidate from four perspectives, then return ONLY the top 5 ranked from most to least relevant.\n\nPerspectives (each scored 0-10 with a one-sentence rationale):\n- business_model: how similar are the revenue, pricing, and customer-relationship shapes?\n- market: how similar are the target buyers, market size, and demand drivers?\n- gtm: how similar are the go-to-",
+    "response_format_present": true,
+    "system_preview": "",
+    "tools_present": []
+  },
+  "response": {
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "cost_usd": 0.004941,
+    "stop_reason": "stop",
+    "text": "{\"ranked\": []} "
+  },
+  "schema_version": "1.0"
+}
