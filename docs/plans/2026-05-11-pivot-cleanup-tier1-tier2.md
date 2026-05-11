@@ -248,7 +248,7 @@ Replace the binding idea with a contract test that pins all three copies to the 
 **Pros:** Catches any drift between prompt template, `_INJECTION_MARKER`, and `SpanEvent` at test time — at least one of the three must move for detection to silently break, and the test fails the moment any does.
 **Cons:** Pure test addition; no behavior change.
 
-- [ ] **Step 1: Add the contract test**
+- [x] **Step 1: Add the contract test**
 
 Create `tests/stages/test_injection_marker_contract.py`:
 
@@ -282,17 +282,17 @@ def test_injection_marker_present_in_prompt_template() -> None:
 
 If the prompt path differs from what's above, locate it with `git grep -l "synthesize.j2"` and adjust.
 
-- [ ] **Step 2: Run the contract test**
+- [x] **Step 2: Run the contract test**
 
 Run: `just test tests/stages/test_injection_marker_contract.py -v`
 Expected: both tests pass against current code.
 
-- [ ] **Step 3: Full verify**
+- [x] **Step 3: Full verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/stages/test_injection_marker_contract.py
