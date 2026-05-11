@@ -29,7 +29,7 @@
 
 - [x] Task 0 [AFK]: Tavily evidence-discovery pre-flight (5 known-dead Web3 companies; ≥4 must return a usable hit) → depends on `none` → batch 0
 - [x] Task 1 [AFK]: Tavily structured-search helper (`tavily_search_structured` returning `list[TavilyHit]`, not formatted string) → depends on `Task 0` → batch 1
-- [ ] Task 2 [AFK]: `RecallSuggestion` schema shrink (drop `evidence_url`; relax `homepage_url` to `str | None`); `llm_recall.j2` prompt update; cassette re-record for `llm_recall` → depends on `Task 1` → batch 2
+- [x] Task 2 [AFK]: `RecallSuggestion` schema shrink (drop `evidence_url`; relax `homepage_url` to `str | None`); `llm_recall.j2` prompt update; cassette re-record for `llm_recall` → depends on `Task 1` → batch 2
 - [ ] Task 3 [AFK]: Verifier search head (`_search_for_evidence`); plumb discovered URL through `verify_suggestion`; L4 Wayback stays, gated on `homepage_url is not None`; `_recall_source_id` keeps the homepage key with a name-only fallback when homepage is absent → depends on `Task 2` → batch 3
 - [ ] Task 4 [AFK]: Pipeline wiring (`RecallDeps` adds `tavily_search` callable; CLI builds it from config; eval recorder fakes it) → depends on `Task 3` → batch 4
 - [ ] Task 5 [AFK]: Telemetry + cassette re-record for `recall_deathness` (URL bodies will differ); test sweep across recall_verify / recall_persist / pipeline_recall_fallback test files → depends on `Task 4` → batch 5
