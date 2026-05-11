@@ -80,6 +80,7 @@ _QUERY_PHASE_LABELS: dict[QueryPhase, str] = {
     QueryPhase.FACET_EXTRACT: "Extracting facets",
     QueryPhase.RETRIEVE: "Retrieving candidates",
     QueryPhase.RERANK: "Reranking candidates",
+    QueryPhase.RECALL: "Recalling from memory",
     QueryPhase.SYNTHESIZE: "Synthesizing post-mortems",
 }
 
