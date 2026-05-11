@@ -55,7 +55,7 @@ if TYPE_CHECKING:
         RawEntry,
     )
     from slopmortem.stages import SparseEncoder, VerificationTier
-    from slopmortem.stages.recall_verify import TavilySearchFn
+    from slopmortem.stages.recall_verify import ExtractFn, TavilySearchFn
 
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,11 @@ class RecallDeps:
     silently no-oping mid-run.
 
     ``tavily_search`` is required: the L0 search head is mandatory under the
-    new contract.
+    new contract. ``extract`` is required: the L3 fallback fires when direct
+    GET 4xx's (bot-blocked hosts like Medium) or returns a body too short to
+    admit (SPA shells like decrypt.co Next.js). Both surfaces are bundled
+    under ``enable_tavily_recall_search`` — disabling Tavily disables recall
+    entirely.
 
     ``wayback`` defaults to ``None`` so production wiring can omit it and
     let the pipeline construct a fresh ``WaybackEnricher()``; tests inject
@@ -93,6 +97,7 @@ class RecallDeps:
     slop_classifier: SlopClassifier
     post_mortems_root: Path
     tavily_search: TavilySearchFn
+    extract: ExtractFn
     # Typed as the broad ``Enricher`` Protocol so tests can inject a fake
     # without subclassing ``WaybackEnricher``.
     wayback: Enricher | None = None
@@ -234,6 +239,7 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         persist=_persist,
         llm=llm,
         tavily_search=recall_deps.tavily_search,
+        extract=recall_deps.extract,
         tavily_recall_max_results=config.tavily_recall_max_results,
         model_recall_deathness=config.model_recall_deathness,
         max_tokens_recall_deathness=config.max_tokens_recall_deathness,

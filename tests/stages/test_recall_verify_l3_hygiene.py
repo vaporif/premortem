@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.stages.recall_verify import verify_suggestion
+from tests.stages.test_recall_search_head import FakeTavilyExtract
 
 if TYPE_CHECKING:
     import pytest
@@ -26,6 +27,10 @@ _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
 _STRUGGLING_MIN_CONFIDENCE = 0.85
+# Default extract fake: returns "" so any L3 fallback call drops without
+# recovering. These tests don't exercise the extract path; the fake exists
+# to satisfy the required ``extract=`` kwarg.
+_NEVER_EXTRACT = FakeTavilyExtract()
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "recall"
 PAYWALL_HTML = (_FIXTURES / "paywall_stub.html").read_text()
@@ -149,6 +154,7 @@ async def test_l3_drops_when_body_under_500_chars(monkeypatch: pytest.MonkeyPatc
         discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=_call_blocker(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -171,6 +177,7 @@ async def test_l3_rejects_when_name_only_in_sidebar(monkeypatch: pytest.MonkeyPa
         discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=_call_blocker(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -199,6 +206,7 @@ async def test_l3_does_not_match_substring_inside_word(monkeypatch: pytest.Monke
         discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=_call_blocker(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -228,6 +236,7 @@ async def test_l3_admits_shuttered_keyword(monkeypatch: pytest.MonkeyPatch) -> N
         discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -258,6 +267,7 @@ async def test_l3_admits_chapter_eleven(monkeypatch: pytest.MonkeyPatch) -> None
         discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,

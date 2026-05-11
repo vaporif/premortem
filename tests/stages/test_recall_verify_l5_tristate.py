@@ -26,6 +26,7 @@ from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.stages.recall_persist import persist_recall_entry
 from slopmortem.stages.recall_verify import _recall_source_id, verify_suggestion
+from tests.stages.test_recall_search_head import FakeTavilyExtract
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,6 +36,9 @@ _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
 _STRUGGLING_MIN_CONFIDENCE = 0.85
+# Default extract fake: returns "" so any L3 fallback call drops without
+# recovering. These tests don't exercise the extract path.
+_NEVER_EXTRACT = FakeTavilyExtract()
 
 _FILLER = (
     "The board cited prolonged headwinds, falling renewal rates, and a stalled "
@@ -195,6 +199,7 @@ async def test_l5_tristate_thresholds(
         discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -240,6 +245,7 @@ async def test_l5_news_body_and_persisted_combined_when_anchored(
         discovered_url=discovered,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -282,6 +288,7 @@ async def test_persisted_body_omits_wayback_section_when_not_anchored(
         discovered_url=discovered,
         wayback=_FakeWayback(enriched_text=None),
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,

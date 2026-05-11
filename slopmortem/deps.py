@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 
 from slopmortem.budget import Budget
 from slopmortem.corpus import QdrantCorpus
-from slopmortem.corpus.tavily import tavily_search_structured
+from slopmortem.corpus.tavily import tavily_extract_structured, tavily_search_structured
 from slopmortem.llm import OpenRouterClient, make_embedder
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from slopmortem.corpus import Corpus
     from slopmortem.llm import EmbeddingClient, LLMClient
     from slopmortem.stages import SparseEncoder
-    from slopmortem.stages.recall_verify import TavilySearchFn
+    from slopmortem.stages.recall_verify import ExtractFn, TavilySearchFn
 
 
 def build_deps(
@@ -77,3 +77,17 @@ def build_tavily_recall_search(config: Config) -> TavilySearchFn | None:
     if not config.enable_tavily_recall_search:
         return None
     return tavily_search_structured
+
+
+def build_tavily_recall_extract(config: Config) -> ExtractFn | None:
+    """Return ``tavily_extract_structured`` when recall search is enabled, else ``None``.
+
+    Bundled under the same flag as the search head: the L3 extract fallback
+    rides whenever Tavily is wired in. Separate flag would add a config knob
+    no one's asked for; the verifier already drops gracefully when extract
+    returns empty or raises, so the only reason to gate extract independently
+    is Tavily quota — and quota is shared across both surfaces anyway.
+    """
+    if not config.enable_tavily_recall_search:
+        return None
+    return tavily_extract_structured

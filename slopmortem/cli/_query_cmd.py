@@ -28,7 +28,7 @@ from slopmortem.cli._common import (
 )
 from slopmortem.config import load_config
 from slopmortem.corpus import set_query_corpus
-from slopmortem.deps import build_deps, build_tavily_recall_search
+from slopmortem.deps import build_deps, build_tavily_recall_extract, build_tavily_recall_search
 from slopmortem.models import InputContext
 from slopmortem.pipeline import RecallDeps, cutoff_iso, run_query
 from slopmortem.render import render
@@ -212,10 +212,12 @@ async def _build_recall_deps(
 
     Returns ``None`` when ``enable_tavily_recall_search=False`` — the L0
     search head is mandatory under the new contract, so disabling Tavily
-    disables the entire recall branch.
+    disables the entire recall branch. The L3 extract fallback is bundled
+    under the same flag.
     """
     tavily_search = build_tavily_recall_search(config)
-    if tavily_search is None:
+    extract = build_tavily_recall_extract(config)
+    if tavily_search is None or extract is None:
         return None
     # Local imports keep the cold-start cost off the import path; mirrors
     # the ``_ingest_cmd.py`` pattern of deferring heavyweight deps.
@@ -238,6 +240,7 @@ async def _build_recall_deps(
         slop_classifier=classifier,
         post_mortems_root=post_mortems_root,
         tavily_search=tavily_search,
+        extract=extract,
     )
 
 

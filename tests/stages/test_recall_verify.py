@@ -21,7 +21,7 @@ from slopmortem.stages.recall_verify import (
     verify_suggestion,
 )
 from slopmortem.tracing import SpanEvent
-from tests.stages.test_recall_search_head import FakeTavilySearch
+from tests.stages.test_recall_search_head import FakeTavilyExtract, FakeTavilySearch
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -34,6 +34,10 @@ _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
 _STRUGGLING_MIN_CONFIDENCE = 0.85
+# Default extract fake: returns "" so any L3 fallback call drops without
+# recovering. Most tests in this file don't exercise the extract path; the
+# fake exists to satisfy the required ``extract=`` kwarg.
+_NEVER_EXTRACT = FakeTavilyExtract()
 # Pad sentence used to push trafilatura output past the 500-char ``LENGTH_FLOOR``
 # without changing the load-bearing keyword tokens each test exercises.
 _FILLER_SENTENCE = (
@@ -215,6 +219,7 @@ async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -239,6 +244,7 @@ async def test_l2_rejects_ssrf_evidence(monkeypatch: pytest.MonkeyPatch) -> None
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -262,6 +268,7 @@ async def test_l2_rejects_httpx_error_evidence(monkeypatch: pytest.MonkeyPatch) 
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -289,6 +296,7 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -317,6 +325,7 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -340,6 +349,7 @@ async def test_l3_rejects_evidence_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -366,6 +376,7 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -405,6 +416,7 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -440,6 +452,7 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -473,6 +486,7 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -504,6 +518,7 @@ async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) 
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -545,6 +560,7 @@ async def test_l4_wayback_short_circuits_when_homepage_is_none(
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -626,6 +642,7 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         tavily_search=tavily,
         tavily_recall_max_results=5,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -672,6 +689,7 @@ async def test_verify_skips_persist_for_dropped_suggestions(
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         tavily_search=_tavily_for([sug]),
         tavily_recall_max_results=5,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -697,6 +715,7 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
         discovered_url=discovered,
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -747,6 +766,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         discovered_url=first_url,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -757,6 +777,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         discovered_url=other_url,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -767,6 +788,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         discovered_url=diff_vendor_url,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -812,6 +834,7 @@ async def test_l5_drops_when_alive(monkeypatch: pytest.MonkeyPatch) -> None:
         discovered_url=discovered,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -837,6 +860,7 @@ async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> 
         discovered_url=discovered,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -861,6 +885,7 @@ async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> 
         discovered_url=discovered,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -886,6 +911,7 @@ async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> Non
         discovered_url=discovered,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -906,6 +932,7 @@ async def test_l5_drops_on_transport_failure(monkeypatch: pytest.MonkeyPatch) ->
         discovered_url=discovered,
         wayback=wb,
         llm=llm,
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,

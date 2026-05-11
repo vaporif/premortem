@@ -17,6 +17,7 @@ import httpx
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.stages.recall_verify import verify_suggestion
+from tests.stages.test_recall_search_head import FakeTavilyExtract
 
 if TYPE_CHECKING:
     import pytest
@@ -27,6 +28,10 @@ _DEATHNESS_MODEL = "test-haiku"
 _DEATHNESS_MAX_TOKENS = 128
 _DEATHNESS_MIN_CONFIDENCE = 0.7
 _STRUGGLING_MIN_CONFIDENCE = 0.85
+# Default extract fake: returns "" so any L3 fallback call drops without
+# recovering. These tests don't exercise the extract path; the fake exists
+# to satisfy the required ``extract=`` kwarg.
+_NEVER_EXTRACT = FakeTavilyExtract()
 
 _FILLER = (
     "The board cited prolonged headwinds, falling renewal rates, and a stalled "
@@ -196,6 +201,7 @@ async def test_homepage_head_does_not_gate_when_wayback_anchors(
         discovered_url=discovered,
         wayback=wb,
         llm=_admits_llm(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -227,6 +233,7 @@ async def test_wayback_empty_admits_at_evidence_only_tier(
         discovered_url=discovered,
         wayback=_PassThroughWayback(),
         llm=_admits_llm(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -260,6 +267,7 @@ async def test_wayback_transient_failure_does_not_drop(
         discovered_url=discovered,
         wayback=wb,
         llm=_admits_llm(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -291,6 +299,7 @@ async def test_evidence_head_405_falls_through_to_get(
         discovered_url=discovered,
         wayback=_PassThroughWayback(),
         llm=_admits_llm(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,
@@ -313,6 +322,7 @@ async def test_evidence_get_404_drops(monkeypatch: pytest.MonkeyPatch) -> None:
         discovered_url=discovered,
         wayback=_PassThroughWayback(),
         llm=_blocker_llm(),
+        extract=_NEVER_EXTRACT,
         model_recall_deathness=_DEATHNESS_MODEL,
         max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
         min_confidence=_DEATHNESS_MIN_CONFIDENCE,

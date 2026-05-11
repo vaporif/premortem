@@ -1,4 +1,4 @@
-"""Structured Tavily ``/search`` surface.
+"""Structured Tavily ``/search`` and ``/extract`` surfaces.
 
 Sibling to the formatted-string ``tavily_search_async`` in ``_tools_impl.py``:
 that one feeds the synthesis LLM tool loop and must keep its line-rendering
@@ -6,6 +6,12 @@ shape (cassette matching), so it stays on the leaf-private module. Callers
 that want typed hits — e.g. the recall verifier's search head — import
 ``tavily_search_structured`` from here without crossing the corpus leaf
 boundary.
+
+``tavily_extract_structured`` exposes the ``/extract`` endpoint for the
+recall verifier's L3 fallback path: when direct GET on a citation URL
+returns 4xx (bot-blocked, e.g. Medium) or yields a body too short to admit
+(SPA shells like decrypt.co Next.js), Tavily extracts the rendered article
+text using its own IP pool and headless browser.
 
 Both surfaces share ``parse_tavily_response`` so the snippet truncation
 and field coercion stay identical.
@@ -21,14 +27,17 @@ from pydantic import BaseModel
 from slopmortem.http import safe_post
 
 TAVILY_SEARCH_URL: Final[str] = "https://api.tavily.com/search"
+TAVILY_EXTRACT_URL: Final[str] = "https://api.tavily.com/extract"
 TAVILY_SNIPPET_CHARS: Final[int] = 500
 
 __all__ = [
+    "TAVILY_EXTRACT_URL",
     "TAVILY_SEARCH_URL",
     "TAVILY_SNIPPET_CHARS",
     "TavilyHit",
     "parse_tavily_response",
     "tavily_api_key",
+    "tavily_extract_structured",
     "tavily_search_structured",
 ]
 
@@ -103,3 +112,36 @@ async def tavily_search_structured(q: str, limit: int) -> list[TavilyHit]:
     resp.raise_for_status()
     payload: object = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
     return parse_tavily_response(payload, limit)
+
+
+async def tavily_extract_structured(url: str) -> str:
+    """Hit ``api.tavily.com/extract`` and return the rendered article body.
+
+    Returns ``""`` when Tavily has no usable content for the URL. The recall
+    verifier's L3 fallback treats empty as a hard drop — same shape as direct
+    GET returning a body below the 500-char floor.
+
+    Raises:
+        RuntimeError: ``TAVILY_API_KEY`` is unset.
+        httpx.HTTPError: Tavily returned a non-2xx status or the request failed.
+    """
+    resp = await safe_post(
+        TAVILY_EXTRACT_URL,
+        json={"api_key": tavily_api_key(), "urls": [url]},
+    )
+    resp.raise_for_status()
+    payload: object = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
+    if not isinstance(payload, dict):
+        return ""
+    raw_payload = cast("dict[str, object]", payload)
+    raw_results = raw_payload.get("results", [])
+    if not isinstance(raw_results, list):
+        return ""
+    raw_list = cast("list[object]", raw_results)
+    if not raw_list:
+        return ""
+    first = raw_list[0]
+    if not isinstance(first, dict):
+        return ""
+    raw_first = cast("dict[str, object]", first)
+    return str(raw_first.get("raw_content", ""))

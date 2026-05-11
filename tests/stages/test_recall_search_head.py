@@ -39,6 +39,33 @@ class FakeTavilySearch:
         return self.response_map.get(q, self.default)[:limit]
 
 
+class FakeTavilyExtract:
+    """Fake for ``ExtractFn`` — returns a canned body (or raises) per URL.
+
+    ``response_map`` keys on the exact URL the verifier hands to extract;
+    ``default`` covers URLs the test doesn't care to enumerate. A queued
+    ``BaseException`` is raised instead of returned, mirroring the live
+    extract surface's contract (``httpx.HTTPError`` / ``SSRFBlockedError`` /
+    ``RuntimeError`` on missing key).
+    """
+
+    def __init__(
+        self,
+        response_map: dict[str, str | BaseException] | None = None,
+        default: str | BaseException = "",
+    ) -> None:
+        self.response_map = response_map or {}
+        self.default = default
+        self.calls: list[str] = []
+
+    async def __call__(self, url: str) -> str:
+        self.calls.append(url)
+        result = self.response_map.get(url, self.default)
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+
 def _suggestion(name: str = "Hexagate") -> RecallSuggestion:
     return RecallSuggestion(
         name=name,

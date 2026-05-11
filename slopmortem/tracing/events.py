@@ -47,6 +47,10 @@ class SpanEvent(StrEnum):
     RECALL_REJECTED_L3_NAME_MISSING = "recall.rejected_l3_name"
     RECALL_REJECTED_L3_KEYWORD_MISSING = "recall.rejected_l3_kw"
     RECALL_REJECTED_L3_BODY_TOO_SHORT = "recall.rejected_l3_body_too_short"
+    # L3 extract fallback fired and a Tavily ``/extract`` call recovered a body
+    # that direct fetch couldn't get (Medium 403, decrypt.co SPA shell, etc.).
+    # Attributes: ``reason`` ("l2_get_4xx" or "l3_body_too_short").
+    RECALL_L3_EXTRACT_FALLBACK_RECOVERED = "recall.l3_extract_fallback_recovered"
     RECALL_VERIFIED_WAYBACK_ANCHORED = "recall.verified_wayback"
     RECALL_VERIFIED_EVIDENCE_ONLY = "recall.verified_evidence"
     RECALL_PERSISTED = "recall.persisted"

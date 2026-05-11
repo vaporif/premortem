@@ -16,7 +16,10 @@ L2 — Liveness on the discovered URL only. HEAD->GET fallthrough: HEAD is the
      cheap first probe, but paywalled/anti-bot citations routinely 401/403/405
      on HEAD while serving GET. The GET status code is the authoritative gate.
      The homepage URL is provenance, not corroboration — its liveness isn't
-     load-bearing here.
+     load-bearing here. On L2 4xx OR L3 body-too-short, the Tavily ``/extract``
+     fallback fires once: its own IP pool/headless browser unblocks bot-blocked
+     hosts (Medium) and SPA shells (decrypt.co Next.js). Anchor-missing
+     rejections don't retry — extract won't change which words are in the body.
 L3 — Body extraction on the GET response. Drops if the body doesn't contain
      both the company name AND a death/distress keyword (case-insensitive).
 L4 — Wayback enrichment, advisory only. Short-circuits when
@@ -77,6 +80,12 @@ if TYPE_CHECKING:
 # concrete (live Tavily, eval-mode fake, recording wrapper) it builds
 # without recall_verify importing the corpus-leaf implementation.
 type TavilySearchFn = Callable[[str, int], Awaitable[list[TavilyHit]]]
+
+
+# Callable shape of ``tavily_extract_structured``: ``(url) -> raw_content``.
+# Returns ``""`` when Tavily has no usable content. Used as L3 fallback when
+# direct GET is bot-blocked (Medium 403) or returns a SPA shell (decrypt.co).
+type ExtractFn = Callable[[str], Awaitable[str]]
 
 
 logger = logging.getLogger(__name__)
@@ -194,22 +203,6 @@ def _body_anchors_name_and_death(name: str, body: str) -> _AnchorResult:
     if not _DEATH_REGEX.search(body):
         return "keyword_missing"
     return "ok"
-
-
-def _log_and_emit_l3_rejection(
-    anchor: _AnchorResult,
-    *,
-    name: str,
-    evidence: str,
-) -> None:
-    """Log + emit the right L3 rejection event for the failing anchor."""
-    if anchor == "name_missing":
-        logger.info("recall_verify: L3 body lacks name anchor for %r at %s", name, evidence)
-        _emit_event(SpanEvent.RECALL_REJECTED_L3_NAME_MISSING)
-        return
-    if anchor == "keyword_missing":
-        logger.info("recall_verify: L3 body lacks death keyword for %r at %s", name, evidence)
-        _emit_event(SpanEvent.RECALL_REJECTED_L3_KEYWORD_MISSING)
 
 
 class _DeathnessJudgment(BaseModel):
@@ -384,29 +377,84 @@ def _combine_recall_body(
     return "\n\n---\n\n".join(parts)
 
 
-async def _l3_body_or_drop(*, name: str, evidence: str, body_text: str) -> str | None:
-    """Extract clean text, gate on the 500-char floor and the name+keyword anchors.
+# Outcome discriminator for ``_l3_classify``. ``body_too_short`` is the
+# recoverable case (Tavily extract may render the article fully); the two
+# anchor failures are not — extract returns the same words.
+type _L3Outcome = Literal["ok", "body_too_short", "name_missing", "keyword_missing"]
 
-    Pulled out so ``verify_suggestion`` stays under the cyclomatic-complexity
-    cap once the HEAD->GET fallthrough lives inline.
+
+def _l3_classify(*, name: str, body_text: str) -> tuple[_L3Outcome, str]:
+    """Extract clean text and classify against the 500-char floor + anchor checks.
+
+    Returns ``(outcome, cleaned_body)``. ``cleaned_body`` is the trafilatura
+    output (possibly empty on ``body_too_short``). The caller decides whether
+    to retry via Tavily extract — only ``body_too_short`` is recoverable.
+
+    ``extract_clean`` strips HTML, runs trafilatura/readability, and returns
+    ``""`` below its 500-char floor. Treating empty as a hard reject means
+    paywalls, JS shells, and any page where main-article extraction failed
+    fall through to the extract fallback rather than fabricating a body from
+    raw HTML.
     """
-    # ``extract_clean`` strips HTML, runs trafilatura/readability, and returns
-    # ``""`` below its 500-char floor. Treating empty as a hard reject means
-    # paywalls, JS shells, and any page where main-article extraction failed
-    # get dropped — no fallback to raw HTML, which would reintroduce the
-    # sidebar-bleed and nav-link false positives the strip prevents.
-    evidence_body = extract_clean(body_text)
-    if len(evidence_body) < _L3_MIN_BODY_CHARS:
-        logger.info(
-            "recall_verify: L3 body too short (%d chars) for %s", len(evidence_body), evidence
-        )
+    cleaned = extract_clean(body_text)
+    if len(cleaned) < _L3_MIN_BODY_CHARS:
+        return "body_too_short", cleaned
+    anchor = _body_anchors_name_and_death(name, cleaned)
+    if anchor == "name_missing":
+        return "name_missing", cleaned
+    if anchor == "keyword_missing":
+        return "keyword_missing", cleaned
+    return "ok", cleaned
+
+
+def _emit_l3_rejection(outcome: _L3Outcome, *, name: str, evidence: str, body_len: int) -> None:
+    """Emit the right L3 rejection event for a non-``ok`` outcome."""
+    if outcome == "body_too_short":
+        logger.info("recall_verify: L3 body too short (%d chars) for %s", body_len, evidence)
         _emit_event(SpanEvent.RECALL_REJECTED_L3_BODY_TOO_SHORT)
+        return
+    if outcome == "name_missing":
+        logger.info("recall_verify: L3 body lacks name anchor for %r at %s", name, evidence)
+        _emit_event(SpanEvent.RECALL_REJECTED_L3_NAME_MISSING)
+        return
+    if outcome == "keyword_missing":
+        logger.info("recall_verify: L3 body lacks death keyword for %r at %s", name, evidence)
+        _emit_event(SpanEvent.RECALL_REJECTED_L3_KEYWORD_MISSING)
+
+
+async def _try_extract_fallback(
+    *,
+    name: str,
+    evidence: str,
+    extract: ExtractFn,
+    fallback_reason: Literal["l2_get_4xx", "l3_body_too_short"],
+) -> str | None:
+    """Run the Tavily ``/extract`` fallback; return the cleaned body on success.
+
+    Returns ``None`` when extract raised, returned no content, or returned a
+    body that still fails ``_l3_classify``. Only emits the recovery event on
+    full success. Anchor-missing outcomes from the fallback body don't retry
+    again — extract won't change which words are in the article.
+    """
+    try:
+        raw = await extract(evidence)
+    except (httpx.HTTPError, SSRFBlockedError, RuntimeError) as exc:
+        logger.info(
+            "recall_verify: L3 extract fallback transport failure for %s: %r", evidence, exc
+        )
         return None
-    anchor = _body_anchors_name_and_death(name, evidence_body)
-    if anchor != "ok":
-        _log_and_emit_l3_rejection(anchor, name=name, evidence=evidence)
+    if not raw:
         return None
-    return evidence_body
+    outcome, cleaned = _l3_classify(name=name, body_text=raw)
+    if outcome != "ok":
+        # Don't re-emit a fresh L3 rejection — the caller already emitted the
+        # original drop event. The fallback simply failed to recover.
+        return None
+    _emit_event(
+        SpanEvent.RECALL_L3_EXTRACT_FALLBACK_RECOVERED,
+        attributes={"reason": fallback_reason},
+    )
+    return cleaned
 
 
 def _hit_mentions(hit: TavilyHit, needle: str) -> bool:
@@ -517,12 +565,95 @@ async def _run_l4_wayback(
     return "evidence_only", None
 
 
+async def _l2_head_failed(evidence: str) -> bool:
+    """Probe ``evidence`` via HEAD; return True if HEAD failed or returned 4xx/5xx.
+
+    HEAD is the cheap first probe but routinely 401/403/405's on paywalled or
+    anti-bot citation hosts even when GET works — so we never drop on HEAD,
+    we only record whether it succeeded so the eventual drop event carries
+    the right attribute.
+    """
+    try:
+        head_resp = await safe_head(evidence, timeout=_FETCH_TIMEOUT_S)
+    except (SSRFBlockedError, httpx.HTTPError) as exc:
+        logger.info(
+            "recall_verify: L2 HEAD failed for %s, falling through to GET: %r", evidence, exc
+        )
+        return True
+    if head_resp.status_code >= _HTTP_BAD_REQUEST:
+        logger.info(
+            "recall_verify: L2 HEAD %s for %s, falling through to GET",
+            head_resp.status_code,
+            evidence,
+        )
+        return True
+    return False
+
+
+async def _l2_get_body(evidence: str) -> str | None:
+    """GET ``evidence`` and return the body text. ``None`` if GET 4xx'd or raised.
+
+    ``safe_get`` does NOT consult robots.txt (unlike Wayback's ``_fetch``).
+    The evidence URL is a third-party citation, so vendor robots policy doesn't apply.
+    """
+    try:
+        resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
+    except (SSRFBlockedError, httpx.HTTPError) as exc:
+        logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
+        return None
+    if resp.status_code >= _HTTP_BAD_REQUEST:
+        logger.info("recall_verify: L3 GET %s for %s", resp.status_code, evidence)
+        return None
+    return resp.text
+
+
+async def _l2_l3_fetch_body(
+    *,
+    name: str,
+    evidence: str,
+    extract: ExtractFn,
+) -> str | None:
+    """Run the L2 HEAD->GET ladder + L3 classify; return the cleaned body or ``None``.
+
+    On L2 GET 4xx/transport failure, fall back to Tavily ``/extract`` once.
+    On L3 ``body_too_short``, fall back to Tavily ``/extract`` once. Anchor
+    failures don't retry — extract returns the same words.
+    """
+    head_failed = await _l2_head_failed(evidence)
+    body_text = await _l2_get_body(evidence)
+    if body_text is None:
+        # L2 4xx / transport failure: try the extract fallback before dropping.
+        recovered = await _try_extract_fallback(
+            name=name, evidence=evidence, extract=extract, fallback_reason="l2_get_4xx"
+        )
+        if recovered is not None:
+            return recovered
+        _emit_event(
+            SpanEvent.RECALL_REJECTED_L2,
+            attributes={"stage": "get", "head_failed": str(head_failed)},
+        )
+        return None
+    outcome, cleaned = _l3_classify(name=name, body_text=body_text)
+    if outcome == "ok":
+        return cleaned
+    # Emit the original rejection event first so traces always carry the
+    # primary drop reason even when the fallback also fails.
+    _emit_l3_rejection(outcome, name=name, evidence=evidence, body_len=len(cleaned))
+    if outcome != "body_too_short":
+        # name_missing / keyword_missing: extract returns the same words. No retry.
+        return None
+    return await _try_extract_fallback(
+        name=name, evidence=evidence, extract=extract, fallback_reason="l3_body_too_short"
+    )
+
+
 async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from config
     suggestion: RecallSuggestion,
     *,
     discovered_url: str,
     wayback: Enricher,
     llm: LLMClient,
+    extract: ExtractFn,
     model_recall_deathness: str,
     max_tokens_recall_deathness: int,
     min_confidence: float,
@@ -531,56 +662,16 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
     """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops.
 
     ``discovered_url`` is the L0 Tavily output — the article URL that the
-    L2/L3 ladder probes. ``RawEntry.url`` falls back to the discovered URL
-    when ``suggestion.homepage_url`` is None so the persisted point always
-    has provenance.
+    L2/L3 ladder probes. ``extract`` is the Tavily ``/extract`` fallback fired
+    once when direct GET 4xx's or the body is too short to admit. ``RawEntry.url``
+    falls back to the discovered URL when ``suggestion.homepage_url`` is None so
+    the persisted point always has provenance.
     """
     homepage = suggestion.homepage_url
     evidence = discovered_url
     seed_url = homepage if homepage is not None else discovered_url
-    # L2: gate the discovered URL only. The homepage is provenance, not
-    # corroboration — its liveness isn't load-bearing. HEAD->GET fallthrough
-    # because many real news sites (paywalls, CDNs, anti-bot) return 401/403/405
-    # on HEAD even when GET works. Try HEAD first because it's cheap; on any
-    # failure shape, fall through to the L3 GET that would have run anyway and
-    # let its status code be the gate.
-    head_failed = False
-    try:
-        head_resp = await safe_head(evidence, timeout=_FETCH_TIMEOUT_S)
-    except (SSRFBlockedError, httpx.HTTPError) as exc:
-        logger.info(
-            "recall_verify: L2 HEAD failed for %s, falling through to GET: %r", evidence, exc
-        )
-        head_failed = True
-    else:
-        if head_resp.status_code >= _HTTP_BAD_REQUEST:
-            logger.info(
-                "recall_verify: L2 HEAD %s for %s, falling through to GET",
-                head_resp.status_code,
-                evidence,
-            )
-            head_failed = True
-    # L3: GET the evidence body. Authoritative gate once HEAD is non-load-bearing.
-    # ``safe_get`` does NOT consult robots.txt (unlike Wayback's ``_fetch``).
-    # The evidence URL is a third-party citation, so vendor robots policy doesn't apply.
-    try:
-        evidence_resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
-    except (SSRFBlockedError, httpx.HTTPError) as exc:
-        logger.info("recall_verify: L3 GET failed for %s: %r", evidence, exc)
-        _emit_event(
-            SpanEvent.RECALL_REJECTED_L2,
-            attributes={"stage": "get", "head_failed": str(head_failed)},
-        )
-        return None
-    if evidence_resp.status_code >= _HTTP_BAD_REQUEST:
-        logger.info("recall_verify: L3 GET %s for %s", evidence_resp.status_code, evidence)
-        _emit_event(
-            SpanEvent.RECALL_REJECTED_L2,
-            attributes={"stage": "get", "head_failed": str(head_failed)},
-        )
-        return None
-    evidence_body = await _l3_body_or_drop(
-        name=suggestion.name, evidence=evidence, body_text=evidence_resp.text
+    evidence_body = await _l2_l3_fetch_body(
+        name=suggestion.name, evidence=evidence, extract=extract
     )
     if evidence_body is None:
         return None
@@ -638,7 +729,7 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
 # evidence body can be sizeable.
 @observe(
     name="stage.recall_verify",
-    ignore_inputs=["suggestions", "persist", "wayback", "llm", "tavily_search"],
+    ignore_inputs=["suggestions", "persist", "wayback", "llm", "tavily_search", "extract"],
     ignore_output=True,
 )
 async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knobs flow through from pipeline
@@ -648,6 +739,7 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
     persist: Callable[[RawEntry, VerificationTier, Literal["dead", "struggling"]], Awaitable[None]],
     llm: LLMClient,
     tavily_search: TavilySearchFn,
+    extract: ExtractFn,
     tavily_recall_max_results: int,
     model_recall_deathness: str,
     max_tokens_recall_deathness: int,
@@ -676,6 +768,7 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
                 discovered_url=discovered,
                 wayback=wayback,
                 llm=llm,
+                extract=extract,
                 model_recall_deathness=model_recall_deathness,
                 max_tokens_recall_deathness=max_tokens_recall_deathness,
                 min_confidence=min_confidence,
