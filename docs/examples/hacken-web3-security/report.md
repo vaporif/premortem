@@ -45,7 +45,7 @@ Generated: 2026-05-11T18:17:39.132865+00:00
    Applies because: Hacken is an established brand operating this as a product line — acquisition or deep partnership could replicate the Cylance/BlackBerry dynamic where integration eroded the product's competitive edge and destroyed ARR.
    Raised by: Cylance (acquired by BlackBerry, product wound down) (1/2)
 
-## 1c0f80a249690307
+## Harpie
 *Source: LLM recall (verified against live web)*
 
 Coinbase-backed on-chain firewall for Ethereum wallets that shut down in 2025 after failing to build a sustainable business model despite $4.5M in seed funding.
