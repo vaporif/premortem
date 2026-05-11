@@ -6,9 +6,9 @@ import asyncio
 import importlib
 import json
 import typing
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import pytest
 
@@ -19,6 +19,7 @@ from slopmortem.corpus import MergeJournal
 from slopmortem.ingest import (
     FakeSlopClassifier,
     InMemoryCorpus,
+    NullProgress,
     ingest,
 )
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
@@ -825,29 +826,13 @@ async def test_ingest_records_at_most_max_recorded_errors_attributes(tmp_path, c
     assert len(failed_events) == n
 
 
-@dataclass
-class _RecordingProgress:
-    """Capture ``error()`` calls; other progress hooks are no-ops.
+class _RecordingProgress(NullProgress):
+    """``NullProgress`` plus an ``error()`` recorder for assertions."""
 
-    Mirrors ``NullProgress`` minus the active recording — keeps the protocol
-    surface, so the orchestrator's ``isinstance(progress, IngestProgress)``
-    boundary is honoured.
-    """
+    def __init__(self) -> None:
+        self.errors: list[tuple[str, str]] = []
 
-    errors: list[tuple[str, str]] = field(default_factory=list)
-
-    def start_phase(self, phase, total) -> None:
-        del phase, total
-
-    def advance_phase(self, phase, n: int = 1) -> None:
-        del phase, n
-
-    def end_phase(self, phase) -> None:
-        del phase
-
-    def log(self, message: str) -> None:
-        del message
-
+    @override
     def error(self, phase, message: str) -> None:
         self.errors.append((str(phase), message))
 
