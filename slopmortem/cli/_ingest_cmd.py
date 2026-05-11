@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import functools
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, cast
 
@@ -308,14 +307,14 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             valid = ", ".join(sorted(_SOURCE_REGISTRY))
             msg = f"--only-source: unknown source {only_source!r}. Valid: {valid}."
             raise typer.BadParameter(msg)
-        spec = _SOURCE_REGISTRY[only_source]
+        source_class = _SOURCE_REGISTRY[only_source]
         # Each opt-in source's --enable-* flag needs an explicit branch here —
         # Python's keyword-only parameter binding can't be table-driven without
         # ``locals()`` tricks. Add one when introducing a new opt-in source.
-        if spec.source_class is TavilyNewsSource:
+        if source_class is TavilyNewsSource:
             enable_tavily_news = True
         # crunchbase_csv is gated by a path argument, not a boolean — require it explicitly.
-        if spec.source_class is CrunchbaseCsvSource and crunchbase_csv is None:
+        if source_class is CrunchbaseCsvSource and crunchbase_csv is None:
             msg = "--only-source crunchbase_csv requires --crunchbase-csv PATH."
             raise typer.BadParameter(msg)
 
@@ -351,7 +350,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         )
 
     if only_source is not None:
-        wanted_class = _SOURCE_REGISTRY[only_source].source_class
+        wanted_class = _SOURCE_REGISTRY[only_source]
         sources = [s for s in sources if isinstance(s, wanted_class)]
         if not sources:
             msg = (
@@ -452,16 +451,11 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         typer.echo(f"slopmortem ingest result: {result} cost=${budget.spent_usd:.4f}")
 
 
-@dataclass(frozen=True)
-class _SourceSpec:
-    source_class: type[Source]
-
-
-_SOURCE_REGISTRY: dict[str, _SourceSpec] = {
-    "curated": _SourceSpec(source_class=CuratedSource),
-    "hn_algolia": _SourceSpec(source_class=HNAlgoliaSource),
-    "crunchbase_csv": _SourceSpec(source_class=CrunchbaseCsvSource),
-    "tavily_news": _SourceSpec(source_class=TavilyNewsSource),
+_SOURCE_REGISTRY: dict[str, type[Source]] = {
+    "curated": CuratedSource,
+    "hn_algolia": HNAlgoliaSource,
+    "crunchbase_csv": CrunchbaseCsvSource,
+    "tavily_news": TavilyNewsSource,
 }
 
 

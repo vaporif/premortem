@@ -486,11 +486,11 @@ git commit -m "cleanup: drop _set_corpus alias"
 **Pros:** Removes ceremony. `_SourceSpec` adds zero over `type[Source]`.
 **Cons:** If a second field (`enable_flag`, `default_kwargs`) is coming, the dataclass becomes useful — but per CLAUDE.md, design for today, not hypothetical futures.
 
-- [ ] **Step 1: Find all `_SourceSpec` / `source_class` references**
+- [x] **Step 1: Find all `_SourceSpec` / `source_class` references**
 
 Run: `git grep -n '_SourceSpec\|source_class' slopmortem/cli/_ingest_cmd.py`
 
-- [ ] **Step 2: Replace the dataclass with a bare type alias**
+- [x] **Step 2: Replace the dataclass with a bare type alias**
 
 In `slopmortem/cli/_ingest_cmd.py:455-465`, delete the `_SourceSpec` dataclass definition and change:
 
@@ -516,12 +516,12 @@ _SOURCE_REGISTRY: dict[str, type[Source]] = {
 
 Replace every `spec.source_class` lookup elsewhere in the file with the registry value directly (e.g. `_SOURCE_REGISTRY[name]` instead of `_SOURCE_REGISTRY[name].source_class`).
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add slopmortem/cli/_ingest_cmd.py
