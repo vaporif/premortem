@@ -12,6 +12,12 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from slopmortem.corpus.tavily import (
+    TAVILY_SEARCH_URL as _TAVILY_SEARCH_URL,
+)
+from slopmortem.corpus.tavily import (
+    parse_tavily_response,
+)
 from slopmortem.http import safe_post
 from slopmortem.models import (
     BusinessModelLit,
@@ -25,9 +31,7 @@ from slopmortem.models import (
 if TYPE_CHECKING:
     from slopmortem.corpus._store import Corpus
 
-_TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
-_TAVILY_SNIPPET_CHARS = 500
 
 __all__ = [
     "GetPostMortemArgs",
@@ -144,23 +148,22 @@ def _tavily_api_key() -> str:
 
 
 async def tavily_search_async(q: str, limit: int = 5) -> str:
-    r"""Search Tavily; return ``- title — url\n  snippet`` lines or ``"(no results)"``."""
+    r"""Search Tavily; return ``- title — url\n  snippet`` lines or ``"(no results)"``.
+
+    Shares ``parse_tavily_response`` with ``tavily_search_structured`` so the
+    snippet truncation stays in lockstep across both surfaces. The line shape
+    is load-bearing for cassette matching on the synthesis tool-call loop.
+    """
     resp = await safe_post(
         _TAVILY_SEARCH_URL,
         json={"api_key": _tavily_api_key(), "query": q, "max_results": limit},
     )
     resp.raise_for_status()
-    payload = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
-    raw_hits: list[dict[str, object]] = (
-        payload.get("results", [])[:limit] if payload else []  # pyright: ignore[reportAny]
-    )
-    lines: list[str] = []
-    for hit in raw_hits:
-        title = str(hit.get("title", "(no title)"))
-        url = str(hit.get("url", ""))
-        snippet = str(hit.get("content") or "")[:_TAVILY_SNIPPET_CHARS]
-        lines.append(f"- {title} — {url}\n  {snippet}")
-    return "\n".join(lines) if lines else "(no results)"
+    payload: object = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
+    hits = parse_tavily_response(payload, limit)
+    if not hits:
+        return "(no results)"
+    return "\n".join(f"- {h.title} — {h.url}\n  {h.snippet}" for h in hits)
 
 
 async def tavily_extract_async(url: str) -> str:
