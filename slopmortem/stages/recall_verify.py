@@ -533,6 +533,11 @@ async def _search_for_evidence(
 ) -> str | None:
     """L0: ask Tavily for a citation URL via two passes; return None to drop.
 
+    Short-circuits when ``suggestion.evidence_url`` is set — Opus pre-discovered
+    a citation URL via its own ``tavily_search`` loop, so the verifier trusts
+    the pick (L2-L5 still validate) and saves one Tavily round-trip per
+    suggestion.
+
     Pass 1: status-shaped query (precise — biases toward death-keyword articles).
     Pass 2 (fallback): status-blind query (broad — let L5 judge alive/dead from body).
 
@@ -546,6 +551,16 @@ async def _search_for_evidence(
     pass 2 also failed by transport (signal: Tavily was unreachable, not that
     nothing exists).
     """
+    if suggestion.evidence_url is not None:
+        # Opus already did a tavily_search and picked this URL. Trust the pick;
+        # L2-L5 still validate. Saves one Tavily call per pre-discovered suggestion.
+        _emit_event(SpanEvent.RECALL_L0_PROVIDED_BY_RECALL_LLM)
+        logger.info(
+            "recall_verify: L0 short-circuit (LLM-provided URL) for %r: %s",
+            suggestion.name,
+            suggestion.evidence_url,
+        )
+        return suggestion.evidence_url
     primary_query = _build_status_shaped_query(suggestion)
     chosen, _outcome1 = await _try_query(
         suggestion, primary_query, tavily_search=tavily_search, limit=limit

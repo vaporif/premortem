@@ -235,15 +235,13 @@ def test_recall_tools_returns_empty_when_cap_is_zero(tavily_key):
     assert recall_tools(cfg) == []
 
 
-def test_recall_tools_returns_tavily_search_when_enabled(tavily_key):
+def test_recall_tools_returns_both_search_and_extract(tavily_key):
     del tavily_key
     cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
     tools = recall_tools(cfg)
-    assert len(tools) == 1
-    assert tools[0].name == "tavily_search"
-    # tavily_extract is intentionally NOT exposed to recall — the recall LLM
-    # discovers names, the verifier reads bodies.
-    assert {t.name for t in tools} == {"tavily_search"}
+    # Both surfaces are exposed: search for discovery, extract for high-stakes
+    # picks where the snippet alone isn't enough to commit.
+    assert {t.name for t in tools} == {"tavily_search", "tavily_extract"}
 
 
 async def test_recall_tools_bounded_search_caps_at_budget(monkeypatch, tavily_key):
@@ -269,3 +267,39 @@ async def test_recall_tools_bounded_search_caps_at_budget(monkeypatch, tavily_ke
     # Real implementation was hit exactly cap times — the sixth call short-
     # circuited before reaching Tavily.
     assert real_calls == ["q0", "q1", "q2", "q3", "q4"]
+
+
+async def test_recall_tools_shared_budget_caps_combined_calls(monkeypatch, tavily_key):
+    """The recall cap spans tavily_search + tavily_extract — not each independently."""
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
+    search_calls: list[str] = []
+    extract_calls: list[str] = []
+
+    async def fake_search(q: str, limit: int = 5) -> str:
+        del limit
+        search_calls.append(q)
+        return f"hit:{q}"
+
+    async def fake_extract(url: str) -> str:
+        extract_calls.append(url)
+        return "body"
+
+    monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_search)
+    monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_extract_async", fake_extract)
+    tools = recall_tools(cfg)
+    search = next(t for t in tools if t.name == "tavily_search")
+    extract = next(t for t in tools if t.name == "tavily_extract")
+
+    # 3 searches + 2 extracts = 5 (at the cap); the 6th call (whichever shape)
+    # must refuse.
+    for i in range(3):
+        out = await search.fn(q=f"q{i}", limit=5)
+        assert "hit:" in out
+    for i in range(2):
+        out = await extract.fn(url=f"https://example.com/{i}")
+        assert out == "body"
+    out6 = await extract.fn(url="https://example.com/over")
+    assert "budget exceeded" in out6
+    assert len(search_calls) == 3
+    assert len(extract_calls) == 2

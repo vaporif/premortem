@@ -14,8 +14,8 @@ from openai import AsyncOpenAI
 
 from slopmortem.budget import Budget
 from slopmortem.llm import CompletionResult, LLMClient, OpenRouterClient
-from slopmortem.models import Facets, PerspectiveScore, ScoredCandidate, SimilarityScores
-from slopmortem.stages.llm_recall import llm_recall
+from slopmortem.models import Facets
+from slopmortem.stages.llm_recall import PriorCandidateHint, llm_recall
 
 CASSETTE_FILE = (
     Path(__file__).parent.parent / "fixtures" / "cassettes" / "recall" / "llm_recall_hacken.yaml"
@@ -86,22 +86,14 @@ def _assert_matches_protocol(_: LLMClient) -> None:
 _assert_matches_protocol(_StubLLM())
 
 
-def _scored(candidate_id: str, *, score: float = 8.0, rationale: str = "stub") -> ScoredCandidate:
-    perspective = PerspectiveScore(score=score, rationale=rationale)
-    return ScoredCandidate(
-        candidate_id=candidate_id,
-        perspective_scores=SimilarityScores(
-            business_model=perspective,
-            market=perspective,
-            gtm=perspective,
-            stage_scale=perspective,
-        ),
-        rationale=rationale,
-    )
+def _hint(name: str, *, rationale: str = "stub") -> PriorCandidateHint:
+    return PriorCandidateHint(name=name, rationale=rationale)
 
 
-def _suggestion_json(name: str, *, year: int = 2023) -> dict[str, Any]:
-    return {
+def _suggestion_json(
+    name: str, *, year: int = 2023, evidence_url: str | None = None
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "name": name,
         "category": "Web3 security audits",
         "status": "dead",
@@ -109,6 +101,9 @@ def _suggestion_json(name: str, *, year: int = 2023) -> dict[str, Any]:
         "failure_year": year,
         "one_liner": f"{name} did Web3 audits and shut down in {year}.",
     }
+    if evidence_url is not None:
+        payload["evidence_url"] = evidence_url
+    return payload
 
 
 async def test_recall_returns_empty_on_uncertain_llm() -> None:
@@ -135,12 +130,12 @@ async def test_recall_returns_empty_on_uncertain_llm() -> None:
 
 async def test_recall_renders_current_top_n_block() -> None:
     # Covers the Jinja ``{% if current_top_n %}`` branch: the prior top-N
-    # gets serialized as ``- candidate_id: <id> (rationale: ...)`` so Opus
-    # avoids re-suggesting what the corpus already returned.
+    # gets serialized with human-readable *names* (not candidate id slugs)
+    # plus the reranker's rationale so Opus can dedupe meaningfully.
     llm = _StubLLM(text='{"suggestions": []}')
     top_n = [
-        _scored("hacken-io", rationale="prior corpus hit A"),
-        _scored("certik", rationale="prior corpus hit B"),
+        _hint("Hacken", rationale="prior corpus hit A"),
+        _hint("CertiK", rationale="prior corpus hit B"),
     ]
 
     out = await llm_recall(
@@ -156,8 +151,11 @@ async def test_recall_renders_current_top_n_block() -> None:
 
     assert out == []
     rendered = llm.calls[0]["prompt"]
-    assert "candidate_id: hacken-io" in rendered
-    assert "candidate_id: certik" in rendered
+    # Names render verbatim — no ``candidate_id:`` prefix anymore.
+    assert "Hacken — already in corpus" in rendered
+    assert "CertiK — already in corpus" in rendered
+    assert "prior corpus hit A" in rendered
+    assert "candidate_id:" not in rendered
     assert "(none — corpus returned no in-vertical matches)" not in rendered
 
 
@@ -233,6 +231,40 @@ async def test_recall_drops_wrapper_failing_validation() -> None:
     assert out == []
 
 
+async def test_recall_accepts_evidence_url_when_llm_provides_one() -> None:
+    # Opus pre-discovers a citation URL via its own ``tavily_search`` and
+    # surfaces it on the wire; the parsed model should preserve it for the
+    # verifier's L0 short-circuit.
+    payload = {
+        "suggestions": [
+            {
+                "name": "Hexagate",
+                "category": "Web3 security",
+                "status": "absorbed",
+                "homepage_url": "https://hexagate.example.com",
+                "evidence_url": "https://news.example.com/hexagate-shutdown",
+                "failure_year": 2024,
+                "one_liner": "Acquired by Chainalysis in 2024.",
+            }
+        ]
+    }
+    llm = _StubLLM(text=json.dumps(payload))
+
+    out = await llm_recall(
+        pitch="...",
+        facets=_facets(),
+        current_top_n=[],
+        llm=llm,
+        model=_RECALL_MODEL,
+        max_tokens=_MAX_TOKENS,
+        cap=8,
+        tools=[],
+    )
+
+    assert len(out) == 1
+    assert out[0].evidence_url == "https://news.example.com/hexagate-shutdown"
+
+
 async def test_recall_accepts_missing_homepage_url() -> None:
     # homepage_url is OPTIONAL per the new contract — null (or absent) should
     # validate cleanly and surface as ``None`` on the parsed model.
@@ -287,15 +319,14 @@ async def test_llm_recall_passes_tools_to_llm(monkeypatch) -> None:
     # Build a real ``recall_tools(config)`` spec list and assert the stage
     # forwards it intact through ``llm.complete(..., tools=...)`` — the
     # tool-call loop in OpenRouterClient is what gives Opus mid-reasoning
-    # access to tavily_search.
+    # access to tavily_search + tavily_extract.
     monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
     from slopmortem.config import Config  # noqa: PLC0415
     from slopmortem.llm import recall_tools  # noqa: PLC0415
 
     cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
     tools = recall_tools(cfg)
-    assert len(tools) == 1
-    assert tools[0].name == "tavily_search"
+    assert {t.name for t in tools} == {"tavily_search", "tavily_extract"}
 
     llm = _StubLLM(text='{"suggestions": []}')
     _ = await llm_recall(
@@ -312,8 +343,7 @@ async def test_llm_recall_passes_tools_to_llm(monkeypatch) -> None:
 
     forwarded = llm.calls[0]["tools"]
     assert forwarded is not None
-    assert len(forwarded) == 1
-    assert forwarded[0].name == "tavily_search"
+    assert {t.name for t in forwarded} == {"tavily_search", "tavily_extract"}
 
 
 async def test_llm_recall_empty_tools_list_is_passed_through() -> None:

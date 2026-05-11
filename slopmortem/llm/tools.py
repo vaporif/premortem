@@ -130,17 +130,18 @@ def synthesis_tools(config: Config) -> list[ToolSpec]:
 def recall_tools(config: Config) -> list[ToolSpec]:
     """Tools available to the recall LLM (Opus) during candidate discovery.
 
-    Today: only ``tavily_search``. ``tavily_extract`` is intentionally NOT
-    here — the recall LLM should discover names and let the verifier read
-    bodies. Bounded by ``config.recall_max_tavily_calls``; returns an empty
-    list when the cap is 0 (recall stays training-data-only).
+    Both ``tavily_search`` and ``tavily_extract`` share a single
+    ``config.recall_max_tavily_calls`` quota — Opus uses search to find
+    candidate articles and extract to read the body of high-stakes picks
+    before committing to a suggestion. Returns an empty list when the
+    enable flag is off or the cap is 0 (recall stays training-data-only).
     """
     if not config.enable_tavily_recall_search:
         return []
     if config.recall_max_tavily_calls <= 0:
         return []
     from slopmortem.corpus import _tools_impl  # noqa: PLC0415 - break import cycle
-    from slopmortem.corpus._tools_impl import tavily_search  # noqa: PLC0415
+    from slopmortem.corpus._tools_impl import tavily_extract, tavily_search  # noqa: PLC0415
 
     used = 0
     cap = config.recall_max_tavily_calls
@@ -152,6 +153,13 @@ def recall_tools(config: Config) -> list[ToolSpec]:
         used += 1
         return await _tools_impl.tavily_search_async(q, limit)
 
+    async def _bounded_extract(*, url: str) -> str:
+        nonlocal used
+        if used >= cap:
+            return f"tavily call budget exceeded ({cap} per recall); refusing"
+        used += 1
+        return await _tools_impl.tavily_extract_async(url)
+
     return [
         ToolSpec(
             name=tavily_search.name,
@@ -162,5 +170,16 @@ def recall_tools(config: Config) -> list[ToolSpec]:
             ),
             args_model=tavily_search.args_model,
             fn=_bounded_search,
+        ),
+        ToolSpec(
+            name=tavily_extract.name,
+            description=(
+                "Fetch the readable body of an article URL found via tavily_search. "
+                "Use sparingly — only when a search snippet alone leaves you "
+                "uncertain whether the article actually describes failure/distress "
+                "for the company you remember."
+            ),
+            args_model=tavily_extract.args_model,
+            fn=_bounded_extract,
         ),
     ]

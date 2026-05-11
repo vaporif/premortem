@@ -274,21 +274,28 @@ _FAILURE_YEAR_MAX = 2030
 
 
 class RecallSuggestion(BaseModel):
-    """One LLM-recalled comparable: company name plus a hint at its homepage.
+    """One LLM-recalled comparable: company name plus optional URL hints.
 
-    The optional ``homepage_url`` carries no field-level ``HttpUrl`` format
-    constraint because strict ``response_format`` mode on both OpenAI and
-    Anthropic rejects ``format``/``minLength``/``maxLength`` on strings and
-    ``minimum``/``maximum`` on integers. ``_validate_constraints`` below runs
-    parse-equivalent validation so the wire contract is "well-formed http(s)
-    URL when present, year in [1990, 2030]" even though the schema sent
-    upstream is just ``"type": "string"`` / ``"type": "integer"``.
+    Both ``homepage_url`` and ``evidence_url`` carry no field-level
+    ``HttpUrl`` format constraint because strict ``response_format`` mode on
+    both OpenAI and Anthropic rejects ``format``/``minLength``/``maxLength``
+    on strings and ``minimum``/``maximum`` on integers.
+    ``_validate_constraints`` below runs parse-equivalent validation so the
+    wire contract is "well-formed http(s) URL when present, year in [1990,
+    2030]" even though the schema sent upstream is just ``"type": "string"``
+    / ``"type": "integer"``.
+
+    ``evidence_url`` is the citation URL Opus saw in its own
+    ``tavily_search`` results (title + snippet mentioned the company AND
+    described a failure event). When present, the verifier skips its own L0
+    Tavily round-trip and threads the URL straight into L2-L5.
     """
 
     name: str
     category: str
     status: Literal["dead", "absorbed", "struggling", "bruised"]
     homepage_url: str | None = None
+    evidence_url: str | None = None
     failure_year: int
     one_liner: str
 
@@ -297,6 +304,8 @@ class RecallSuggestion(BaseModel):
         # Same shape ``HttpUrl`` would have enforced on the field directly.
         if self.homepage_url is not None:
             _HTTP_URL_ADAPTER.validate_python(self.homepage_url)
+        if self.evidence_url is not None:
+            _HTTP_URL_ADAPTER.validate_python(self.evidence_url)
         if not _FAILURE_YEAR_MIN <= self.failure_year <= _FAILURE_YEAR_MAX:
             msg = (
                 f"failure_year {self.failure_year} outside "

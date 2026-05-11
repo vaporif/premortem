@@ -366,3 +366,30 @@ async def test_l0_drops_when_pass2_transport_error_after_pass1_no_hits(
     out = await _search_for_evidence(sug, tavily_search=fake_search, limit=5)
     assert out is None
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "transport_error"})]
+
+
+async def test_l0_short_circuits_when_suggestion_carries_evidence_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Opus pre-discovered the URL; verifier returns it without calling Tavily.
+
+    L0 short-circuit saves the round-trip when the recall LLM's own
+    ``tavily_search`` loop already picked a citation. L2-L5 still validate
+    downstream — only the L0 search head is skipped.
+    """
+    events = _capture_events(monkeypatch)
+    pre_discovered = "https://news.example.com/hexagate-shutdown"
+    sug = RecallSuggestion(
+        name="Hexagate",
+        category="Web3 security",
+        status="dead",
+        homepage_url="https://hexagate.example.com/",
+        evidence_url=pre_discovered,
+        failure_year=2024,
+        one_liner="Hexagate shut down in 2024.",
+    )
+    fake = FakeTavilySearch(default=[])  # would return [] but must never be called
+    out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
+    assert out == pre_discovered
+    assert fake.calls == []
+    assert events == [(SpanEvent.RECALL_L0_PROVIDED_BY_RECALL_LLM, {})]

@@ -47,6 +47,10 @@ class SpanEvent(StrEnum):
     # the trace dashboard can answer "how often is Opus's status guess wrong?"
     # — the count is a direct lower bound on L0 false-precision.
     RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED = "recall.l0_name_only_fallback_recovered"
+    # Opus pre-discovered the citation URL during its own tavily_search loop;
+    # the verifier's L0 was skipped. L2-L5 still validated. Useful to measure
+    # how often the recall-LLM-side search saves a verifier-side search.
+    RECALL_L0_PROVIDED_BY_RECALL_LLM = "recall.l0_provided_by_recall_llm"
     # Carries ``stage`` attribute: "head" (HEAD probe) or "get" (GET body fetch).
     RECALL_REJECTED_L2 = "recall.rejected_l2"
     RECALL_REJECTED_L3_NAME_MISSING = "recall.rejected_l3_name"

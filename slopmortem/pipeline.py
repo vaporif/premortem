@@ -36,6 +36,7 @@ from slopmortem.stages import (
     synthesize_all,
     verify_and_persist_all,
 )
+from slopmortem.stages.llm_recall import PriorCandidateHint
 from slopmortem.tracing import SpanEvent, git_sha, mint_run_id
 
 if TYPE_CHECKING:
@@ -179,10 +180,21 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
     Runs at most once per query (no loop). Caller wraps in ``QueryProgress``
     start/advance/end hooks; this helper only owns the LLM/HTTP work.
     """
+    # Join the reranker's scored ids against the retrieve payloads so the
+    # recall prompt's "already covered" hint block carries human-readable
+    # names rather than ``<slug>::sector`` ids. Top ``N_synthesize`` is the
+    # cap Opus actually competes against downstream — more hints just bloat
+    # prompt tokens without changing dedup judgment.
+    by_id: dict[str, Candidate] = {c.canonical_id: c for c in retrieved}
+    prior_hints = [
+        PriorCandidateHint(name=by_id[sc.candidate_id].payload.name, rationale=sc.rationale)
+        for sc in reranked.ranked[: config.N_synthesize]
+        if sc.candidate_id in by_id
+    ]
     suggestions = await llm_recall(
         pitch=input_ctx.description,
         facets=facets,
-        current_top_n=reranked.ranked[: config.N_synthesize],
+        current_top_n=prior_hints,
         llm=llm,
         model=config.model_recall,
         max_tokens=config.max_tokens_recall,

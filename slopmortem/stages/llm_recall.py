@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 from lmnr import observe
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from slopmortem.llm import render_blocks, to_strict_response_schema
 from slopmortem.models import RecallSuggestion, RecallSuggestionList
@@ -16,6 +16,20 @@ from slopmortem.models import RecallSuggestion, RecallSuggestionList
 if TYPE_CHECKING:
     from slopmortem.llm import LLMClient
     from slopmortem.models import Candidate, Facets, ScoredCandidate, ToolSpec
+
+
+class PriorCandidateHint(BaseModel):
+    """Human-readable hint for one prior-corpus candidate.
+
+    Sibling to ``ScoredCandidate`` for the recall prompt's "already covered"
+    block only — Opus reads the company *name* (not the canonical id slug)
+    plus the reranker's rationale so dedup judgment is meaningful. The
+    pipeline joins ``ScoredCandidate.candidate_id`` against the retrieved
+    payloads to produce these.
+    """
+
+    name: str
+    rationale: str
 
 
 logger = logging.getLogger(__name__)
@@ -81,7 +95,7 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
     *,
     pitch: str,
     facets: Facets,
-    current_top_n: list[ScoredCandidate],
+    current_top_n: list[PriorCandidateHint],
     llm: LLMClient,
     model: str,
     max_tokens: int,

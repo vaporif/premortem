@@ -147,6 +147,31 @@ def test_recall_deps_built_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert captured["recall_deps"] is _RECALL_DEPS_STUB
 
 
+def test_query_cmd_calls_maybe_setup_logging(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """``query`` honors ``SLOPMORTEM_LOG`` by going through ``_maybe_setup_logging``.
+
+    The bug this locks: ``query`` previously didn't call the helper, so
+    ``SLOPMORTEM_LOG=info just query`` was a silent no-op. Spy on the
+    helper rather than asserting on captured logs — root-logger config has
+    been touched by other tests in the suite and is brittle to assert on.
+    """
+    captured: dict[str, Any] = {}
+    _patch_query_seams(monkeypatch, captured=captured, tmp_path=tmp_path)
+
+    calls: list[bool] = []
+
+    def _spy() -> None:
+        calls.append(True)
+
+    monkeypatch.setattr("slopmortem.cli._query_cmd._maybe_setup_logging", _spy)
+    runner = CliRunner()
+    result = runner.invoke(app, ["query", "A pitch", "--stdout"])
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")
+    assert calls == [True]
+
+
 def test_debug_retrieve_skips_recall_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """``--debug-retrieve`` returns before deps construction.
 

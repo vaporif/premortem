@@ -24,6 +24,7 @@ from slopmortem.cli import app
 from slopmortem.cli._common import (
     RichQueryProgress,
     _maybe_init_tracing,
+    _maybe_setup_logging,
     _render_query_footer,
 )
 from slopmortem.config import load_config
@@ -146,6 +147,7 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
     # flag does need re-validation, switch to
     # ``Config.model_validate({**config.model_dump(), **overrides})``.
     config = config.model_copy(update={"force_llm_recall": force_llm_recall})
+    _maybe_setup_logging()
     _maybe_init_tracing(config)
     llm, embedder, corpus, budget, sparse_encoder = build_deps(config)
     set_query_corpus(corpus)
