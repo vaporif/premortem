@@ -649,16 +649,16 @@ git commit -m "cleanup: single source for TAVILY_EXTRACT_URL"
 
 Once Tasks 2–11 land, run the standard polish pass: three review rounds with fixes, idiomatic-code pass, `/cleanup`, comment humanization. Catches anything the per-task verify loop missed and strips any AI breadcrumbs left in the diff.
 
-- [ ] **Step 1: Dispatch the polish skill**
+- [x] **Step 1: Dispatch the polish skill**
 
 Use the `post-implementation-polish` skill on the commits in this plan (the ten cleanup commits, not the whole branch). Constrain scope to the files this plan touched, and **review the polish diff before letting it commit** — polish/cleanup passes can revert intentional choices (e.g., the synthetic `RuntimeError` in Task 3, the `assert_never` arm in Task 4, the marker comment in Task 5).
 
-- [ ] **Step 2: Final full-suite run**
+- [x] **Step 2: Final full-suite run**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass. If polish surfaced any new findings worth applying, they land as separate commits.
 
-- [ ] **Step 3: Confirm no cassette files moved**
+- [x] **Step 3: Confirm no cassette files moved**
 
 Run: `git status tests/fixtures/cassettes/`
 Expected: clean. If a cassette moved, the LLM schema or prompt SHA shifted unexpectedly — bisect to find the offending task and re-evaluate before merging.
