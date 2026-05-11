@@ -1,9 +1,8 @@
 """Tavily search tool for the LLM-driven pitch filler.
 
-Kept separate from the synthesis-time `tavily_search` in
-``corpus/_tools_impl.py`` because the filler needs raw_content (truncated)
-in the result payload — synthesis only needs snippets. Coupling both
-callers to one shape would make either side carry weight it doesn't need.
+Separate from the synthesis-time ``tavily_search`` in
+``corpus/_tools_impl.py`` because the filler needs truncated ``raw_content``;
+synthesis only needs snippets.
 """
 
 from __future__ import annotations

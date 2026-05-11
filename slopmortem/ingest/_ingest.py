@@ -138,11 +138,10 @@ async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branc
     Per-entry failures log and continue; only the run-level orchestrator can
     short-circuit. Mutates ``result`` counters and ``result.span_events``.
 
-    Each entry's enrich + slop call runs concurrently up to
-    ``config.ingest_concurrency``. Counter mutations and ``keepers`` writes
-    are coroutine-safe under anyio (single-threaded event loop).
-    ``gather_resilient`` preserves input order, so ``keepers`` stays in
-    entry-order to match the previous sequential behaviour.
+    Per-entry enrich+slop runs concurrently up to ``config.ingest_concurrency``;
+    counter mutations are coroutine-safe (anyio single-threaded loop).
+    ``gather_resilient`` preserves input order, so ``keepers`` matches the
+    previous sequential behaviour.
     """
     progress.start_phase(IngestPhase.CLASSIFY, total=len(entries))
     limiter = anyio.CapacityLimiter(config.ingest_concurrency)

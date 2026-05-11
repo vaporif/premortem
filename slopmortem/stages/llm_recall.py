@@ -19,13 +19,11 @@ if TYPE_CHECKING:
 
 
 class PriorCandidateHint(BaseModel):
-    """Human-readable hint for one prior-corpus candidate.
+    """Human-readable hint for the recall prompt's "already covered" block.
 
-    Sibling to ``ScoredCandidate`` for the recall prompt's "already covered"
-    block only — Opus reads the company *name* (not the canonical id slug)
-    plus the reranker's rationale so dedup judgment is meaningful. The
-    pipeline joins ``ScoredCandidate.candidate_id`` against the retrieved
-    payloads to produce these.
+    Carries the company name (not the slug id) plus the reranker's rationale
+    so Opus's dedup judgment has something to read. The pipeline joins
+    ``ScoredCandidate.candidate_id`` against retrieved payloads to build these.
     """
 
     name: str

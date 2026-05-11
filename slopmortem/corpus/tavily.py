@@ -1,20 +1,15 @@
 """Structured Tavily ``/search`` and ``/extract`` surfaces.
 
-Sibling to the formatted-string ``tavily_search_async`` in ``_tools_impl.py``:
-that one feeds the synthesis LLM tool loop and must keep its line-rendering
-shape (cassette matching), so it stays on the leaf-private module. Callers
-that want typed hits — e.g. the recall verifier's search head — import
-``tavily_search_structured`` from here without crossing the corpus leaf
-boundary.
+Sibling to the formatted-string ``tavily_search_async`` in ``_tools_impl.py``,
+which keeps its line-rendering shape for cassette matching. Callers that want
+typed hits (e.g. the recall verifier) import from here.
 
-``tavily_extract_structured`` exposes the ``/extract`` endpoint for the
-recall verifier's L3 fallback path: when direct GET on a citation URL
-returns 4xx (bot-blocked, e.g. Medium) or yields a body too short to admit
-(SPA shells like decrypt.co Next.js), Tavily extracts the rendered article
-text using its own IP pool and headless browser.
+``tavily_extract_structured`` is the L3 fallback when direct GET 4xxs
+(bot-blocked hosts like Medium) or returns a body too short to admit (SPA
+shells like decrypt.co); Tavily fetches via its own IP pool and headless
+browser.
 
-Both surfaces share ``parse_tavily_response`` so the snippet truncation
-and field coercion stay identical.
+Both surfaces share ``parse_tavily_response`` for snippet truncation.
 """
 
 from __future__ import annotations

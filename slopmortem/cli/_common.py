@@ -29,13 +29,11 @@ if TYPE_CHECKING:
     from slopmortem.config import Config
     from slopmortem.models import Report
 
-# Shared between ``_maybe_setup_logging``'s ``RichHandler`` and every
-# ``RichPhaseProgress`` instance the CLI builds. Live's render-height
-# tracking only stays consistent when log lines and bar refreshes go
-# through the same ``Console``: ``Console.print`` acquires Live's lock
-# and prints above the live region. A stdlib ``StreamHandler`` (or a
-# second ``Console(stderr=True)``) would write past Live's redirect
-# proxy and orphan a copy of the phase table per log line.
+# Single Console shared by ``RichHandler`` and every ``RichPhaseProgress``.
+# Live's render-height tracking only stays consistent when log lines and bar
+# refreshes go through the same Console (it holds Live's lock). A stdlib
+# StreamHandler would bypass Live's redirect proxy and orphan a phase-table
+# copy per log line.
 _STDERR_CONSOLE = Console(stderr=True)
 
 
@@ -122,13 +120,10 @@ class RichQueryProgress(RichPhaseProgress[QueryPhase]):
 def progress_context[T](
     factory: Callable[[], contextlib.AbstractContextManager[T]],
 ) -> contextlib.AbstractContextManager[T | None]:
-    """TTY-gated factory for the Rich phase bar. ``None`` when the bar is suppressed.
+    """Build the Rich phase bar context, or ``nullcontext`` when stderr isn't a tty.
 
-    Three independent gates: ``SLOPMORTEM_NO_PROGRESS`` env escape hatch,
-    Python's fileno-level TTY check on stderr, and Rich's own ``is_terminal``
-    probe. Non-tty environments (redirected stderr, CI without a pty) fall
-    back to ``nullcontext`` — stdlib logging still surfaces the same info via
-    ``SLOPMORTEM_LOG=info``.
+    Gates: ``SLOPMORTEM_NO_PROGRESS``, ``sys.stderr.isatty()``, Rich's
+    ``is_terminal``. Non-tty users still see progress via ``SLOPMORTEM_LOG=info``.
     """
     if os.environ.get("SLOPMORTEM_NO_PROGRESS"):
         return contextlib.nullcontext()

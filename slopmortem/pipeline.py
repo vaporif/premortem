@@ -78,22 +78,16 @@ class QueryPhase(StrEnum):
 class RecallDeps:
     """Long-lived deps the recall persist tail needs.
 
-    Bundled into one kwarg so non-recall callers (the default ``slopmortem
-    query`` path) don't have to thread four extra arguments through. If
-    recall fires while ``recall_deps`` is missing, the pipeline raises
-    ``RuntimeError`` so the misconfig surfaces at the call site instead of
-    silently no-oping mid-run.
+    Bundled so non-recall callers don't thread four args through. The pipeline
+    raises ``RuntimeError`` when recall fires without these, so misconfig
+    surfaces at the call site instead of no-oping mid-run.
 
-    ``tavily_search`` is required: the L0 search head is mandatory under the
-    new contract. ``extract`` is required: the L3 fallback fires when direct
-    GET 4xx's (bot-blocked hosts like Medium) or returns a body too short to
-    admit (SPA shells like decrypt.co Next.js). Both surfaces are bundled
-    under ``enable_tavily_recall_search`` — disabling Tavily disables recall
-    entirely.
+    ``tavily_search`` is the mandatory L0 search head; ``extract`` is the L3
+    fallback for GET-4xx hosts (Medium) and SPA shells (decrypt.co). Both
+    ride ``enable_tavily_recall_search``.
 
-    ``wayback`` defaults to ``None`` so production wiring can omit it and
-    let the pipeline construct a fresh ``WaybackEnricher()``; tests inject
-    a fake to avoid hitting archive.org.
+    ``wayback=None`` lets production wiring construct ``WaybackEnricher()``
+    lazily; tests inject a fake to avoid hitting archive.org.
     """
 
     journal: MergeJournal
@@ -337,12 +331,10 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
     Per-candidate synthesis exceptions are dropped silently; ``BudgetExceededError``
     truncates the run and surfaces as ``pipeline_meta.budget_exceeded=True``.
 
-    ``recall_deps`` should be provided so the coverage-gap predicate can fire
-    when survivors < ``N_synthesize`` after rerank+min_similarity. When the
-    predicate fires without deps the branch is a logged no-op (used by tests
-    that don't exercise recall). ``config.force_llm_recall=True`` without deps
-    raises ``RuntimeError`` so explicit operator opt-in surfaces misconfig.
-    The default ``query`` CLI builds deps eagerly.
+    Provide ``recall_deps`` so the coverage-gap predicate can fire. Without
+    deps, predicate-driven recall logs and no-ops (the test path);
+    ``config.force_llm_recall=True`` raises ``RuntimeError`` instead, so
+    explicit operator opt-in surfaces misconfig.
     """
     t0 = time.monotonic()
     successes: list[Synthesis] = []

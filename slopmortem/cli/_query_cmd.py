@@ -142,10 +142,9 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
     force_llm_recall: bool = False,
 ) -> None:
     config = load_config()
-    # ``model_copy(update=...)`` skips validators; ``force_llm_recall`` does
-    # not participate in cross-field validation, so this is safe. If a future
-    # flag does need re-validation, switch to
-    # ``Config.model_validate({**config.model_dump(), **overrides})``.
+    # ``model_copy`` skips validators; ``force_llm_recall`` has no cross-field
+    # constraints so this is safe. If that changes, switch to
+    # ``Config.model_validate``.
     config = config.model_copy(update={"force_llm_recall": force_llm_recall})
     _maybe_setup_logging()
     _maybe_init_tracing(config)
@@ -204,16 +203,12 @@ async def _build_recall_deps(
     *,
     llm: LLMClient,
 ) -> RecallDeps | None:
-    """Construct ``RecallDeps`` for every non-debug query, or ``None`` when recall is off.
+    """Build ``RecallDeps`` eagerly; return ``None`` when recall is off.
 
-    The recall branch can fire on any query whose coverage-gap predicate
-    trips, so deps are built up front. Cold-start cost is dominated by
-    ``MergeJournal.init()`` (sqlite open + table check), well under 50ms.
-
-    Returns ``None`` when ``enable_tavily_recall_search=False`` — the L0
-    search head is mandatory under the new contract, so disabling Tavily
-    disables the entire recall branch. The L3 extract fallback is bundled
-    under the same flag.
+    Deps are built up front because the coverage-gap predicate can fire on any
+    query. ``MergeJournal.init()`` (sqlite open) dominates cold start at <50ms.
+    Tavily-off disables the whole branch — L0 search and L3 extract share the
+    same flag.
     """
     tavily_search = build_tavily_recall_search(config)
     extract = build_tavily_recall_extract(config)

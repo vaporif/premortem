@@ -1,16 +1,13 @@
 """Cheap title-only Haiku gate that runs before the pitch filler.
 
-Most HN-Algolia phrase-search hits aren't startup death narratives —
-denials, listicles, generic essays, Show HN posts. A yes/no question on
-the title alone (no body, no Tavily) cuts pitch-filler invocations and
-Tavily credit burn substantially. Rejected entries get
-``title_pre_filter_rejected=True``; downstream enrichers and the ingest
-classify loop short-circuit on the flag.
+Most HN-Algolia phrase-search hits aren't death narratives (denials,
+listicles, Show HN posts), so a yes/no on the title alone cuts pitch-filler
+and Tavily spend substantially. Rejected entries get
+``title_pre_filter_rejected=True``; downstream enrichers and classify
+short-circuit on the flag.
 
-Per-entry isolation contract: log and return the entry unchanged on every
-recoverable failure (HTTP, JSON parse, schema mismatch).
-``BudgetExceededError`` is the one fatal class — it propagates so the
-orchestrator can short-circuit the run.
+Recoverable failures log and return the entry unchanged.
+``BudgetExceededError`` propagates so the orchestrator can short-circuit.
 """
 
 from __future__ import annotations

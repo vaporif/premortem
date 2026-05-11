@@ -86,11 +86,10 @@ def _build_bounded_tavily_pair(
 ) -> list[ToolSpec]:
     """Build the (search, extract) ToolSpec pair under one shared call quota.
 
-    Both bounds share the same ``used``/``cap`` budget so a caller that hits
-    the cap on either surface refuses on the other too. ``label`` rides in
-    the refusal string so log/trace inspection tells synthesis vs recall
-    apart. Descriptions fall back to the underlying tool's default — recall
-    overrides them to nudge Opus on when to reach for each surface.
+    Search and extract share the same ``used``/``cap`` counter, so hitting the
+    cap on either surface refuses on the other. ``label`` rides into the
+    refusal string for log/trace attribution. Descriptions fall back to the
+    tool default; recall overrides them.
     """
     from slopmortem.corpus import _tools_impl  # noqa: PLC0415 - break import cycle
     from slopmortem.corpus._tools_impl import tavily_extract, tavily_search  # noqa: PLC0415

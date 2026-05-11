@@ -310,15 +310,13 @@ class MergeJournal:
             return None if row is None else str(row["canonical_id"])
 
     async def is_terminal(self, source: str, source_id: str) -> bool:
-        """Return True when (source, source_id) has reached a terminal state.
+        """True when (source, source_id) has a terminal row.
 
-        Terminal = a ``merge_state='complete'`` row in ``merge_journal``, or any
-        row in ``quarantine_journal``. Mid-flight states (``pending``,
-        ``alias_blocked``, ``resolver_flipped``) deliberately count as
-        non-terminal so a crashed prior run, an edited alias graph, or a
-        re-resolved entity can re-run end-to-end. Used by the ingest classify
-        phase to short-circuit before the enricher chain pays for an entry
-        we already processed.
+        Terminal = ``merge_state='complete'`` or any ``quarantine_journal`` row.
+        Mid-flight states (``pending``, ``alias_blocked``, ``resolver_flipped``)
+        deliberately stay non-terminal so crashed runs, alias-graph edits, and
+        re-resolutions re-run end-to-end. Classify uses this to skip
+        already-processed entries before paying for the enricher chain.
         """
         return await to_thread.run_sync(self._is_terminal_sync, source, source_id)
 

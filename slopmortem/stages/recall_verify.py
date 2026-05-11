@@ -205,14 +205,12 @@ def _body_anchors_name_and_death(name: str, body: str) -> _AnchorResult:
 class _DeathnessJudgment(BaseModel):
     """L5 verdict: did the evidence body establish death, distress, or neither.
 
-    ``evidence_quote`` rides along for audit trails — it's not consumed by
-    the gate, just preserved for diagnostics if a downstream operator wants
-    to inspect why a suggestion was admitted or rejected.
+    ``evidence_quote`` is preserved for audit diagnostics only — the gate
+    doesn't read it.
 
-    ``confidence`` carries no field-level ``ge``/``le``: strict
-    ``response_format`` mode (both OpenAI and Anthropic) rejects
-    ``minimum``/``maximum`` on numeric schemas. The [0.0, 1.0] bound is
-    enforced post-parse in ``_validate_confidence`` below.
+    ``confidence`` has no field-level ``ge``/``le`` because strict
+    ``response_format`` (OpenAI + Anthropic) rejects ``minimum``/``maximum`` on
+    numeric schemas; ``_validate_confidence`` enforces [0.0, 1.0] post-parse.
     """
 
     verdict: Literal["dead", "struggling", "alive"]
