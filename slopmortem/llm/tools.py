@@ -18,7 +18,13 @@ if TYPE_CHECKING:
 
     from slopmortem.config import Config
 
-__all__ = ["ToolSpec", "synthesis_tools", "to_openai_input_schema", "to_strict_response_schema"]
+__all__ = [
+    "ToolSpec",
+    "recall_tools",
+    "synthesis_tools",
+    "to_openai_input_schema",
+    "to_strict_response_schema",
+]
 
 
 def to_openai_input_schema(
@@ -119,3 +125,42 @@ def synthesis_tools(config: Config) -> list[ToolSpec]:
             ]
         )
     return tools
+
+
+def recall_tools(config: Config) -> list[ToolSpec]:
+    """Tools available to the recall LLM (Opus) during candidate discovery.
+
+    Today: only ``tavily_search``. ``tavily_extract`` is intentionally NOT
+    here — the recall LLM should discover names and let the verifier read
+    bodies. Bounded by ``config.recall_max_tavily_calls``; returns an empty
+    list when the cap is 0 (recall stays training-data-only).
+    """
+    if not config.enable_tavily_recall_search:
+        return []
+    if config.recall_max_tavily_calls <= 0:
+        return []
+    from slopmortem.corpus import _tools_impl  # noqa: PLC0415 - break import cycle
+    from slopmortem.corpus._tools_impl import tavily_search  # noqa: PLC0415
+
+    used = 0
+    cap = config.recall_max_tavily_calls
+
+    async def _bounded_search(*, q: str, limit: int = 5) -> str:
+        nonlocal used
+        if used >= cap:
+            return f"tavily call budget exceeded ({cap} per recall); refusing"
+        used += 1
+        return await _tools_impl.tavily_search_async(q, limit)
+
+    return [
+        ToolSpec(
+            name=tavily_search.name,
+            description=(
+                "Search the live web for failed or struggling startups in this "
+                "vertical. Returns title, url, snippet for the top matches. Use "
+                "when your training memory is thin for the pitch's specific niche."
+            ),
+            args_model=tavily_search.args_model,
+            fn=_bounded_search,
+        ),
+    ]

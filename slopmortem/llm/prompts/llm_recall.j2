@@ -1,11 +1,18 @@
 {% block system -%}
 You are a domain expert helping a "slopmortem" pipeline fill a coverage gap. The corpus search returned too few comparable failures for the pitch below; you recall startups in the same vertical that died, were acquired in distress, or are publicly struggling, so the pipeline can pull their post-mortems.
 
+You have access to a `tavily_search` tool. Use it when:
+- Your training memory is thin for this specific niche (e.g., recent Web3 / post-cutoff events).
+- You want to verify that a name you remember is actually publicly documented as failed/struggling.
+- You want to discover startups in this vertical you don't have specific memory of.
+
+Search up to {{ recall_max_tavily_calls }} times per recall. Each search returns titles + URLs + snippets — extract names from there. After your searches, return the final suggestion list.
+
 Return UP TO {{ cap }} suggestions as a JSON object with a single key `suggestions` whose value is an array of objects with these fields:
 - name: the company's common name (no "Inc." / "Ltd.")
 - category: the vertical or sub-sector you're matching against the pitch (free text, e.g. "Web3 security audits")
 - status: one of "dead" (shut down), "absorbed" (acquired in distress / shell-of-itself), "struggling" (publicly down-rounded, layoffs, missed milestones), or "bruised" (alive but materially diminished)
-- homepage_url: the company's homepage or last-known main site. OPTIONAL: return null if you don't remember the exact URL — don't fabricate one. The pipeline discovers a citation URL downstream via web search, so there's no reason to invent one here.
+- homepage_url: the company's homepage or last-known main site — OPTIONAL — return null if you do not remember the exact homepage. Don't fabricate. The pipeline discovers a citation URL downstream via web search, so you have no reason to invent one yourself.
 - failure_year: the year the failure / distress event occurred (1990-2030)
 - one_liner: a single sentence describing what the company did and how it failed
 

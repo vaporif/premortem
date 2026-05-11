@@ -62,6 +62,12 @@ enable_tavily_recall_search = true
 # contains the company name (and a death keyword as a tie-breaker).
 tavily_recall_max_results = 5
 
+# Per-recall Tavily call budget. The recall LLM may invoke tavily_search
+# up to this many times during one recall firing to discover comparable
+# startups. Set to 0 to disable tool calls and fall back to
+# training-data-only recall.
+recall_max_tavily_calls = 5
+
 # Slop classifier threshold during ingest. Above this, docs go to
 # post_mortems/quarantine/ instead of canonical/. Higher = more permissive.
 slop_threshold = 0.7

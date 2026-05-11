@@ -113,7 +113,7 @@ async def test_search_corpus_returns_hits(fixture_corpus):
 
 # Per-synthesis Tavily budget gate (spec line 1005).
 from slopmortem.config import Config  # noqa: E402
-from slopmortem.llm import synthesis_tools  # noqa: E402
+from slopmortem.llm import recall_tools, synthesis_tools  # noqa: E402
 
 
 @pytest.fixture
@@ -214,3 +214,58 @@ def test_tavily_disabled_means_no_tavily_tools_in_factory():
     names = {t.name for t in tools}
     assert "tavily_search" not in names
     assert "tavily_extract" not in names
+
+
+# ----- recall_tools (Opus tavily_search during candidate discovery) ----------
+
+
+def test_recall_tools_returns_empty_when_disabled(monkeypatch):
+    # enable_tavily_recall_search=False overrides everything else — the recall
+    # branch falls back to training-data-only suggestions.
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    cfg = Config(enable_tavily_recall_search=False)
+    assert recall_tools(cfg) == []
+
+
+def test_recall_tools_returns_empty_when_cap_is_zero(tavily_key):
+    # recall_max_tavily_calls=0 short-circuits the tool list even when the
+    # outer enable flag is on.
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=0)
+    assert recall_tools(cfg) == []
+
+
+def test_recall_tools_returns_tavily_search_when_enabled(tavily_key):
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
+    tools = recall_tools(cfg)
+    assert len(tools) == 1
+    assert tools[0].name == "tavily_search"
+    # tavily_extract is intentionally NOT exposed to recall — the recall LLM
+    # discovers names, the verifier reads bodies.
+    assert {t.name for t in tools} == {"tavily_search"}
+
+
+async def test_recall_tools_bounded_search_caps_at_budget(monkeypatch, tavily_key):
+    """Sixth call returns the budget-exceeded string instead of hitting Tavily."""
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
+    real_calls: list[str] = []
+
+    async def fake_real(q: str, limit: int = 5) -> str:
+        del limit
+        real_calls.append(q)
+        return f"hit:{q}"
+
+    monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_real)
+    tools = recall_tools(cfg)
+    search = next(t for t in tools if t.name == "tavily_search")
+
+    for i in range(5):
+        out = await search.fn(q=f"q{i}", limit=5)
+        assert "hit:" in out
+    out6 = await search.fn(q="q5", limit=5)
+    assert "budget exceeded" in out6
+    # Real implementation was hit exactly cap times — the sixth call short-
+    # circuited before reaching Tavily.
+    assert real_calls == ["q0", "q1", "q2", "q3", "q4"]

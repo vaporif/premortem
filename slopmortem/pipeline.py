@@ -21,6 +21,7 @@ from lmnr import Laminar, observe
 from slopmortem.budget import BudgetExceededError
 from slopmortem.corpus.sources import WaybackEnricher
 from slopmortem.ingest import IngestResult, NullProgress
+from slopmortem.llm import recall_tools
 from slopmortem.models import PipelineMeta, Report, Synthesis, TopRisks
 from slopmortem.stages import (
     compute_coverage_gap,
@@ -186,6 +187,8 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         model=config.model_recall,
         max_tokens=config.max_tokens_recall,
         cap=config.recall_max_suggestions_per_pitch,
+        tools=recall_tools(config),
+        recall_max_tavily_calls=config.recall_max_tavily_calls,
     )
     if Laminar.is_initialized():
         Laminar.event(

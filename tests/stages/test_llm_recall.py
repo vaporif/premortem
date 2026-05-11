@@ -61,13 +61,14 @@ class _StubLLM:
         max_tokens: int | None = None,
         single_tool_call: bool = False,
     ) -> CompletionResult:
-        del tools, cache, response_format, extra_body, single_tool_call
+        del cache, response_format, extra_body, single_tool_call
         self.calls.append(
             {
                 "prompt": prompt,
                 "system": system,
                 "model": model,
                 "max_tokens": max_tokens,
+                "tools": tools,
             }
         )
         if self.raises is not None:
@@ -122,6 +123,7 @@ async def test_recall_returns_empty_on_uncertain_llm() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     assert out == []
@@ -149,6 +151,7 @@ async def test_recall_renders_current_top_n_block() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     assert out == []
@@ -173,6 +176,7 @@ async def test_recall_caps_at_max() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     assert len(out) == 8
@@ -192,6 +196,7 @@ async def test_recall_drops_invalid_response() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     assert out == []
@@ -222,6 +227,7 @@ async def test_recall_drops_wrapper_failing_validation() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     assert out == []
@@ -252,6 +258,7 @@ async def test_recall_accepts_missing_homepage_url() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     assert len(out) == 1
@@ -270,9 +277,61 @@ async def test_recall_returns_empty_on_http_error() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     assert out == []
+
+
+async def test_llm_recall_passes_tools_to_llm(monkeypatch) -> None:
+    # Build a real ``recall_tools(config)`` spec list and assert the stage
+    # forwards it intact through ``llm.complete(..., tools=...)`` — the
+    # tool-call loop in OpenRouterClient is what gives Opus mid-reasoning
+    # access to tavily_search.
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    from slopmortem.config import Config  # noqa: PLC0415
+    from slopmortem.llm import recall_tools  # noqa: PLC0415
+
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
+    tools = recall_tools(cfg)
+    assert len(tools) == 1
+    assert tools[0].name == "tavily_search"
+
+    llm = _StubLLM(text='{"suggestions": []}')
+    _ = await llm_recall(
+        pitch="...",
+        facets=_facets(),
+        current_top_n=[],
+        llm=llm,
+        model=_RECALL_MODEL,
+        max_tokens=_MAX_TOKENS,
+        cap=8,
+        tools=tools,
+        recall_max_tavily_calls=cfg.recall_max_tavily_calls,
+    )
+
+    forwarded = llm.calls[0]["tools"]
+    assert forwarded is not None
+    assert len(forwarded) == 1
+    assert forwarded[0].name == "tavily_search"
+
+
+async def test_llm_recall_empty_tools_list_is_passed_through() -> None:
+    # Default training-data-only mode: tools=[] reaches llm.complete unchanged.
+    llm = _StubLLM(text='{"suggestions": []}')
+
+    _ = await llm_recall(
+        pitch="...",
+        facets=_facets(),
+        current_top_n=[],
+        llm=llm,
+        model=_RECALL_MODEL,
+        max_tokens=_MAX_TOKENS,
+        cap=8,
+        tools=[],
+    )
+
+    assert llm.calls[0]["tools"] == []
 
 
 @pytest.mark.vcr
@@ -299,6 +358,7 @@ async def test_recall_cassette_round_trip() -> None:
         model=_RECALL_MODEL,
         max_tokens=_MAX_TOKENS,
         cap=8,
+        tools=[],
     )
 
     # We don't assert specific names — Opus picks. Just confirm round trip

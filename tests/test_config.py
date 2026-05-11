@@ -205,3 +205,23 @@ def test_min_similarity_score_after_recall_validator_rejects_above_normal(tmp_pa
     monkeypatch.chdir(tmp_path)
     with pytest.raises(ValidationError, match="min_similarity_score_after_recall"):
         Config(min_similarity_score=4.0, min_similarity_score_after_recall=5.0)
+
+
+def test_recall_max_tavily_calls_default_is_5(tmp_path, monkeypatch):
+    """Per-recall Tavily call budget defaults to 5 so Opus can browse a few times."""
+    monkeypatch.chdir(tmp_path)
+    cfg = Config()
+    assert cfg.recall_max_tavily_calls == 5
+
+
+def test_recall_max_tavily_calls_rejects_above_cap(tmp_path, monkeypatch):
+    """Cap of 20 keeps a runaway tool loop from blowing the whole budget."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError, match="recall_max_tavily_calls"):
+        Config(recall_max_tavily_calls=21)
+
+
+def test_recall_max_tavily_calls_rejects_negative(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError, match="recall_max_tavily_calls"):
+        Config(recall_max_tavily_calls=-1)

@@ -72,6 +72,9 @@ from slopmortem.llm.prompts import (
     render_prompt as render_prompt,
 )
 from slopmortem.llm.tools import (
+    recall_tools as recall_tools,
+)
+from slopmortem.llm.tools import (
     synthesis_tools as synthesis_tools,
 )
 from slopmortem.llm.tools import (
@@ -104,6 +107,7 @@ __all__ = [
     "llm_cassette_key",
     "make_embedder",
     "prompt_template_sha",
+    "recall_tools",
     "render_blocks",
     "render_prompt",
     "synthesis_tools",

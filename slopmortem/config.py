@@ -132,6 +132,12 @@ class Config(BaseSettings):
 
     tavily_calls_per_synthesis: int = Field(default=2, ge=0)
 
+    # Per-recall Tavily call budget. The recall LLM may invoke ``tavily_search``
+    # up to this many times during one recall firing to discover comparable
+    # startups before returning its suggestion list. Bounded so a runaway
+    # tool loop can't blow the budget on a single query.
+    recall_max_tavily_calls: int = Field(default=5, ge=0, le=20)
+
     # Recall L0: when True, the recall verifier discovers a citation URL via
     # Tavily search before the L2 HEAD/GET gate. When False, the recall branch
     # is disabled entirely (the L0 step is mandatory under the new contract).

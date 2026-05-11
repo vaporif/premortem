@@ -15,7 +15,7 @@ from slopmortem.models import RecallSuggestion, RecallSuggestionList
 
 if TYPE_CHECKING:
     from slopmortem.llm import LLMClient
-    from slopmortem.models import Candidate, Facets, ScoredCandidate
+    from slopmortem.models import Candidate, Facets, ScoredCandidate, ToolSpec
 
 
 logger = logging.getLogger(__name__)
@@ -86,12 +86,20 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
     model: str,
     max_tokens: int,
     cap: int,
+    tools: list[ToolSpec],
+    recall_max_tavily_calls: int = 0,
 ) -> list[RecallSuggestion]:
     """Ask the recall LLM (Opus) for comparable failures the corpus missed.
 
     Returns ``[]`` on transport failure, hard stops, or any wrapper-validation
     error — the recall branch is best-effort. The cap is applied here so the
     pipeline never has to slice a returned list itself.
+
+    ``tools`` is the list of tool specs Opus may call mid-reasoning to discover
+    candidates (today: just ``tavily_search`` built via ``recall_tools(config)``).
+    Pass ``[]`` to keep recall training-data-only. ``recall_max_tavily_calls``
+    is the per-recall budget surfaced to the prompt so Opus knows how many
+    searches it may issue before returning a final answer.
     """
     blocks = render_blocks(
         "llm_recall",
@@ -99,12 +107,14 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
         facets=facets,
         current_top_n=current_top_n,
         cap=cap,
+        recall_max_tavily_calls=recall_max_tavily_calls,
     )
     try:
         result = await llm.complete(
             blocks["user"],
             system=blocks["system"],
             model=model,
+            tools=tools,
             response_format={
                 "type": "json_schema",
                 "json_schema": {
