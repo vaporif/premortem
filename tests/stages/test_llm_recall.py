@@ -106,7 +106,6 @@ def _suggestion_json(name: str, *, year: int = 2023) -> dict[str, Any]:
         "status": "dead",
         "homepage_url": f"https://{name.lower().replace(' ', '')}.example.com",
         "failure_year": year,
-        "evidence_url": f"https://news.example.com/{name.lower().replace(' ', '-')}-shuts-down",
         "one_liner": f"{name} did Web3 audits and shut down in {year}.",
     }
 
@@ -199,7 +198,7 @@ async def test_recall_drops_invalid_response() -> None:
 
 
 async def test_recall_drops_wrapper_failing_validation() -> None:
-    # Valid JSON but suggestion misses `evidence_url` — wrapper validation
+    # Valid JSON but suggestion misses `failure_year` — wrapper validation
     # rejects the whole response.
     bad = {
         "suggestions": [
@@ -208,8 +207,7 @@ async def test_recall_drops_wrapper_failing_validation() -> None:
                 "category": "Web3 security",
                 "status": "absorbed",
                 "homepage_url": "https://hexagate.com",
-                "failure_year": 2024,
-                # evidence_url missing
+                # failure_year missing
                 "one_liner": "Acquired by Chainalysis in 2024.",
             }
         ]
@@ -227,6 +225,37 @@ async def test_recall_drops_wrapper_failing_validation() -> None:
     )
 
     assert out == []
+
+
+async def test_recall_accepts_missing_homepage_url() -> None:
+    # homepage_url is OPTIONAL per the new contract — null (or absent) should
+    # validate cleanly and surface as ``None`` on the parsed model.
+    payload = {
+        "suggestions": [
+            {
+                "name": "Hexagate",
+                "category": "Web3 security",
+                "status": "absorbed",
+                "homepage_url": None,
+                "failure_year": 2024,
+                "one_liner": "Acquired by Chainalysis in 2024.",
+            }
+        ]
+    }
+    llm = _StubLLM(text=json.dumps(payload))
+
+    out = await llm_recall(
+        pitch="...",
+        facets=_facets(),
+        current_top_n=[],
+        llm=llm,
+        model=_RECALL_MODEL,
+        max_tokens=_MAX_TOKENS,
+        cap=8,
+    )
+
+    assert len(out) == 1
+    assert out[0].homepage_url is None
 
 
 async def test_recall_returns_empty_on_http_error() -> None:

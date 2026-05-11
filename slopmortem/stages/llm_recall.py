@@ -132,6 +132,6 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
         logger.info(
             "llm_recall: received %d suggestion(s): %s",
             len(suggestions),
-            [(s.name, s.status, s.failure_year) for s in suggestions],
+            [(s.name, s.status) for s in suggestions],
         )
     return suggestions

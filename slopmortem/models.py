@@ -274,30 +274,30 @@ _FAILURE_YEAR_MAX = 2030
 
 
 class RecallSuggestion(BaseModel):
-    """One LLM-recalled comparable: company name plus the citation that proves failure.
+    """One LLM-recalled comparable: company name plus a hint at its homepage.
 
-    Field-level constraints (``HttpUrl`` format, integer ``ge``/``le``) are
-    avoided on purpose: strict ``response_format`` mode on both OpenAI and
+    The optional ``homepage_url`` carries no field-level ``HttpUrl`` format
+    constraint because strict ``response_format`` mode on both OpenAI and
     Anthropic rejects ``format``/``minLength``/``maxLength`` on strings and
     ``minimum``/``maximum`` on integers. Parse-equivalent validation runs in
     ``_validate_constraints`` below, so the wire contract stays
-    "well-formed http(s) URL, year in [1990, 2030]" even though the schema
-    sent upstream is just ``"type": "string"`` / ``"type": "integer"``.
+    "well-formed http(s) URL when present, year in [1990, 2030]" even though
+    the schema sent upstream is just ``"type": "string"`` / ``"type":
+    "integer"``.
     """
 
     name: str
     category: str
     status: Literal["dead", "absorbed", "struggling", "bruised"]
-    homepage_url: str
+    homepage_url: str | None = None
     failure_year: int
-    evidence_url: str
     one_liner: str
 
     @model_validator(mode="after")
     def _validate_constraints(self) -> RecallSuggestion:
         # Same shape ``HttpUrl`` would have enforced on the field directly.
-        _HTTP_URL_ADAPTER.validate_python(self.homepage_url)
-        _HTTP_URL_ADAPTER.validate_python(self.evidence_url)
+        if self.homepage_url is not None:
+            _HTTP_URL_ADAPTER.validate_python(self.homepage_url)
         if not _FAILURE_YEAR_MIN <= self.failure_year <= _FAILURE_YEAR_MAX:
             msg = (
                 f"failure_year {self.failure_year} outside "
