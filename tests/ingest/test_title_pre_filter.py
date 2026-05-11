@@ -11,6 +11,7 @@ import pytest
 
 from slopmortem.budget import Budget
 from slopmortem.ingest import HaikuTitlePreFilter
+from slopmortem.llm import OpenRouterCompletionError
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry
 
@@ -149,8 +150,8 @@ async def test_budget_exhausted_skips() -> None:
 
 
 @pytest.mark.anyio
-async def test_llm_runtime_error_returns_entry_unchanged() -> None:
-    llm = _StubLLM(raise_exc=RuntimeError("boom"))
+async def test_llm_completion_error_returns_entry_unchanged() -> None:
+    llm = _StubLLM(raise_exc=OpenRouterCompletionError("boom", reason="hard_stop"))
     out = await _filter(llm=llm).enrich(_make_entry())
     assert out.title_pre_filter_rejected is False
 

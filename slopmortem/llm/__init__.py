@@ -57,6 +57,9 @@ from slopmortem.llm.openrouter import (
     OpenRouterClient as OpenRouterClient,
 )
 from slopmortem.llm.openrouter import (
+    OpenRouterCompletionError as OpenRouterCompletionError,
+)
+from slopmortem.llm.openrouter import (
     gather_with_limit as gather_with_limit,
 )
 from slopmortem.llm.openrouter import (
@@ -99,6 +102,7 @@ __all__ = [
     "NoCannedResponseError",
     "OpenAIEmbeddingClient",
     "OpenRouterClient",
+    "OpenRouterCompletionError",
     "PitchFillerSearchArgs",
     "build_pitch_filler_tavily_tool",
     "embed_cassette_key",

@@ -10,7 +10,7 @@ import httpx
 from lmnr import observe
 from pydantic import BaseModel, ValidationError
 
-from slopmortem.llm import render_blocks, to_strict_response_schema
+from slopmortem.llm import OpenRouterCompletionError, render_blocks, to_strict_response_schema
 from slopmortem.models import RecallSuggestion, RecallSuggestionList
 
 if TYPE_CHECKING:
@@ -134,11 +134,7 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
             },
             max_tokens=max_tokens,
         )
-    # RuntimeError covers OpenRouter's hard-stop / null-tool-calls / unknown
-    # finish-reason failures (slopmortem/llm/openrouter.py raises plain
-    # RuntimeError on those). BudgetExceededError extends Exception directly,
-    # not RuntimeError, so budget exhaustion still propagates up.
-    except (httpx.HTTPError, RuntimeError) as exc:
+    except (httpx.HTTPError, OpenRouterCompletionError) as exc:
         logger.warning("llm_recall: call failed: %r", exc)
         return []
     try:

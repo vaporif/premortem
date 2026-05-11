@@ -22,6 +22,7 @@ from pydantic import BaseModel, ValidationError
 
 from slopmortem.budget import BudgetExceededError
 from slopmortem.llm import (
+    OpenRouterCompletionError,
     prompt_template_sha,
     render_blocks,
     to_strict_response_schema,
@@ -96,7 +97,7 @@ class HaikuTitlePreFilter:
         except BudgetExceededError:
             # Fatal: let the orchestrator short-circuit the run.
             raise
-        except (httpx.HTTPError, RuntimeError) as exc:
+        except (httpx.HTTPError, OpenRouterCompletionError) as exc:
             logger.warning(
                 "title pre-filter: LLM call failed for %s:%s: %r",
                 entry.source,

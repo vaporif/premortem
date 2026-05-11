@@ -24,6 +24,7 @@ from pydantic import BaseModel, ValidationError
 
 from slopmortem.budget import BudgetExceededError
 from slopmortem.llm import (
+    OpenRouterCompletionError,
     build_pitch_filler_tavily_tool,
     prompt_template_sha,
     render_blocks,
@@ -134,7 +135,7 @@ class HaikuPitchFiller:
         except BudgetExceededError:
             # Fatal: let the orchestrator short-circuit the run.
             raise
-        except (httpx.HTTPError, RuntimeError) as exc:
+        except (httpx.HTTPError, OpenRouterCompletionError) as exc:
             logger.warning(
                 "pitch filler: LLM call failed for %s:%s: %r",
                 entry.source,

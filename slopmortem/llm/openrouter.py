@@ -48,6 +48,24 @@ class MidStreamError(Exception):
         return str(getattr(self.error, "code", ""))
 
 
+class OpenRouterCompletionError(Exception):
+    """Completion loop reached a non-recoverable terminal state.
+
+    Reasons: ``hard_stop`` (finish_reason=length|content_filter),
+    ``null_tool_calls`` (tool_calls finish reason with empty list),
+    ``tool_loop_exceeded`` (turn budget exhausted),
+    ``allowlist_violation`` (model called an unregistered tool),
+    ``retry_exhausted`` (defensive; retry loop fell through).
+
+    Callers catch this alongside ``httpx.HTTPError`` to degrade gracefully
+    while letting ``BudgetExceededError`` propagate.
+    """
+
+    def __init__(self, msg: str, *, reason: str) -> None:
+        super().__init__(msg)
+        self.reason = reason
+
+
 _TRANSIENT_MIDSTREAM_CODES = frozenset({"overloaded_error"})
 
 
@@ -188,11 +206,10 @@ class OpenRouterClient:
                     tcs = choice.message.tool_calls
                     if not tcs:
                         # Some providers return finish_reason="tool_calls" with a
-                        # null/empty tool_calls list. Surface as RuntimeError so
-                        # callers' existing ``except RuntimeError`` paths handle
-                        # it the same way as "hard stop: length".
+                        # null/empty tool_calls list. Surface as a typed error so
+                        # callers degrade like ``hard stop: length``.
                         msg = "tool_calls finish reason but no tool_calls in message"
-                        raise RuntimeError(msg)
+                        raise OpenRouterCompletionError(msg, reason="null_tool_calls")
                     self._assert_tool_allowlist(tcs, registered)
                     messages.append(_assistant_with_tools(choice.message))
                     for tc in tcs:
@@ -216,7 +233,7 @@ class OpenRouterClient:
 
                 if fr in ("length", "content_filter"):
                     msg = f"hard stop: {fr}"
-                    raise RuntimeError(msg)
+                    raise OpenRouterCompletionError(msg, reason="hard_stop")
 
                 if fr == "error":
                     # _call_with_retry should have consumed the stream and raised
@@ -224,7 +241,7 @@ class OpenRouterClient:
                     raise MidStreamError(getattr(choice, "error", {"code": "unknown"}))
 
             msg = "tool-loop bound exceeded"
-            raise RuntimeError(msg)
+            raise OpenRouterCompletionError(msg, reason="tool_loop_exceeded")
         finally:
             if cost > 0.0:
                 # True cost lands on response.usage.cost — settle without a
@@ -263,7 +280,7 @@ class OpenRouterClient:
             else:
                 return resp
         msg = "retry loop exited without resolution"  # pragma: no cover - unreachable
-        raise RuntimeError(msg)
+        raise OpenRouterCompletionError(msg, reason="retry_exhausted")
 
     async def _backoff(self, attempt: int) -> None:
         delay = self._initial_backoff * (2**attempt)
@@ -313,7 +330,7 @@ class OpenRouterClient:
             name = _tc_name(tc)
             if name not in registered:
                 msg = f"{SpanEvent.TOOL_ALLOWLIST_VIOLATION.value}: {name}"
-                raise RuntimeError(msg)
+                raise OpenRouterCompletionError(msg, reason="allowlist_violation")
 
     def _emit(self, _event: SpanEvent) -> None:
         # No-op hook so tests can patch it to observe emissions. Active emit

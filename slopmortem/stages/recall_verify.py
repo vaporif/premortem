@@ -58,7 +58,12 @@ from slopmortem.concurrency import gather_resilient
 from slopmortem.corpus import extract_clean
 from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.http import SSRFBlockedError, safe_get, safe_head
-from slopmortem.llm import prompt_template_sha, render_blocks, to_strict_response_schema
+from slopmortem.llm import (
+    OpenRouterCompletionError,
+    prompt_template_sha,
+    render_blocks,
+    to_strict_response_schema,
+)
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.tracing import SpanEvent
 
@@ -256,10 +261,7 @@ async def _l5_deathness_judgment(
             extra_body={"prompt_template_sha": prompt_template_sha("recall_deathness")},
             max_tokens=max_tokens,
         )
-    # RuntimeError covers OpenRouter's hard-stop / null-tool-calls / unknown
-    # finish-reason failures. BudgetExceededError extends Exception directly
-    # so budget exhaustion still propagates up.
-    except (httpx.HTTPError, RuntimeError) as exc:
+    except (httpx.HTTPError, OpenRouterCompletionError) as exc:
         logger.info("recall_verify: L5 LLM call failed: %r", exc)
         return None
     try:

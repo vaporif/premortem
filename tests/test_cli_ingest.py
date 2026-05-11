@@ -123,7 +123,9 @@ def test_ingest_default_auto_enables_title_pre_filter_for_hn_algolia(
 
 def test_ingest_default_without_tavily_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default sources include hn_algolia → pitch filler requires TAVILY_API_KEY."""
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    # Set to empty string (not delenv) so pydantic-settings sees the env override
+    # winning over any .env on disk — env > dotenv in pydantic-settings precedence.
+    monkeypatch.setenv("TAVILY_API_KEY", "")
     # Disable the query-side recall L0 head so the ingest CLI's own pitch-filler
     # gate is the only TAVILY_API_KEY check left at load time.
     monkeypatch.setenv("ENABLE_TAVILY_RECALL_SEARCH", "false")
@@ -222,7 +224,8 @@ def test_ingest_with_crunchbase_csv_appends_source(
 
 
 def test_enable_tavily_news_without_api_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    # Empty string (not delenv) so the env override beats any .env on disk.
+    monkeypatch.setenv("TAVILY_API_KEY", "")
     # Recall-side L0 also wants TAVILY_API_KEY but is unrelated to this test;
     # disable it so the only error path is the ingest CLI's --enable-tavily-news check.
     monkeypatch.setenv("ENABLE_TAVILY_RECALL_SEARCH", "false")
