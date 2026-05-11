@@ -1,0 +1,60 @@
+# Death/distress vocabulary the L3 anchor check (slopmortem/stages/recall_verify.py)
+# looks for. Word-boundary regex match, case-insensitive. Multi-word entries
+# match across HTML whitespace runs.
+#
+# Grouping is for human readability only; the loader flattens to one tuple.
+# Add or remove signals here — no code change needed.
+
+terminal:
+  # Company is gone.
+  - shutdown
+  - shut down
+  - shuttered
+  - closed
+  - ceased
+  - defunct
+  - dissolved
+  - bankrupt
+  - bankruptcy
+  - Chapter 11
+  - Chapter 7
+  - liquidation
+  - wound down
+  - wind-down
+  - wind down
+  - going out of business
+  - out of business
+  - obituary
+  - delisted
+  - cease operations
+  - acquired
+  - acquisition
+
+distress:
+  # Still operating but visibly hurting.
+  - layoffs
+  - layoff
+  - restructuring
+  - struggling
+  - missed payroll
+  - downsizing
+  - troubled
+
+crypto_native:
+  # Web3 projects die via exploits, drained funds, token collapse — not
+  # Chapter 11 filings. Catches death events traditional startup vocabulary
+  # misses. The L3 anchor check still requires the company name in the same
+  # body, so generic "hackathon" or "growth hack" content can't false-admit.
+  - hacked
+  - exploit
+  - exploited
+  - drained
+  - rug pull
+  - rugged
+  - depeg
+  - depegged
+  - token collapse
+  - protocol died
+  - dead in the water
+  - abandoned
+  - team disbanded

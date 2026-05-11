@@ -52,10 +52,13 @@ import hashlib
 import logging
 import re
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Final, Literal
+from functools import cache
+from pathlib import Path
+from typing import TYPE_CHECKING, Final, Literal, cast
 
 import anyio
 import httpx
+import yaml
 from lmnr import Laminar, observe
 from pydantic import BaseModel, ValidationError, model_validator
 
@@ -106,44 +109,22 @@ _FETCH_TIMEOUT_S: Final = 40.0
 # single host's limit while keeping the wall clock reasonable.
 _DEFAULT_CONCURRENCY: Final = 3
 
-# Tuple, not frozenset: the order is irrelevant for membership but the regex
-# build needs a stable longest-first sort so "Chapter 11" wins over a stray
-# "Chapter" prefix and "shut down" wins over "shut". `acquired`/`acquisition`
-# stay in — the false-positive cost is one Haiku call at L5; the false-negative
-# would silently drop real fire-sale exits.
-_DEATH_KEYWORDS: Final[tuple[str, ...]] = (
-    # Terminal: the company is gone.
-    "shutdown",
-    "shut down",
-    "shuttered",
-    "closed",
-    "ceased",
-    "defunct",
-    "dissolved",
-    "bankrupt",
-    "bankruptcy",
-    "Chapter 11",
-    "Chapter 7",
-    "liquidation",
-    "wound down",
-    "wind-down",
-    "wind down",
-    "going out of business",
-    "out of business",
-    "obituary",
-    "delisted",
-    "cease operations",
-    "acquired",
-    "acquisition",
-    # Distress: still operating but visibly hurting.
-    "layoffs",
-    "layoff",
-    "restructuring",
-    "struggling",
-    "missed payroll",
-    "downsizing",
-    "troubled",
-)
+# Word-boundary regex builds from the keyword list at module-load. Source
+# of truth is ``death_keywords.yml`` (sibling file) — edit there to add or
+# remove signals. Tuple, not frozenset: the regex builder needs a stable
+# longest-first sort so "Chapter 11" wins over a stray "Chapter" prefix
+# and "shut down" wins over "shut".
+_DEATH_KEYWORDS_PATH: Final = Path(__file__).parent / "death_keywords.yml"
+
+
+@cache
+def _load_death_keywords() -> tuple[str, ...]:
+    """Load death/distress keywords from the YAML sibling, flatten across groups."""
+    raw = cast("dict[str, list[str]]", yaml.safe_load(_DEATH_KEYWORDS_PATH.read_text()))
+    return tuple(kw for group in raw.values() for kw in group)
+
+
+_DEATH_KEYWORDS: Final[tuple[str, ...]] = _load_death_keywords()
 
 
 def _build_death_regex() -> re.Pattern[str]:

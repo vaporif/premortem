@@ -274,3 +274,37 @@ async def test_l3_admits_chapter_eleven(monkeypatch: pytest.MonkeyPatch) -> None
         struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
     )
     assert out is not None
+
+
+async def test_l3_anchors_on_crypto_native_keyword(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A body using crypto-native death vocabulary (no traditional keywords) clears L3.
+
+    Regression for the live-trace finding that Nomad Bridge's Medium obituary
+    used "hacked"/"exploited"/"drained" instead of "shutdown"/"bankrupt", so
+    the L3 anchor check needs to recognize those.
+    """
+    sug = _suggestion("Nomad Bridge")
+    discovered = _discovered("Nomad Bridge")
+    lead = (
+        "<html><body><main><p>Nomad Bridge was a cross-chain communication protocol "
+        "that got hacked in August 2022, drained for nearly $190M. The team "
+        "eventually disbanded and the protocol is now dead in the water. "
+    )
+    body = lead + ("Background detail. " * 80) + "</p></main></body></html>"
+    _patch_http(
+        monkeypatch,
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=body)},
+    )
+    out = await verify_suggestion(
+        sug,
+        discovered_url=discovered,
+        wayback=_FakeWayback(),
+        llm=_FakeLLM(default=_DEATHNESS_PASS),
+        extract=_NEVER_EXTRACT,
+        model_recall_deathness=_DEATHNESS_MODEL,
+        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
+        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
+        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+    )
+    assert out is not None
