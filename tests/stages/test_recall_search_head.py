@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import httpx
+
 from slopmortem.corpus.tavily import TavilyHit
 from slopmortem.models import RecallSuggestion
 from slopmortem.stages import recall_verify as _rv
@@ -129,6 +131,26 @@ async def test_returns_primary_hit_with_name_and_death_keyword(
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
     assert out == "https://news.example.com/b"
     assert events == []
+
+
+class _RaisingTavilySearch:
+    """Fake whose ``__call__`` raises a transport error to exercise the L0 except branch."""
+
+    def __init__(self, exc: BaseException) -> None:
+        self._exc = exc
+
+    async def __call__(self, q: str, limit: int) -> list[TavilyHit]:
+        raise self._exc
+
+
+async def test_drops_on_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tavily raises ``httpx.ConnectError`` — emit ``reason=transport_error`` and drop."""
+    events = _capture_events(monkeypatch)
+    sug = _suggestion()
+    fake = _RaisingTavilySearch(httpx.ConnectError("boom"))
+    out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
+    assert out is None
+    assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "transport_error"})]
 
 
 async def test_returns_fallback_hit_with_name_only(monkeypatch: pytest.MonkeyPatch) -> None:

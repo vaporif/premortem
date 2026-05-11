@@ -440,14 +440,23 @@ async def _search_for_evidence(
     title-or-snippet contains the name. ``None`` means the article URL
     would have 404'd anyway, save the L2 round-trip.
     """
-    if suggestion.status in ("dead", "absorbed"):
-        q = (
-            f'"{suggestion.name}" shutdown or closed or bankrupt or "Chapter 11" '
-            f"{suggestion.failure_year}"
-        )
-    else:  # "struggling" or "bruised"
-        q = f'"{suggestion.name}" layoffs or restructuring or struggling {suggestion.failure_year}'
-    hits = await tavily_search(q, limit)
+    match suggestion.status:
+        case "dead" | "absorbed":
+            q = (
+                f'"{suggestion.name}" shutdown or closed or bankrupt or "Chapter 11" '
+                f"{suggestion.failure_year}"
+            )
+        case "struggling" | "bruised":
+            q = (
+                f'"{suggestion.name}" layoffs or restructuring or struggling '
+                f"{suggestion.failure_year}"
+            )
+    try:
+        hits = await tavily_search(q, limit)
+    except (httpx.HTTPError, SSRFBlockedError) as exc:
+        logger.info("recall_verify: L0 Tavily transport failure for %r: %r", suggestion.name, exc)
+        _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": "transport_error"})
+        return None
     if not hits:
         logger.info("recall_verify: L0 dropped %r — no_hits", suggestion.name)
         _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": "no_hits"})
