@@ -325,6 +325,13 @@ async def _l5_decide(  # noqa: PLR0913 - mirrors the deathness knob set passed t
         )
         _emit_event(SpanEvent.RECALL_REJECTED_L5_LOW_CONFIDENCE)
         return None
+    logger.info(
+        "recall_verify: L5 %s confidence %.2f admitted %r (quote=%r)",
+        judgment.verdict,
+        judgment.confidence,
+        suggestion.name,
+        judgment.evidence_quote[:120],
+    )
     return judgment.verdict
 
 
@@ -484,6 +491,13 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
     )
     if verdict is None:
         return None
+    logger.info(
+        "recall_verify: admitted %r tier=%s verdict=%s evidence=%s",
+        suggestion.name,
+        tier,
+        verdict,
+        evidence,
+    )
     # Persisted body: news article (always) + Wayback snapshot (when anchored).
     # Synthesizer reads both the value-prop and the death narrative from the
     # same Qdrant entry; verifier and synthesizer agree on which document

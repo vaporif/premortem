@@ -127,4 +127,11 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
     except ValidationError as exc:
         logger.info("llm_recall: dropped invalid response: %r", exc)
         return []
-    return wrapper.suggestions[:cap]
+    suggestions = wrapper.suggestions[:cap]
+    if logger.isEnabledFor(logging.INFO):
+        logger.info(
+            "llm_recall: received %d suggestion(s): %s",
+            len(suggestions),
+            [(s.name, s.status, s.failure_year) for s in suggestions],
+        )
+    return suggestions
