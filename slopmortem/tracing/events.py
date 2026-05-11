@@ -37,10 +37,10 @@ class SpanEvent(StrEnum):
     # before/after qualifying counts.
     RECALL_GAP_SCORE_AFTER = "recall.gap_score_after"
     RECALL_SUGGESTIONS_RECEIVED = "recall.suggestions_received"
-    # L0 search head: zero hits, or hits but no name match. Different from
-    # L2/L3 (URL fetched, body parsed but failed anchor check) — this fires
-    # before any HTTP is issued to the citation host. Carries ``reason``
-    # attribute: "no_hits" or "no_name_match".
+    # L0 search head drop. Different from L2/L3 (URL fetched, body parsed but
+    # failed anchor check) — this fires before any HTTP hits the citation host.
+    # Carries ``reason`` attribute: "no_hits", "no_name_match", or
+    # "transport_error".
     RECALL_REJECTED_NO_EVIDENCE = "recall.rejected_no_evidence"
     # Carries ``stage`` attribute: "head" (HEAD probe) or "get" (GET body fetch).
     RECALL_REJECTED_L2 = "recall.rejected_l2"

@@ -584,14 +584,9 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
     )
     if evidence_body is None:
         return None
-    # L4: Wayback enrichment, advisory only. Gated on a homepage being present —
-    # when the recall LLM didn't supply one, Wayback against the news URL
-    # would archive an unrelated news page, so we skip the round-trip entirely.
-    # WaybackEnricher.enrich already retries 3x internally with exponential
-    # backoff and swallows transient errors by returning the entry unchanged
-    # (wayback.py:62-99, 163-202).
     # markdown_text=None AND raw_html=None matter — WaybackEnricher.enrich
-    # short-circuits if either body is already populated.
+    # short-circuits if either body is already populated, so the seed has to
+    # arrive empty for L4 to do its enrichment pass.
     seed = RawEntry(
         source=SOURCE_LLM_RECALL,
         source_id=_recall_source_id(suggestion),
