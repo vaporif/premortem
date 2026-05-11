@@ -20,10 +20,6 @@ if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture
 
 
-@pytest.mark.xfail(
-    reason="taxonomy bumped to v2 in adf0eb2; cassettes need just eval-record",
-    strict=True,
-)
 @pytest.mark.requires_qdrant
 def test_runner_replay_passes_with_recorded_cassettes(tmp_path: Path) -> None:
     """Happy path: ephemeral Qdrant + committed cassette dir → exit 0, non-empty rows.
