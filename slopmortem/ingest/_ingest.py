@@ -368,6 +368,21 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
             case ProcessOutcome.SKIPPED_EMPTY:
                 result.skipped_empty += 1
             case ProcessOutcome.FAILED:
+                # ``_process_entry`` already logged the underlying cause at
+                # warning level (e.g. delete_chunks transport error). Surface
+                # the entry on progress + trace at parity with the exception
+                # path; the synthetic exc is a placeholder so the helper's
+                # contract stays narrow.
+                _record_entry_failure(
+                    result=result,
+                    progress=progress,
+                    phase=IngestPhase.WRITE,
+                    entry=entry,
+                    exc=RuntimeError("process_entry returned FAILED; see prior warning"),
+                    message=(
+                        f"write phase failed for {entry.source}:{entry.source_id} (FAILED outcome)"
+                    ),
+                )
                 result.failed += 1
         progress.advance_phase(IngestPhase.WRITE)
     progress.end_phase(IngestPhase.WRITE)

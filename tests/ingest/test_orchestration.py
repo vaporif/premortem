@@ -6,7 +6,7 @@ import asyncio
 import importlib
 import json
 import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -823,6 +823,82 @@ async def test_ingest_records_at_most_max_recorded_errors_attributes(tmp_path, c
     assert result.processed == 0
     failed_events = [e for e in result.span_events if e == SpanEvent.INGEST_ENTRY_FAILED.value]
     assert len(failed_events) == n
+
+
+@dataclass
+class _RecordingProgress:
+    """Capture ``error()`` calls; other progress hooks are no-ops.
+
+    Mirrors ``NullProgress`` minus the active recording — keeps the protocol
+    surface, so the orchestrator's ``isinstance(progress, IngestProgress)``
+    boundary is honoured.
+    """
+
+    errors: list[tuple[str, str]] = field(default_factory=list)
+
+    def start_phase(self, phase, total) -> None:
+        del phase, total
+
+    def advance_phase(self, phase, n: int = 1) -> None:
+        del phase, n
+
+    def end_phase(self, phase) -> None:
+        del phase
+
+    def log(self, message: str) -> None:
+        del message
+
+    def error(self, phase, message: str) -> None:
+        self.errors.append((str(phase), message))
+
+
+async def test_failed_outcome_records_entry_failure(tmp_path, cfg, monkeypatch):
+    """``ProcessOutcome.FAILED`` from ``_process_entry`` must reach progress + trace.
+
+    Without this, the only signal a delete_chunks failure happened is a silent
+    ``result.failed`` counter; the entry vanishes from the trace and the UI.
+    """
+    from slopmortem.ingest._journal_writes import ProcessOutcome  # noqa: PLC0415
+
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=cfg.embed_model_id)
+    budget = Budget(cap_usd=cfg.max_cost_usd_per_ingest)
+    classifier = FakeSlopClassifier(default_score=0.0)
+
+    ingest_inner = importlib.import_module("slopmortem.ingest._ingest")
+
+    async def _return_failed(*_args, **_kwargs):
+        return ProcessOutcome.FAILED
+
+    monkeypatch.setattr(ingest_inner, "_process_entry", _return_failed)
+
+    progress = _RecordingProgress()
+    entry = _entry(source="hn_algolia", source_id="123")
+    result = await ingest(
+        sources=[_ListSource(entries=[entry])],
+        enrichers=[],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=classifier,
+        config=cfg,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+        progress=progress,
+    )
+
+    assert result.failed == 1
+    assert result.errors == 1, "FAILED outcome must record an entry-level error"
+    assert SpanEvent.INGEST_ENTRY_FAILED.value in result.span_events
+    assert progress.errors, "progress.error must be called for FAILED outcome"
+    assert any("123" in msg for _phase, msg in progress.errors), (
+        f"progress.error message must include source_id; got {progress.errors!r}"
+    )
 
 
 async def test_ingest_write_phase_reraises_cancelled_error(tmp_path, cfg, monkeypatch):

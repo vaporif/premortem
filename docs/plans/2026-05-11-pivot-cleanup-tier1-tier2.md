@@ -118,7 +118,7 @@ The match arm at `_ingest.py:371-372` increments `result.failed` and does nothin
 **Pros:** Brings the FAILED outcome to parity with the exception path. Recovers the entry identity in trace and UI for the delete_chunks failure mode.
 **Cons:** `_record_entry_failure` (defined earlier in `_ingest.py`) is signed for the exception path — it takes `result`, `progress`, `phase`, `entry`, `exc`, `message`. The FAILED outcome has no `exc` because the failure was logged-and-converted inside `_process_entry`. Two options: (a) synthesize a placeholder `RuntimeError("delete_chunks failed; see prior log")` and pass it as `exc`, or (b) widen `_record_entry_failure` to accept `exc: BaseException | None`. Pick (a) — it's the smaller diff and keeps the helper's contract intact.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `tests/ingest/test_orchestration.py`:
 
@@ -147,12 +147,12 @@ async def test_failed_outcome_records_entry_failure(
 
 `_RecordingProgress`, `_make_entry`, `_AsyncReturn`, and `_run_write_phase` may not exist verbatim — use the closest equivalents already in this test file. If none exist, build them from the patterns used by neighboring tests in the same file.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `just test tests/ingest/test_orchestration.py::test_failed_outcome_records_entry_failure -v`
 Expected: FAIL with `assert progress.errors` (empty list).
 
-- [ ] **Step 3: Apply the fix**
+- [x] **Step 3: Apply the fix**
 
 In `slopmortem/ingest/_ingest.py:371-372`, change:
 
@@ -177,17 +177,17 @@ case ProcessOutcome.FAILED:
 
 `_record_entry_failure` already increments `result.failed` (verify by reading its body before the edit — if it doesn't, keep the `result.failed += 1`). The synthetic `RuntimeError` is a placeholder so we don't widen the helper's signature for a single caller; the real reason was already logged at warning level inside `_process_entry` (`_journal_writes.py:196-200`). Do not add a new helper.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `just test tests/ingest/test_orchestration.py::test_failed_outcome_records_entry_failure -v`
 Expected: PASS.
 
-- [ ] **Step 5: Full verify**
+- [x] **Step 5: Full verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add slopmortem/ingest/_ingest.py tests/ingest/test_orchestration.py
