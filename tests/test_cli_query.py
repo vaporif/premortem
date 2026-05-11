@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 
 from slopmortem.budget import Budget
 from slopmortem.cli import app
+from slopmortem.cli._query_cmd import _progress_context
 from slopmortem.models import (
     InputContext,
     PerspectiveScore,
@@ -197,3 +198,44 @@ def test_debug_retrieve_skips_recall_deps(monkeypatch: pytest.MonkeyPatch, tmp_p
     runner = CliRunner()
     result = runner.invoke(app, ["query", "A pitch", "--debug-retrieve"])
     assert result.exit_code == 0, result.stdout + (result.stderr or "")
+
+
+def test_progress_context_returns_nullcontext_when_env_disables(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``SLOPMORTEM_NO_PROGRESS=1`` short-circuits even when every TTY probe says yes.
+
+    Forces both ``sys.stderr.isatty`` and Rich's ``Console.is_terminal`` to
+    True so the env-var gate is the only thing that can flip the result —
+    proves the escape hatch isn't shadowed by the other checks.
+    """
+    monkeypatch.setenv("SLOPMORTEM_NO_PROGRESS", "1")
+    monkeypatch.setattr("sys.stderr.isatty", lambda: True)
+    monkeypatch.setattr("rich.console.Console.is_terminal", True)
+    with _progress_context() as bar:
+        assert bar is None
+
+
+def test_progress_context_returns_nullcontext_when_stderr_not_tty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-TTY stderr (piped/redirected) disables the bar."""
+    monkeypatch.delenv("SLOPMORTEM_NO_PROGRESS", raising=False)
+    monkeypatch.setattr("sys.stderr.isatty", lambda: False)
+    with _progress_context() as bar:
+        assert bar is None
+
+
+def test_progress_context_returns_nullcontext_when_rich_rejects_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Python TTY check True + Rich ``is_terminal`` False = still disabled.
+
+    This is the pty-but-not-cursor-positionable case (``just`` wrapper, some
+    CI shells) that caused the splatting bug.
+    """
+    monkeypatch.delenv("SLOPMORTEM_NO_PROGRESS", raising=False)
+    monkeypatch.setattr("sys.stderr.isatty", lambda: True)
+    monkeypatch.setattr("rich.console.Console.is_terminal", False)
+    with _progress_context() as bar:
+        assert bar is None

@@ -207,11 +207,11 @@ def test_min_similarity_score_after_recall_validator_rejects_above_normal(tmp_pa
         Config(min_similarity_score=4.0, min_similarity_score_after_recall=5.0)
 
 
-def test_recall_max_tavily_calls_default_is_5(tmp_path, monkeypatch):
-    """Per-recall Tavily call budget defaults to 5 so Opus can browse a few times."""
+def test_recall_max_tavily_calls_default_is_3(tmp_path, monkeypatch):
+    """Per-recall Tavily call budget defaults to 3 — covers most niches without bloating latency."""
     monkeypatch.chdir(tmp_path)
     cfg = Config()
-    assert cfg.recall_max_tavily_calls == 5
+    assert cfg.recall_max_tavily_calls == 3
 
 
 def test_recall_max_tavily_calls_rejects_above_cap(tmp_path, monkeypatch):

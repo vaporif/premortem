@@ -410,11 +410,12 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             )
         )
 
-    # TTY-gated: attach Rich progress only when stderr is a real terminal.
-    # Piped invocations (CI, ``> file``) get a quiet run.
-    progress_ctx: contextlib.AbstractContextManager[RichIngestProgress | None] = (
-        RichIngestProgress() if sys.stderr.isatty() else contextlib.nullcontext()
-    )
+    # Same TTY-gating logic as ``_query_cmd._progress_context`` — Rich's Live
+    # mode splats frames into stdout when it can't do cursor positioning
+    # (``just``'s pty, some CI shells), so we layer Python's TTY check, the
+    # ``SLOPMORTEM_NO_PROGRESS`` env escape, and Rich's own ``is_terminal``
+    # probe before attaching the bar.
+    progress_ctx = _ingest_progress_context()
     # Print escaping exceptions before Rich tears down — Progress.__exit__
     # clears the screen, so a traceback interleaved with bar redraws disappears.
     err_console = Console(stderr=True)
@@ -575,6 +576,24 @@ async def _build_ingest_deps(
 class RichIngestProgress(RichPhaseProgress[IngestPhase]):
     def __init__(self) -> None:
         super().__init__(INGEST_PHASE_LABELS)
+
+
+def _ingest_progress_context() -> contextlib.AbstractContextManager[RichIngestProgress | None]:
+    """Same gating contract as ``_query_cmd._progress_context``.
+
+    Three gates: ``SLOPMORTEM_NO_PROGRESS`` env escape hatch, Python's
+    fileno-level TTY check on stderr, and Rich's own ``is_terminal`` probe.
+    See the query-side helper for the full rationale; both ingest and query
+    use ``RichPhaseProgress`` with ``Console(stderr=True)``, so the same
+    splatting failure mode applies.
+    """
+    if os.environ.get("SLOPMORTEM_NO_PROGRESS"):
+        return contextlib.nullcontext()
+    if not sys.stderr.isatty():
+        return contextlib.nullcontext()
+    if not Console(stderr=True).is_terminal:
+        return contextlib.nullcontext()
+    return RichIngestProgress()
 
 
 def _render_ingest_result(console: Console, result: IngestResult, budget: Budget) -> None:
