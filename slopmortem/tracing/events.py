@@ -42,6 +42,11 @@ class SpanEvent(StrEnum):
     # Carries ``reason`` attribute: "no_hits", "no_name_match", or
     # "transport_error".
     RECALL_REJECTED_NO_EVIDENCE = "recall.rejected_no_evidence"
+    # L0 status-shaped query returned no name match; the status-blind retry
+    # (`"<name>" <category> <year>`) found a name-matching hit. Recorded so
+    # the trace dashboard can answer "how often is Opus's status guess wrong?"
+    # — the count is a direct lower bound on L0 false-precision.
+    RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED = "recall.l0_name_only_fallback_recovered"
     # Carries ``stage`` attribute: "head" (HEAD probe) or "get" (GET body fetch).
     RECALL_REJECTED_L2 = "recall.rejected_l2"
     RECALL_REJECTED_L3_NAME_MISSING = "recall.rejected_l3_name"

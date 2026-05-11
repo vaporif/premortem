@@ -93,19 +93,23 @@ def _capture_events(monkeypatch: pytest.MonkeyPatch) -> list[tuple[SpanEvent, di
     return events
 
 
-async def test_drops_on_zero_hits(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Search returned no results — emit ``reason=no_hits`` and drop."""
+async def test_drops_on_zero_hits_both_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Both status-shaped and status-blind queries return 0 hits — drop with no_name_match.
+
+    Pass-1 ``no_hits`` collapses into the consolidated ``no_name_match`` event
+    so the dashboard sees one final reason per dropped suggestion.
+    """
     events = _capture_events(monkeypatch)
     sug = _suggestion()
     fake = FakeTavilySearch(default=[])
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
     assert out is None
-    assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "no_hits"})]
-    assert len(fake.calls) == 1
+    assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "no_name_match"})]
+    assert len(fake.calls) == 2
 
 
 async def test_drops_when_no_hit_mentions_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Three hits, none containing the company name in title or snippet."""
+    """Hits exist but none contain the company name — both passes run, then drop."""
     events = _capture_events(monkeypatch)
     sug = _suggestion()
     hits = [
@@ -129,6 +133,7 @@ async def test_drops_when_no_hit_mentions_name(monkeypatch: pytest.MonkeyPatch) 
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
     assert out is None
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "no_name_match"})]
+    assert len(fake.calls) == 2
 
 
 async def test_returns_primary_hit_with_name_and_death_keyword(
@@ -158,6 +163,8 @@ async def test_returns_primary_hit_with_name_and_death_keyword(
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
     assert out == "https://news.example.com/b"
     assert events == []
+    # Pass 1 found a primary hit — pass 2 must not run.
+    assert len(fake.calls) == 1
 
 
 class _RaisingTavilySearch:
@@ -165,23 +172,26 @@ class _RaisingTavilySearch:
 
     def __init__(self, exc: BaseException) -> None:
         self._exc = exc
+        self.calls: list[tuple[str, int]] = []
 
     async def __call__(self, q: str, limit: int) -> list[TavilyHit]:
+        self.calls.append((q, limit))
         raise self._exc
 
 
-async def test_drops_on_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Tavily raises ``httpx.ConnectError`` — emit ``reason=transport_error`` and drop."""
+async def test_drops_on_both_passes_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tavily raises on both passes — emit ONE ``reason=transport_error`` event."""
     events = _capture_events(monkeypatch)
     sug = _suggestion()
     fake = _RaisingTavilySearch(httpx.ConnectError("boom"))
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
     assert out is None
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "transport_error"})]
+    assert len(fake.calls) == 2
 
 
 async def test_returns_fallback_hit_with_name_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No hit has a death keyword; first name-matching hit wins as fallback."""
+    """No hit has a death keyword; first name-matching hit wins as fallback (pass 1)."""
     events = _capture_events(monkeypatch)
     sug = _suggestion()
     hits = [
@@ -205,3 +215,154 @@ async def test_returns_fallback_hit_with_name_only(monkeypatch: pytest.MonkeyPat
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
     assert out == "https://news.example.com/first"
     assert events == []
+    # Pass 1 found a name-matching hit (even without a death keyword) → pass 2 not needed.
+    assert len(fake.calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Two-pass L0 shape (Fix 2): pass-1 status-shaped → pass-2 status-blind
+# ---------------------------------------------------------------------------
+
+
+def _status_shaped_query(sug: RecallSuggestion) -> str:
+    """Mirror ``_build_status_shaped_query`` so tests can key ``response_map`` on it."""
+    if sug.status in ("dead", "absorbed"):
+        return f'"{sug.name}" shutdown or closed or bankrupt or "Chapter 11" {sug.failure_year}'
+    return f'"{sug.name}" layoffs or restructuring or struggling {sug.failure_year}'
+
+
+def _status_blind_query(sug: RecallSuggestion) -> str:
+    return f'"{sug.name}" {sug.category} {sug.failure_year}'
+
+
+async def test_l0_falls_back_to_status_blind_query_when_status_shaped_returns_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pass 1 returns 0 hits; pass 2 (status-blind) finds a name match."""
+    events = _capture_events(monkeypatch)
+    sug = _suggestion()
+    fallback_hit = TavilyHit(
+        title="Hexagate raises Series B",
+        url="https://news.example.com/series-b",
+        snippet="Hexagate, a Web3 security firm, raised a Series B this quarter.",
+    )
+    fake = FakeTavilySearch(
+        response_map={
+            _status_shaped_query(sug): [],
+            _status_blind_query(sug): [fallback_hit],
+        }
+    )
+    out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
+    assert out == fallback_hit.url
+    assert events == [(SpanEvent.RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED, {})]
+    assert len(fake.calls) == 2
+    assert fake.calls[0][0] == _status_shaped_query(sug)
+    assert fake.calls[1][0] == _status_blind_query(sug)
+
+
+async def test_l0_returns_pass1_result_when_status_shaped_finds_hit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pass 1 finds a primary hit; pass 2 must not fire."""
+    events = _capture_events(monkeypatch)
+    sug = _suggestion()
+    primary_hit = TavilyHit(
+        title="Hexagate shuts down operations",
+        url="https://news.example.com/primary",
+        snippet="Hexagate announced its shutdown in late 2024 after losing clients.",
+    )
+    fake = FakeTavilySearch(
+        response_map={
+            _status_shaped_query(sug): [primary_hit],
+            # If pass 2 fires by accident, the URL will differ and the assert below catches it.
+            _status_blind_query(sug): [
+                TavilyHit(
+                    title="Hexagate launches new tier",
+                    url="https://news.example.com/should-not-be-used",
+                    snippet="Hexagate, a Web3 security firm, expanded its enterprise offering.",
+                )
+            ],
+        }
+    )
+    out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
+    assert out == primary_hit.url
+    assert events == []
+    assert len(fake.calls) == 1
+
+
+async def test_l0_drops_when_both_passes_return_no_name_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both queries return hits, none mention the name — drop with no_name_match."""
+    events = _capture_events(monkeypatch)
+    sug = _suggestion()
+    unrelated = [
+        TavilyHit(
+            title="Some other startup folds",
+            url="https://news.example.com/a",
+            snippet="A startup unrelated to the subject went under this week.",
+        ),
+    ]
+    fake = FakeTavilySearch(
+        response_map={
+            _status_shaped_query(sug): unrelated,
+            _status_blind_query(sug): unrelated,
+        }
+    )
+    out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
+    assert out is None
+    assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "no_name_match"})]
+    assert len(fake.calls) == 2
+
+
+async def test_l0_fallback_on_pass1_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pass 1 raises a transport error; pass 2 recovers — no rejection event fires."""
+    events = _capture_events(monkeypatch)
+    sug = _suggestion()
+    fallback_hit = TavilyHit(
+        title="Hexagate raises Series B",
+        url="https://news.example.com/recovered",
+        snippet="Hexagate, a Web3 security firm, raised a Series B this quarter.",
+    )
+    pass1_query = _status_shaped_query(sug)
+    pass2_query = _status_blind_query(sug)
+
+    calls: list[str] = []
+
+    async def fake_search(q: str, _limit: int) -> list[TavilyHit]:
+        calls.append(q)
+        if q == pass1_query:
+            err = httpx.ConnectError("boom")
+            raise err
+        if q == pass2_query:
+            return [fallback_hit]
+        msg = f"unexpected query: {q!r}"
+        raise AssertionError(msg)
+
+    out = await _search_for_evidence(sug, tavily_search=fake_search, limit=5)
+    assert out == fallback_hit.url
+    assert events == [(SpanEvent.RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED, {})]
+    assert calls == [pass1_query, pass2_query]
+
+
+async def test_l0_drops_when_pass2_transport_error_after_pass1_no_hits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pass 1 returns 0 hits, pass 2 raises — emit transport_error (signals Tavily down)."""
+    events = _capture_events(monkeypatch)
+    sug = _suggestion()
+    pass1_query = _status_shaped_query(sug)
+    pass2_query = _status_blind_query(sug)
+
+    async def fake_search(q: str, _limit: int) -> list[TavilyHit]:
+        if q == pass1_query:
+            return []
+        if q == pass2_query:
+            err = httpx.ConnectError("tavily down")
+            raise err
+        msg = f"unexpected query: {q!r}"
+        raise AssertionError(msg)
+
+    out = await _search_for_evidence(sug, tavily_search=fake_search, limit=5)
+    assert out is None
+    assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "transport_error"})]

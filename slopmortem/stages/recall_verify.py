@@ -455,57 +455,123 @@ def _has_death_keyword(text: str) -> bool:
     return _DEATH_REGEX.search(text) is not None
 
 
-async def _search_for_evidence(
-    suggestion: RecallSuggestion,
-    *,
-    tavily_search: TavilySearchFn,
-    limit: int,
-) -> str | None:
-    """L0: ask Tavily for a citation URL. Return None to drop.
+def _build_status_shaped_query(suggestion: RecallSuggestion) -> str:
+    """Pass-1 query: biases Tavily toward articles whose surface text screams death.
 
-    Status-shaped query. Prose syntax (the Task 0 winner). Selection:
-    primary = first hit whose title-or-snippet contains the name AND a
-    death keyword from ``_DEATH_KEYWORDS``; fallback = first hit whose
-    title-or-snippet contains the name. ``None`` means the article URL
-    would have 404'd anyway, save the L2 round-trip.
+    Precise. Misses alive companies that Opus over-labeled as
+    ``bruised``/``struggling`` — pass 2 picks those up.
     """
     match suggestion.status:
         case "dead" | "absorbed":
-            q = (
+            return (
                 f'"{suggestion.name}" shutdown or closed or bankrupt or "Chapter 11" '
                 f"{suggestion.failure_year}"
             )
         case "struggling" | "bruised":
-            q = (
+            return (
                 f'"{suggestion.name}" layoffs or restructuring or struggling '
                 f"{suggestion.failure_year}"
             )
-    try:
-        hits = await tavily_search(q, limit)
-    except (httpx.HTTPError, SSRFBlockedError) as exc:
-        logger.info("recall_verify: L0 Tavily transport failure for %r: %r", suggestion.name, exc)
-        _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": "transport_error"})
-        return None
-    if not hits:
-        logger.info("recall_verify: L0 dropped %r — no_hits", suggestion.name)
-        _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": "no_hits"})
-        return None
+
+
+def _select_hit(hits: list[TavilyHit], name: str) -> TavilyHit | None:
+    """Pick the best name-matching hit: primary (name + death keyword) over fallback (name-only)."""
     primary: TavilyHit | None = None
     fallback: TavilyHit | None = None
     for hit in hits:
-        if not _hit_mentions(hit, suggestion.name):
+        if not _hit_mentions(hit, name):
             continue
         if fallback is None:
             fallback = hit
         if _has_death_keyword(f"{hit.title} {hit.snippet}"):
             primary = hit
             break
-    chosen = primary or fallback
+    return primary or fallback
+
+
+# Outcome of one Tavily pass. ``transport_error`` and ``no_name_match`` map
+# 1:1 to ``RECALL_REJECTED_NO_EVIDENCE`` reasons; ``no_hits`` collapses into
+# ``no_name_match`` at the consolidated drop event so the dashboard sees one
+# final reason per suggestion. The caller (``_search_for_evidence``) owns the
+# emit — pass 1 outcomes never emit on their own so a pass-1 transport_error
+# followed by pass-2 recovery emits nothing.
+type _PassOutcome = Literal["ok", "no_hits", "no_name_match", "transport_error"]
+
+
+async def _try_query(
+    suggestion: RecallSuggestion,
+    query: str,
+    *,
+    tavily_search: TavilySearchFn,
+    limit: int,
+) -> tuple[TavilyHit | None, _PassOutcome]:
+    """Run one Tavily search + selection. Returns ``(hit_or_None, outcome)``.
+
+    Outcome is informational — the caller decides whether to retry, drop, or
+    emit. No span events fire here; consolidating emits at the caller means a
+    suggestion recovered by pass 2 produces zero rejection events even if pass 1
+    raised a transport error.
+    """
+    try:
+        hits = await tavily_search(query, limit)
+    except (httpx.HTTPError, SSRFBlockedError) as exc:
+        logger.info("recall_verify: L0 Tavily transport failure for %r: %r", suggestion.name, exc)
+        return None, "transport_error"
+    if not hits:
+        return None, "no_hits"
+    chosen = _select_hit(hits, suggestion.name)
     if chosen is None:
-        logger.info("recall_verify: L0 dropped %r — no_name_match", suggestion.name)
-        _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": "no_name_match"})
-        return None
-    return chosen.url
+        return None, "no_name_match"
+    return chosen, "ok"
+
+
+async def _search_for_evidence(
+    suggestion: RecallSuggestion,
+    *,
+    tavily_search: TavilySearchFn,
+    limit: int,
+) -> str | None:
+    """L0: ask Tavily for a citation URL via two passes; return None to drop.
+
+    Pass 1: status-shaped query (precise — biases toward death-keyword articles).
+    Pass 2 (fallback): status-blind query (broad — let L5 judge alive/dead from body).
+
+    Two passes because Opus over-labels alive companies as ``bruised``/``struggling``
+    and the precise query then can't surface them. L5 is the actual alive/dead
+    arbiter — pass 2 routes more candidates to it instead of pre-dropping at L0.
+
+    One ``RECALL_REJECTED_NO_EVIDENCE`` event per dropped suggestion. A pass-1
+    transport error followed by pass-2 recovery emits nothing — the suggestion
+    wasn't dropped. ``transport_error`` is preferred over ``no_name_match`` when
+    pass 2 also failed by transport (signal: Tavily was unreachable, not that
+    nothing exists).
+    """
+    primary_query = _build_status_shaped_query(suggestion)
+    chosen, _outcome1 = await _try_query(
+        suggestion, primary_query, tavily_search=tavily_search, limit=limit
+    )
+    if chosen is not None:
+        return chosen.url
+    fallback_query = f'"{suggestion.name}" {suggestion.category} {suggestion.failure_year}'
+    chosen, outcome2 = await _try_query(
+        suggestion, fallback_query, tavily_search=tavily_search, limit=limit
+    )
+    if chosen is not None:
+        logger.info(
+            "recall_verify: L0 name-only fallback recovered %r via %s",
+            suggestion.name,
+            chosen.url,
+        )
+        _emit_event(SpanEvent.RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED)
+        return chosen.url
+    # Both passes failed. ``transport_error`` if pass 2's failure was transport
+    # (Tavily down), otherwise ``no_name_match`` (the consolidated drop reason
+    # for both 0-hits and hits-without-name-match — pass-1 outcome doesn't
+    # change the picture once pass 2 confirms nothing found).
+    reason = "transport_error" if outcome2 == "transport_error" else "no_name_match"
+    logger.info("recall_verify: L0 dropped %r — %s (both passes)", suggestion.name, reason)
+    _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": reason})
+    return None
 
 
 async def _run_l4_wayback(
