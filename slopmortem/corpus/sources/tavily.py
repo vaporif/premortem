@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, cast
 import httpx
 
 from slopmortem.corpus._extract import extract_clean
-from slopmortem.corpus._tools_impl import TAVILY_EXTRACT_URL
+from slopmortem.corpus.tavily import TAVILY_EXTRACT_URL
 from slopmortem.http import safe_post
 
 if TYPE_CHECKING:

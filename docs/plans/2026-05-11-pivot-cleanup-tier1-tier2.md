@@ -615,11 +615,11 @@ git commit -m "harden: validate --tavily-news-search-depth at CLI boundary"
 **Pros:** One source of truth for the URL.
 **Cons:** None.
 
-- [ ] **Step 1: Find every reference**
+- [x] **Step 1: Find every reference**
 
 Run: `git grep -n 'TAVILY_EXTRACT_URL' slopmortem/ tests/`
 
-- [ ] **Step 2: Delete the duplicate**
+- [x] **Step 2: Delete the duplicate**
 
 In `slopmortem/corpus/_tools_impl.py`, delete the line at `:32`:
 
@@ -627,16 +627,16 @@ In `slopmortem/corpus/_tools_impl.py`, delete the line at `:32`:
 TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
 ```
 
-- [ ] **Step 3: Re-point any imports that came from `_tools_impl`**
+- [x] **Step 3: Re-point any imports that came from `_tools_impl`**
 
 For every file that imports `TAVILY_EXTRACT_URL` from `slopmortem.corpus._tools_impl`, change the source to `slopmortem.corpus.tavily`. Most likely just `sources/tavily.py`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add slopmortem/corpus/_tools_impl.py slopmortem/corpus/sources/tavily.py

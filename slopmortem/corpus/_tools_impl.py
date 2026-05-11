@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from slopmortem.corpus.tavily import (
+    TAVILY_EXTRACT_URL,
     TAVILY_SEARCH_URL,
     parse_tavily_response,
     tavily_api_key,
@@ -28,8 +29,6 @@ from slopmortem.models import (
 
 if TYPE_CHECKING:
     from slopmortem.corpus._store import Corpus
-
-TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
 
 __all__ = [
     "GetPostMortemArgs",
