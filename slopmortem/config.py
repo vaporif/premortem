@@ -30,6 +30,14 @@ class Config(BaseSettings):
     K_retrieve: int = Field(default=30, ge=1)
     N_synthesize: int = Field(default=5, ge=1)
     min_similarity_score: float = Field(default=4.0, ge=0.0, le=10.0)
+    # When recall fires AND persists at least one entry, use this lower
+    # threshold for the pre-synthesis top-N filter. Recall by definition
+    # fires only when the corpus is thin for this pitch — demanding the
+    # corpus-normal floor (``min_similarity_score``) from a population we
+    # already know is loose produces empty results. The verifier
+    # (slop classifier + L0-L5 + Haiku deathness) already vetted these
+    # candidates; the lower bar trades fidelity for a non-empty report.
+    min_similarity_score_after_recall: float = Field(default=3.0, ge=0.0, le=10.0)
     strict_sector_filter: bool = False
     strict_sector_filter_excludes_other: bool = False
     ingest_concurrency: int = Field(default=20, ge=1)
@@ -158,6 +166,17 @@ class Config(BaseSettings):
     def _check_k_ge_n(self) -> Config:
         if self.K_retrieve < self.N_synthesize:
             msg = f"K_retrieve ({self.K_retrieve}) must be >= N_synthesize ({self.N_synthesize})"
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def _check_recall_similarity_threshold(self) -> Config:
+        if self.min_similarity_score_after_recall > self.min_similarity_score:
+            msg = (
+                f"min_similarity_score_after_recall ({self.min_similarity_score_after_recall}) "
+                f"must be <= min_similarity_score ({self.min_similarity_score}); a recall "
+                "threshold above the corpus-normal floor has no useful effect"
+            )
             raise ValueError(msg)
         return self
 

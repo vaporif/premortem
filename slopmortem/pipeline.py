@@ -346,6 +346,9 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
                 "config.K_retrieve": config.K_retrieve,
                 "config.N_synthesize": config.N_synthesize,
                 "config.min_similarity_score": config.min_similarity_score,
+                "config.min_similarity_score_after_recall": (
+                    config.min_similarity_score_after_recall
+                ),
                 "config.strict_deaths": config.strict_deaths,
                 "config.model_facet": config.model_facet,
                 "config.model_rerank": config.model_rerank,
@@ -461,10 +464,19 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
             progress.advance_phase(QueryPhase.RECALL)
             progress.end_phase(QueryPhase.RECALL)
 
+        # When recall persisted >=1 entry, the corpus is by definition thin for
+        # this pitch — the corpus-normal floor would re-filter out the very
+        # entries we just verified and persisted. Lower bar trades fidelity
+        # for a non-empty report; verifier already vetted the candidates.
+        synthesis_threshold = (
+            config.min_similarity_score_after_recall
+            if recall_persisted_count > 0
+            else config.min_similarity_score
+        )
         top_n, filtered_pre_synth = select_top_n_by_similarity(
             retrieved=retrieved,
             ranked=reranked.ranked,
-            min_similarity=config.min_similarity_score,
+            min_similarity=synthesis_threshold,
             n_synthesize=config.N_synthesize,
         )
 

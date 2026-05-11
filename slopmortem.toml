@@ -11,6 +11,13 @@ N_synthesize = 5
 # the report renders an empty-state banner.
 min_similarity_score = 4.0
 
+# When the recall branch fires and persists at least one entry, the
+# pre-synthesis top-N filter uses this lower threshold instead of
+# min_similarity_score. Recall fires only on thin-corpus queries; a
+# non-empty lower-fidelity report beats "no matching post-mortems found."
+# Must be <= min_similarity_score.
+min_similarity_score_after_recall = 3.0
+
 # Hard filter on `facets.sector` at retrieve time. Off by default — the
 # soft sector boost is unchanged. Turn on to prevent wrong-vertical
 # entries from reaching the rerank stage. The "other" bucket stays

@@ -190,3 +190,18 @@ def test_title_pre_filter_config_defaults() -> None:
     assert c.enable_title_pre_filter is False
     assert c.model_title_pre_filter == "anthropic/claude-haiku-4.5"
     assert c.max_tokens_title_pre_filter == 16
+
+
+def test_min_similarity_score_after_recall_default(tmp_path, monkeypatch):
+    """Recall-branch synthesis floor defaults to 3.0 (below the 4.0 corpus-normal)."""
+    monkeypatch.chdir(tmp_path)
+    cfg = Config()
+    assert cfg.min_similarity_score_after_recall == 3.0
+    assert cfg.min_similarity_score_after_recall <= cfg.min_similarity_score
+
+
+def test_min_similarity_score_after_recall_validator_rejects_above_normal(tmp_path, monkeypatch):
+    """Setting the recall floor above the corpus-normal floor is rejected at load."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError, match="min_similarity_score_after_recall"):
+        Config(min_similarity_score=4.0, min_similarity_score_after_recall=5.0)

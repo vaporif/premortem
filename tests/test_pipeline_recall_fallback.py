@@ -1012,6 +1012,72 @@ async def test_pipeline_recall_raises_when_sparse_encoder_missing(
         )
 
 
+async def test_pipeline_recall_lowers_synth_floor_when_persisted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Recall persisted >=1 → pre-synth filter uses ``min_similarity_score_after_recall``.
+
+    Spike rerank score at 3.5: between the recall floor (3.0) and the corpus-
+    normal floor (4.0). Without the adaptive threshold the candidate would be
+    dropped and synthesis would run on zero entries. With it, the persisted
+    recall entry reaches synthesis.
+    """
+    cfg = _build_config(k_retrieve=6, n_synthesize=3)
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    persisted = _candidate("alpha-stub")
+    corpus = _HybridCorpus(base_candidates=[], augment_with=persisted)
+    canned = _build_canned(
+        retrieved=[],
+        top_n=[],
+        ctx=ctx,
+        cfg=cfg,
+        second_pass=[persisted],
+        second_pass_top_n=[persisted],
+        # Below corpus-normal (4.0) but above recall floor (3.0): exercises
+        # the adaptive-threshold branch.
+        rerank_score=3.5,
+    )
+    inner = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    llm = _RecallRoutingLLM(
+        inner=inner,
+        recall_responses=[FakeResponse(text=_recall_payload(), cost_usd=0.05)],
+    )
+    embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    budget = Budget(cap_usd=2.0)
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
+    _patch_recall_http(monkeypatch)
+    deps = await _make_recall_deps(tmp_path)
+
+    report = await run_query(
+        ctx,
+        llm=llm,
+        embedding_client=embed,
+        corpus=corpus,
+        config=cfg,
+        budget=budget,
+        sparse_encoder=_stub_sparse,
+        recall_deps=deps,
+    )
+
+    # Recall fired and persisted alpha; the 3.5 rerank score clears the
+    # adaptive 3.0 floor (it would have been dropped at 4.0).
+    assert report.pipeline_meta.recall_used is True
+    assert report.pipeline_meta.recall_persisted_count == 1
+    assert len(report.candidates) == 1
+    assert report.candidates[0].name == "acme"
+
+
+def test_min_similarity_score_after_recall_validator_at_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``min_similarity_score_after_recall=4.5`` above 4.0 → load-time ``ValidationError``."""
+    from pydantic import ValidationError  # noqa: PLC0415 - local import, narrow rebind for test
+
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError, match="min_similarity_score_after_recall"):
+        Config(min_similarity_score=4.0, min_similarity_score_after_recall=4.5)
+
+
 def _capture_laminar_events(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """Pin ``Laminar.is_initialized`` true and capture every emitted event.
 
