@@ -386,7 +386,7 @@ url = entry.url or ""
 **Pros:** Honest narrowing. A future loosening of `_should_skip` surfaces immediately rather than producing an empty-domain pitch filler call.
 **Cons:** `assert` is stripped under `python -O`, which the project doesn't use — fine here, but worth a note. If the team prefers a runtime-loud narrowing, use `if entry.url is None: raise AssertionError(...)`.
 
-- [ ] **Step 1: Replace the dead fallback**
+- [x] **Step 1: Replace the dead fallback**
 
 In `slopmortem/ingest/_pitch_filler.py:99-100`, change:
 
@@ -403,12 +403,12 @@ assert entry.url, "pitch filler reached enrich() with empty entry.url"
 url = entry.url
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add slopmortem/ingest/_pitch_filler.py

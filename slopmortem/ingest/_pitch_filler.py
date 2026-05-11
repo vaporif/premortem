@@ -96,8 +96,11 @@ class HaikuPitchFiller:
         if self._should_skip(entry):
             return entry
 
-        # ``url`` is non-empty here per the skip-guard above; narrow for the typechecker.
-        url = entry.url or ""
+        # ``_should_skip`` guarantees a non-empty URL at this point.
+        if not entry.url:
+            msg = "pitch filler reached enrich() with empty entry.url"
+            raise AssertionError(msg)
+        url = entry.url
         domain = urlparse(url).netloc.removeprefix("www.")
         blocks = render_blocks(
             "pitch_filler",
