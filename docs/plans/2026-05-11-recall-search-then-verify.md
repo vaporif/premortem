@@ -32,7 +32,7 @@
 - [x] Task 2 [AFK]: `RecallSuggestion` schema shrink (drop `evidence_url`; relax `homepage_url` to `str | None`); `llm_recall.j2` prompt update; cassette re-record for `llm_recall` → depends on `Task 1` → batch 2
 - [x] Task 3 [AFK]: Verifier search head (`_search_for_evidence`); plumb discovered URL through `verify_suggestion`; L4 Wayback stays, gated on `homepage_url is not None`; `_recall_source_id` keeps the homepage key with a name-only fallback when homepage is absent → depends on `Task 2` → batch 3
 - [x] Task 4 [AFK]: Pipeline wiring (`RecallDeps` adds `tavily_search` callable; CLI builds it from config; eval recorder fakes it) → depends on `Task 3` → batch 4
-- [ ] Task 5 [AFK]: Telemetry + cassette re-record for `recall_deathness` (URL bodies will differ); test sweep across recall_verify / recall_persist / pipeline_recall_fallback test files → depends on `Task 4` → batch 5
+- [x] Task 5 [AFK]: Telemetry + cassette re-record for `recall_deathness` (URL bodies will differ); test sweep across recall_verify / recall_persist / pipeline_recall_fallback test files → depends on `Task 4` → batch 5
 - [ ] Polish: post-implementation-polish → depends on `Tasks 1-5` → batch 6
 
 ## Agent Assignments
