@@ -115,8 +115,7 @@ def query_cmd(  # noqa: PLR0913 - every flag mirrors a knob; user types kwargs.
     """When no candidates clear the similarity floor, exits 1 and writes no file.
 
     Tracing is gated on ``Config.enable_tracing`` and ``LMNR_PROJECT_API_KEY``;
-    if the key is missing but tracing is enabled, the run continues untraced
-    with a one-line warning on stderr.
+    missing key + tracing enabled continues untraced with a stderr warning.
     """
     anyio.run(
         functools.partial(
@@ -205,10 +204,9 @@ async def _build_recall_deps(
 ) -> RecallDeps | None:
     """Build ``RecallDeps`` eagerly; return ``None`` when recall is off.
 
-    Deps are built up front because the coverage-gap predicate can fire on any
-    query. ``MergeJournal.init()`` (sqlite open) dominates cold start at <50ms.
-    Tavily-off disables the whole branch — L0 search and L3 extract share the
-    same flag.
+    Built up front because the coverage-gap predicate can fire on any query.
+    ``MergeJournal.init()`` dominates cold start at <50ms. Tavily-off
+    disables the whole branch (L0 search and L3 extract share the flag).
     """
     tavily_search = build_tavily_recall_search(config)
     extract = build_tavily_recall_extract(config)

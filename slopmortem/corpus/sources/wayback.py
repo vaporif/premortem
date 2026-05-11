@@ -161,12 +161,11 @@ class WaybackEnricher:
         return payload
 
     async def enrich(self, entry: RawEntry) -> RawEntry:  # noqa: PLR0911 - guards are semantically distinct; splitting just spreads them.
-        """Skip when *any* body is already present.
+        """Skip when any body is already present.
 
         The ``markdown_text`` guard matters for HN: without it, a Wayback
-        recovery would overwrite HN's own title+story_text with whatever the
-        linked URL's snapshot happened to be — quality regression on top of
-        the latency cost (archive.org is ~5x slower for deep-linked HN URLs).
+        recovery would overwrite HN's own title+story_text with the linked
+        URL's snapshot (archive.org is also ~5x slower for deep-linked HN).
         """
         if entry.raw_html is not None and entry.raw_html.strip():
             return entry

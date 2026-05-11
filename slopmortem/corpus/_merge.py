@@ -3,16 +3,13 @@
 """SQLite-backed merge journal, quarantine table, and alias graph.
 
 All sqlite calls go through ``anyio.to_thread.run_sync``; WAL +
-``busy_timeout=5000``.
-
-Terminal-state writers (``upsert_pending``, ``upsert_resolver_flipped``,
-``upsert_alias_blocked``) each run inside one ``BEGIN; ... COMMIT;`` so a
-crash commits everything or nothing. ``mark_complete`` is the only path from
-``pending`` to ``complete``, and runs after the qdrant and disk writes succeed.
+``busy_timeout=5000``. Terminal-state writers each run in one
+``BEGIN; ... COMMIT;``, so a crash commits everything or nothing.
+``mark_complete`` is the only ``pending`` → ``complete`` path and runs
+after qdrant and disk writes succeed.
 
 Quarantine rows live in a separate table keyed on
-``(content_sha256, source, source_id)``; quarantined docs are not in the
-main journal.
+``(content_sha256, source, source_id)`` and don't appear in the main journal.
 """
 
 from __future__ import annotations
@@ -312,11 +309,10 @@ class MergeJournal:
     async def is_terminal(self, source: str, source_id: str) -> bool:
         """True when (source, source_id) has a terminal row.
 
-        Terminal = ``merge_state='complete'`` or any ``quarantine_journal`` row.
-        Mid-flight states (``pending``, ``alias_blocked``, ``resolver_flipped``)
-        deliberately stay non-terminal so crashed runs, alias-graph edits, and
-        re-resolutions re-run end-to-end. Classify uses this to skip
-        already-processed entries before paying for the enricher chain.
+        Terminal = ``merge_state='complete'`` or any ``quarantine_journal``
+        row. Mid-flight states (``pending``, ``alias_blocked``,
+        ``resolver_flipped``) stay non-terminal so crashed runs, alias-graph
+        edits, and re-resolutions re-run end-to-end.
         """
         return await to_thread.run_sync(self._is_terminal_sync, source, source_id)
 

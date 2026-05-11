@@ -10,7 +10,6 @@ quarantine row and routes survivors back out of the quarantine tree.
 from __future__ import annotations
 
 import functools
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, cast
 
@@ -318,9 +317,9 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             msg = "--only-source crunchbase_csv requires --crunchbase-csv PATH."
             raise typer.BadParameter(msg)
 
-    if enable_tavily_news and not os.environ.get("TAVILY_API_KEY"):
+    if enable_tavily_news and not config.tavily_api_key.get_secret_value():
         msg = (
-            "--enable-tavily-news requires TAVILY_API_KEY: the Tavily news source "
+            "--enable-tavily-news requires tavily_api_key: the Tavily news source "
             "calls /search and pulls article bodies via include_raw_content. "
             "Set TAVILY_API_KEY in .env or unset --enable-tavily-news."
         )
@@ -342,6 +341,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     if enable_tavily_news:
         sources.append(
             TavilyNewsSource(
+                api_key=config.tavily_api_key.get_secret_value(),
                 start_year=tavily_news_start_year,
                 end_year=tavily_news_end_year,
                 max_emit=tavily_news_max_emit,
@@ -365,9 +365,9 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     # from competitor commentary. The LLM pitch filler researches each URL
     # via a single tavily_search and synthesizes a clean pitch instead.
     if any(isinstance(s, HNAlgoliaSource) for s in sources):
-        if not os.environ.get("TAVILY_API_KEY"):
+        if not config.tavily_api_key.get_secret_value():
             msg = (
-                "hn_algolia source requires TAVILY_API_KEY: HN entries are URL-only "
+                "hn_algolia source requires tavily_api_key: HN entries are URL-only "
                 "stubs whose pitches are synthesized by the LLM-driven pitch filler "
                 "using tavily_search. Set TAVILY_API_KEY in .env, or use "
                 "--only-source on a source whose entries already carry their body "
@@ -407,6 +407,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
                 llm=llm,
                 model=config.model_pitch_filler,
                 budget=budget,
+                tavily_api_key=config.tavily_api_key.get_secret_value(),
                 max_tokens=config.max_tokens_pitch_filler,
                 max_chars_per_result=config.pitch_filler_max_chars_per_result,
             )
@@ -468,11 +469,7 @@ def _default_hn_queries_yaml() -> Path:
 
 
 async def _build_journal(config: Config, post_mortems_root: Path) -> MergeJournal:
-    """Build the merge journal, calling `MergeJournal.init`.
-
-    ``init()`` is idempotent so calling it every CLI invocation is cheap and
-    fresh dev databases work without an explicit setup step.
-    """
+    """Build the merge journal and call ``MergeJournal.init`` (idempotent)."""
     from slopmortem.corpus import MergeJournal  # noqa: PLC0415
 
     journal_path = Path(
@@ -486,10 +483,10 @@ async def _build_journal(config: Config, post_mortems_root: Path) -> MergeJourna
 def _build_slop_classifier(
     *, dry_run: bool, llm: LLMClient, model: str, max_tokens: int | None = None
 ) -> SlopClassifier:
-    """Pick a slop classifier based on *dry_run*.
+    """Pick a slop classifier based on ``dry_run``.
 
-    Dry-run uses `FakeSlopClassifier` — no API key, no LLM cost.
-    Live runs use `HaikuSlopClassifier` (one Haiku call per entry).
+    ``FakeSlopClassifier`` (no API key) for dry-run; ``HaikuSlopClassifier``
+    (one Haiku call per entry) for live runs.
     """
     if dry_run:
         from slopmortem.ingest import FakeSlopClassifier  # noqa: PLC0415
@@ -501,9 +498,9 @@ def _build_slop_classifier(
 
 
 async def _build_ingest_corpus(config: Config, post_mortems_root: Path) -> IngestCorpus:
-    """Build the ingest-side `QdrantCorpus`, ensuring the collection exists.
+    """Build the ingest-side ``QdrantCorpus`` and ensure the collection exists.
 
-    Without ``ensure_collection`` (idempotent), ``upsert_chunk`` fails with
+    Without ``ensure_collection``, ``upsert_chunk`` fails with
     ``Collection 'slopmortem' doesn't exist`` on a fresh dev box's first write.
     """
     from qdrant_client import AsyncQdrantClient  # noqa: PLC0415 - heavy dep, lazy import
@@ -535,10 +532,10 @@ async def _build_ingest_deps(
 ) -> tuple[LLMClient, EmbeddingClient, IngestCorpus, Budget, MergeJournal, SlopClassifier]:
     """Build the ingest-side dependency tuple.
 
-    Mirrors `slopmortem.deps.build_deps` but caps the budget at
-    ``max_cost_usd_per_ingest`` and additionally builds a journal plus the
-    slop classifier. ``dry_run=True`` swaps in `FakeSlopClassifier` so
-    the run needs no real API key.
+    Mirrors ``slopmortem.deps.build_deps`` but caps the budget at
+    ``max_cost_usd_per_ingest`` and also builds a journal plus slop
+    classifier. ``dry_run=True`` swaps in ``FakeSlopClassifier`` so the run
+    needs no real API key.
     """
     budget = Budget(cap_usd=config.max_cost_usd_per_ingest)
 

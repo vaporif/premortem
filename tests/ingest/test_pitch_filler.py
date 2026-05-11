@@ -84,6 +84,7 @@ def _filler(*, llm: _StubLLM, budget: Budget | None = None) -> HaikuPitchFiller:
         llm=llm,
         model=_TEST_MODEL,
         budget=budget or Budget(cap_usd=1.0),
+        tavily_api_key="tv-test-key",
         max_tokens=1500,
         max_chars_per_result=2500,
     )
@@ -237,6 +238,7 @@ def test_filler_construction_does_not_render_prompt() -> None:
         llm=_StubLLM(),
         model=_TEST_MODEL,
         budget=Budget(cap_usd=1.0),
+        tavily_api_key="tv-test-key",
     )
 
 

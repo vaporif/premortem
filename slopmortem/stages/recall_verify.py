@@ -1,47 +1,38 @@
 """Verifier for LLM-recalled suggestions: gates L0-L5 before persistence.
 
-The recall stage (``stages.llm_recall``) returns ``RecallSuggestion`` rows
-the LLM thinks failed. None of them have been verified, and a fraction will
-be hallucinated. This module gates each one through:
+``stages.llm_recall`` returns ``RecallSuggestion`` rows the LLM thinks failed.
+None are verified yet, and a fraction will be hallucinated. This module gates
+each through:
 
 L0 — Search head. One Tavily search per suggestion, shaped by ``status`` and
-     ``failure_year``. Drops the suggestion when no hit's title or snippet
-     mentions the company name — equivalent to "the article URL would have
-     404'd anyway, save the L2 round-trip". The selected URL replaces what
-     used to be ``suggestion.evidence_url`` and threads through L2-L5 as
-     ``discovered_url``.
-L1 — Pydantic schema (already enforced at ``RecallSuggestion`` parse time;
-     no work here).
-L2 — Liveness on the discovered URL only. HEAD->GET fallthrough: HEAD is the
-     cheap first probe, but paywalled/anti-bot citations routinely 401/403/405
-     on HEAD while serving GET. The GET status code is the authoritative gate.
-     The homepage URL is provenance, not corroboration — its liveness isn't
-     load-bearing here. On L2 4xx OR L3 body-too-short, the Tavily ``/extract``
-     fallback fires once: its own IP pool/headless browser unblocks bot-blocked
-     hosts (Medium) and SPA shells (decrypt.co Next.js). Anchor-missing
-     rejections don't retry — extract won't change which words are in the body.
-L3 — Body extraction on the GET response. Drops if the body doesn't contain
-     both the company name AND a death/distress keyword (case-insensitive).
-L4 — Wayback enrichment, advisory only. Short-circuits when
-     ``suggestion.homepage_url is None`` — no Wayback round-trip happens and
-     the tier stays ``evidence_only`` with ``wayback_attempted="false"`` on
-     the verified event. When a homepage is present, a snapshot whose body
-     still mentions the name promotes the suggestion to ``wayback_anchored``
-     and appends the snapshot text (richer marketing copy wins for vector
-     retrieval). Failure or empty result never drops the suggestion.
-L5 — Deathness judgment. L1-L4 only prove a URL exists, serves content,
-     and mentions the name + a death-ish word. They don't tell apart "real
-     dead company" from "real live company that had layoffs once". Haiku
-     reads the news article body (always — Wayback marketing copy never
-     says "we died") and returns a tri-state ``verdict`` plus
-     ``confidence``. We drop on verdict="alive", on confidence below the
-     verdict-specific threshold, and on any LLM transport/parse failure
-     (conservative — false admits are worse than false drops in the recall
-     fallback). The admitted verdict ("dead" or "struggling") rides through
-     the persistence chain to ``CandidatePayload.deathness_verdict`` so
-     synthesis can weight terminal vs distress citations differently.
+     ``failure_year``. Drops when no hit's title or snippet mentions the
+     company name (the article would 404 anyway; saves an L2 round-trip).
+     The selected URL becomes ``discovered_url`` and threads through L2-L5.
+L1 — Pydantic schema, enforced at ``RecallSuggestion`` parse time. No-op here.
+L2 — Liveness on the discovered URL. HEAD→GET fallthrough: HEAD is cheap,
+     but paywalled/anti-bot hosts routinely 401/403/405 on HEAD while serving
+     GET. The GET status is authoritative. The homepage URL is provenance,
+     not corroboration. On L2 4xx OR L3 body-too-short, the Tavily
+     ``/extract`` fallback fires once. Anchor-missing rejections don't retry:
+     extract won't change which words are in the body.
+L3 — Body extraction on the GET response. Drops if the body lacks both the
+     company name AND a death/distress keyword (case-insensitive).
+L4 — Wayback enrichment, advisory only. Skipped when ``homepage_url`` is
+     None; the tier stays ``evidence_only`` with ``wayback_attempted="false"``.
+     A snapshot whose body mentions the name promotes the tier to
+     ``wayback_anchored`` and appends the snapshot text. Failure or empty
+     result never drops the suggestion.
+L5 — Deathness judgment. L1-L4 only prove a URL exists, serves content, and
+     mentions the name plus a death-ish word; they don't separate "dead
+     company" from "live company that had layoffs once". Haiku reads the
+     news body (Wayback marketing copy never says "we died") and returns a
+     tri-state ``verdict`` plus ``confidence``. Drop on verdict="alive",
+     below-threshold confidence, or any LLM transport/parse failure
+     (conservative: false admits cost more than false drops here). The
+     admitted verdict rides through to ``CandidatePayload.deathness_verdict``
+     so synthesis weights terminal vs distress citations differently.
 
-The verified ``RawEntry`` rides a ``VerificationTier`` sibling argument to
+The verified ``RawEntry`` carries a ``VerificationTier`` sibling argument to
 the persistence helper. ``RawEntry`` itself is unchanged across non-recall
 sources.
 """
@@ -153,12 +144,7 @@ type VerificationTier = Literal["wayback_anchored", "evidence_only"]
 
 @dataclass(frozen=True, slots=True)
 class DeathnessConfig:
-    """L5 deathness gate knobs bundled for ``verify_suggestion``/``_l5_decide``.
-
-    Bundled so the four-field knob set doesn't thread through three call-stack
-    layers as separate kwargs every time a verifier is invoked. Populated from
-    ``Config`` at the pipeline; tests build it inline.
-    """
+    """L5 deathness gate knobs. Populated from ``Config`` at the pipeline; tests build it inline."""
 
     model: str
     max_tokens: int
@@ -169,13 +155,10 @@ class DeathnessConfig:
 def _recall_source_id(suggestion: RecallSuggestion) -> str:
     """Stable id keyed on (name, homepage_url) when present, (name,) otherwise.
 
-    Two suggestions for the same vendor (same homepage) collapse to one
-    source_id. When the recall LLM didn't supply a homepage, fall back to
-    name-only — across runs the same homepage-less vendor surfaces via
-    different citation hosts, and a domain-keyed fallback would create
-    duplicate Qdrant points. Name-only fallback risks merging two distinct
-    startups with the same name, but that's vanishingly rare per pitch and
-    alias_graph collapses obvious name collisions at persist time.
+    Same vendor → same source_id. Without a homepage, falling back to
+    citation domain would create duplicate Qdrant points (same vendor, different
+    citation hosts across runs). Name-only collisions across distinct startups
+    are rare per pitch and ``alias_graph`` collapses obvious cases at persist.
     """
     homepage = suggestion.homepage_url
     fingerprint = f"{suggestion.name}|{homepage}" if homepage is not None else suggestion.name
@@ -205,12 +188,10 @@ def _body_anchors_name_and_death(name: str, body: str) -> _AnchorResult:
 class _DeathnessJudgment(BaseModel):
     """L5 verdict: did the evidence body establish death, distress, or neither.
 
-    ``evidence_quote`` is preserved for audit diagnostics only — the gate
-    doesn't read it.
-
-    ``confidence`` has no field-level ``ge``/``le`` because strict
-    ``response_format`` (OpenAI + Anthropic) rejects ``minimum``/``maximum`` on
-    numeric schemas; ``_validate_confidence`` enforces [0.0, 1.0] post-parse.
+    ``evidence_quote`` is audit-only; the gate doesn't read it. ``confidence``
+    has no field-level ``ge``/``le`` because strict ``response_format`` (OpenAI
+    + Anthropic) rejects ``minimum``/``maximum`` on numeric schemas;
+    ``_validate_confidence`` enforces [0.0, 1.0] post-parse.
     """
 
     verdict: Literal["dead", "struggling", "alive"]
@@ -248,9 +229,8 @@ async def _l5_deathness_judgment(
 ) -> _DeathnessJudgment | None:
     """Ask Haiku whether the body proves the company died.
 
-    Returns ``None`` on transport or parse failure; ``verify_suggestion``
-    treats that as a drop. False admits are worse than false drops here:
-    a hallucinated suggestion that slips L1-L4 still has to defeat L5.
+    Returns ``None`` on transport or parse failure; the caller treats that
+    as a drop. False admits cost more than false drops here.
     """
     blocks = render_blocks(
         "recall_deathness",
@@ -298,9 +278,9 @@ async def _l5_decide(
 ) -> _AdmitVerdict | None:
     """L5 verdict: returns the admitted verdict, or ``None`` to drop.
 
-    ``"alive"`` and any below-threshold or transport/parse failure all map
-    to ``None``. Logging + span events live here so ``verify_suggestion``
-    keeps a single L5 branch and stays under the cyclomatic-complexity cap.
+    ``"alive"``, below-threshold confidence, and transport/parse failure all
+    map to ``None``. Logging and span events live here so the caller keeps a
+    single L5 branch.
     """
     judgment = await _l5_deathness_judgment(
         suggestion=suggestion,
@@ -354,15 +334,13 @@ def _combine_recall_body(
 ) -> str:
     """Compose the persisted body from the news article and the Wayback snapshot.
 
-    The news article is the citation L5 verifies against and is therefore
-    always present; Wayback contributes a "Vendor description (archived)"
-    section only when it anchored. Section markers preserve semantic
-    boundaries for the chunker so news content and snapshot content don't
-    blur into a single chunk.
+    News is always present (it's the L5 substrate); Wayback contributes a
+    "Vendor description (archived)" section only when anchored. Section
+    markers keep news and snapshot from blurring into one chunk.
 
-    The status/year line is labeled "LLM-suggested" because it comes from
-    the Sonnet recall payload, not the news body — downstream synthesis
-    should treat it as a hint, not a fact.
+    The status/year line is tagged "LLM-suggested" because it comes from
+    the Sonnet recall payload, not the news body — synthesis treats it as a
+    hint, not a fact.
     """
     parts: list[str] = []
     if wayback_body:
@@ -382,15 +360,10 @@ type _L3Outcome = Literal["ok", "body_too_short", "name_missing", "keyword_missi
 def _l3_classify(*, name: str, body_text: str) -> tuple[_L3Outcome, str]:
     """Extract clean text and classify against the 500-char floor + anchor checks.
 
-    Returns ``(outcome, cleaned_body)``. ``cleaned_body`` is the trafilatura
-    output (possibly empty on ``body_too_short``). The caller decides whether
-    to retry via Tavily extract — only ``body_too_short`` is recoverable.
-
-    ``extract_clean`` strips HTML, runs trafilatura/readability, and returns
-    ``""`` below its 500-char floor. Treating empty as a hard reject means
-    paywalls, JS shells, and any page where main-article extraction failed
-    fall through to the extract fallback rather than fabricating a body from
-    raw HTML.
+    Returns ``(outcome, cleaned_body)``. Only ``body_too_short`` is
+    recoverable via the Tavily extract fallback. ``extract_clean`` returns
+    ``""`` below its 500-char floor, so paywalls and JS shells route to
+    extract instead of synthesizing a body from raw HTML.
     """
     cleaned = extract_clean(body_text)
     if len(cleaned) < _L3_MIN_BODY_CHARS:
@@ -427,10 +400,9 @@ async def _try_extract_fallback(
 ) -> str | None:
     """Run the Tavily ``/extract`` fallback; return the cleaned body on success.
 
-    Returns ``None`` when extract raised, returned no content, or returned a
-    body that still fails ``_l3_classify``. Only emits the recovery event on
-    full success. Anchor-missing outcomes from the fallback body don't retry
-    again — extract won't change which words are in the article.
+    Returns ``None`` when extract raised, returned no content, or still fails
+    ``_l3_classify``. Anchor-missing outcomes from the fallback body don't
+    retry: extract returns the same words.
     """
     try:
         raw = await extract(evidence)
@@ -456,10 +428,8 @@ async def _try_extract_fallback(
 def _hit_mentions(hit: TavilyHit, needle: str) -> bool:
     """Case-insensitive substring check across title and snippet.
 
-    Title-or-snippet (not snippet alone): Tavily snippets cap at ~150-200
-    chars and routinely drop the company name even when the article body
-    is on-topic. The title carries the editorial framing and almost always
-    names the subject.
+    Snippets cap at ~150-200 chars and often drop the company name even on
+    on-topic articles; the title nearly always names the subject.
     """
     needle_lower = needle.lower()
     return needle_lower in hit.title.lower() or needle_lower in hit.snippet.lower()
@@ -473,8 +443,8 @@ def _has_death_keyword(text: str) -> bool:
 def _build_status_shaped_query(suggestion: RecallSuggestion) -> str:
     """Pass-1 query: biases Tavily toward articles whose surface text screams death.
 
-    Precise. Misses alive companies that Opus over-labeled as
-    ``bruised``/``struggling`` — pass 2 picks those up.
+    Precise but misses live companies that Opus over-labeled as
+    ``bruised``/``struggling``; pass 2 picks those up.
     """
     match suggestion.status:
         case "dead" | "absorbed":
@@ -524,10 +494,9 @@ async def _try_query(
 ) -> tuple[TavilyHit | None, _PassOutcome]:
     """Run one Tavily search + selection. Returns ``(hit_or_None, outcome)``.
 
-    Outcome is informational — the caller decides whether to retry, drop, or
-    emit. No span events fire here; consolidating emits at the caller means a
-    suggestion recovered by pass 2 produces zero rejection events even if pass 1
-    raised a transport error.
+    Outcome is informational; the caller decides retry/drop/emit. No span
+    events fire here, so a suggestion recovered by pass 2 produces zero
+    rejection events even if pass 1 raised a transport error.
     """
     try:
         hits = await tavily_search(query, limit)
@@ -550,23 +519,20 @@ async def _search_for_evidence(
 ) -> str | None:
     """L0: ask Tavily for a citation URL via two passes; return None to drop.
 
-    Short-circuits when ``suggestion.evidence_url`` is set — Opus pre-discovered
-    a citation URL via its own ``tavily_search`` loop, so the verifier trusts
-    the pick (L2-L5 still validate) and saves one Tavily round-trip per
-    suggestion.
+    Short-circuits when ``suggestion.evidence_url`` is set — Opus already
+    picked one via its own ``tavily_search`` loop; L2-L5 still validate.
 
     Pass 1: status-shaped query (precise — biases toward death-keyword articles).
-    Pass 2 (fallback): status-blind query (broad — let L5 judge alive/dead from body).
+    Pass 2: status-blind query (broad — let L5 judge alive/dead from body).
 
-    Two passes because Opus over-labels alive companies as ``bruised``/``struggling``
-    and the precise query then can't surface them. L5 is the actual alive/dead
-    arbiter — pass 2 routes more candidates to it instead of pre-dropping at L0.
+    Two passes because Opus over-labels live companies as
+    ``bruised``/``struggling`` and the precise query then can't surface them.
+    L5 is the alive/dead arbiter; pass 2 routes more candidates to it.
 
     One ``RECALL_REJECTED_NO_EVIDENCE`` event per dropped suggestion. A pass-1
-    transport error followed by pass-2 recovery emits nothing — the suggestion
-    wasn't dropped. ``transport_error`` is preferred over ``no_name_match`` when
-    pass 2 also failed by transport (signal: Tavily was unreachable, not that
-    nothing exists).
+    transport error recovered by pass 2 emits nothing. ``transport_error``
+    wins over ``no_name_match`` when pass 2 also failed by transport (signal:
+    Tavily was unreachable, not that nothing exists).
     """
     if suggestion.evidence_url is not None:
         # Opus already did a tavily_search and picked this URL. Trust the pick;
@@ -614,11 +580,9 @@ async def _run_l4_wayback(
 ) -> tuple[VerificationTier, str | None]:
     """L4: enrich via Wayback when a homepage is present. Emit the verified event.
 
-    Returns ``(tier, wayback_body)``: the body is non-None only when the
-    snapshot anchored on the company name. Skipped entirely when
-    ``suggestion.homepage_url is None`` — the news URL would archive an
-    unrelated article, so we record ``wayback_attempted="false"`` and move
-    on.
+    Returns ``(tier, wayback_body)``; body is non-None only when the snapshot
+    anchored on the company name. Skipped when ``homepage_url is None`` (the
+    news URL would archive an unrelated article).
     """
     if suggestion.homepage_url is None:
         _emit_event(
@@ -647,10 +611,9 @@ async def _run_l4_wayback(
 async def _l2_head_failed(evidence: str) -> bool:
     """Probe ``evidence`` via HEAD; return True if HEAD failed or returned 4xx/5xx.
 
-    HEAD is the cheap first probe but routinely 401/403/405's on paywalled or
-    anti-bot citation hosts even when GET works — so we never drop on HEAD,
-    we only record whether it succeeded so the eventual drop event carries
-    the right attribute.
+    HEAD often 401/403/405's on paywalled or anti-bot citation hosts even when
+    GET works, so we never drop on HEAD — the result only annotates the
+    eventual drop event.
     """
     try:
         head_resp = await safe_head(evidence, timeout=_FETCH_TIMEOUT_S)
@@ -672,8 +635,8 @@ async def _l2_head_failed(evidence: str) -> bool:
 async def _l2_get_body(evidence: str) -> str | None:
     """GET ``evidence`` and return the body text. ``None`` if GET 4xx'd or raised.
 
-    ``safe_get`` does NOT consult robots.txt (unlike Wayback's ``_fetch``).
-    The evidence URL is a third-party citation, so vendor robots policy doesn't apply.
+    ``safe_get`` skips robots.txt (unlike Wayback's ``_fetch``); the evidence
+    URL is a third-party citation, vendor robots policy doesn't apply.
     """
     try:
         resp = await safe_get(evidence, timeout=_FETCH_TIMEOUT_S)
@@ -692,11 +655,10 @@ async def _l2_l3_fetch_body(
     evidence: str,
     extract: ExtractFn,
 ) -> str | None:
-    """Run the L2 HEAD->GET ladder + L3 classify; return the cleaned body or ``None``.
+    """Run the L2 HEAD→GET ladder + L3 classify; return the cleaned body or ``None``.
 
-    On L2 GET 4xx/transport failure, fall back to Tavily ``/extract`` once.
-    On L3 ``body_too_short``, fall back to Tavily ``/extract`` once. Anchor
-    failures don't retry — extract returns the same words.
+    Tavily ``/extract`` fires once on L2 GET 4xx/transport failure or L3
+    body-too-short. Anchor failures don't retry.
     """
     head_failed = await _l2_head_failed(evidence)
     body_text = await _l2_get_body(evidence)
@@ -737,11 +699,10 @@ async def verify_suggestion(  # noqa: PLR0913 - verifier signature carries L0-L5
 ) -> tuple[RawEntry, VerificationTier, _AdmitVerdict] | None:
     """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops.
 
-    ``discovered_url`` is the L0 Tavily output — the article URL that the
-    L2/L3 ladder probes. ``extract`` is the Tavily ``/extract`` fallback fired
-    once when direct GET 4xx's or the body is too short to admit. ``RawEntry.url``
-    falls back to the discovered URL when ``suggestion.homepage_url`` is None so
-    the persisted point always has provenance.
+    ``discovered_url`` is the L0 Tavily output that L2/L3 probe. ``extract``
+    fires once on direct-GET 4xx or body-too-short. ``RawEntry.url`` falls
+    back to ``discovered_url`` when ``homepage_url`` is None so the persisted
+    point always has provenance.
     """
     homepage = suggestion.homepage_url
     evidence = discovered_url
@@ -819,10 +780,9 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; recall fan-out
 ) -> list[RawEntry]:
     """Verify each suggestion under a capacity limiter; persist accepted entries.
 
-    ``gather_resilient`` keeps a sibling failure from cancelling the rest —
-    a transient outage on one citation host shouldn't poison the whole batch.
-    Returned list contains only the entries that passed L0-L5 AND persisted
-    cleanly; per-suggestion exceptions land in the logs instead.
+    ``gather_resilient`` isolates per-suggestion failures so a transient
+    outage on one citation host doesn't poison the batch. Returned list
+    contains only entries that passed L0-L5 AND persisted cleanly.
     """
     limiter = anyio.CapacityLimiter(concurrency)
 

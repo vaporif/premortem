@@ -51,15 +51,14 @@ class _PitchFillerOutput(BaseModel):
 class HaikuPitchFiller:
     """[Enricher] Haiku-driven pitch synthesizer for URL-only stubs.
 
-    Skip-guards keep the filler cheap: pre-filled body, missing url, or
-    missing title all return the entry untouched without an LLM call. The
-    confidence gate accepts only ``"high"`` — false positives (wrong-entity
+    Confidence gate accepts only ``"high"`` — false positives (wrong-entity
     pitches) are corpus poison; false negatives are recoverable by re-running.
     """
 
     llm: LLMClient
     model: str
     budget: Budget
+    tavily_api_key: str
     max_tokens: int = 1500
     max_chars_per_result: int = 2500
 
@@ -69,8 +68,7 @@ class HaikuPitchFiller:
             entry.raw_html is not None and entry.raw_html.strip()
         )
         # Silent skips (no log line): upstream gate already rejected, body is
-        # already populated, or there's no URL to research. Combined into one
-        # return to stay under ruff's max-returns=6 on this function.
+        # already populated, or there's no URL to research.
         silently_skip = entry.title_pre_filter_rejected or has_body or not entry.url
         if silently_skip:
             return True
@@ -110,7 +108,10 @@ class HaikuPitchFiller:
         )
         system_block = blocks.get("system", "")
         user_block = blocks.get("user", "")
-        tool = build_pitch_filler_tavily_tool(max_chars_per_result=self.max_chars_per_result)
+        tool = build_pitch_filler_tavily_tool(
+            api_key=self.tavily_api_key,
+            max_chars_per_result=self.max_chars_per_result,
+        )
 
         try:
             result = await self.llm.complete(

@@ -54,9 +54,8 @@ async def test_returns_typed_hits(monkeypatch: pytest.MonkeyPatch) -> None:
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    hits = await tavily_search_structured("acme failure", limit=5)
+    hits = await tavily_search_structured("acme failure", limit=5, api_key="tv-test-key")
 
     assert hits == [
         TavilyHit(
@@ -80,15 +79,8 @@ async def test_returns_empty_list_when_no_results(monkeypatch: pytest.MonkeyPatc
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    assert await tavily_search_structured("nothing matches", limit=5) == []
-
-
-async def test_missing_api_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    with pytest.raises(RuntimeError, match="TAVILY_API_KEY"):
-        await tavily_search_structured("x", limit=1)
+    assert await tavily_search_structured("nothing matches", limit=5, api_key="tv-test-key") == []
 
 
 async def test_snippet_truncated_to_500_chars(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -109,9 +101,8 @@ async def test_snippet_truncated_to_500_chars(monkeypatch: pytest.MonkeyPatch) -
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    hits = await tavily_search_structured("long", limit=1)
+    hits = await tavily_search_structured("long", limit=1, api_key="tv-test-key")
 
     assert len(hits) == 1
     assert len(hits[0].snippet) == 500
@@ -135,9 +126,8 @@ async def test_published_date_optional(monkeypatch: pytest.MonkeyPatch) -> None:
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    hits = await tavily_search_structured("x", limit=1)
+    hits = await tavily_search_structured("x", limit=1, api_key="tv-test-key")
     assert len(hits) == 1
     assert hits[0].published_date is None
 
@@ -149,9 +139,8 @@ async def test_propagates_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
     with pytest.raises(httpx.HTTPStatusError):
-        await tavily_search_structured("x", limit=1)
+        await tavily_search_structured("x", limit=1, api_key="tv-test-key")
 
 
 async def test_posts_documented_body(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -159,9 +148,8 @@ async def test_posts_documented_body(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_resp = _resp(200, {"results": []})
     mock_post = AsyncMock(return_value=fake_resp)
     monkeypatch.setattr("slopmortem.corpus.tavily.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    await tavily_search_structured("acme failure", limit=3)
+    await tavily_search_structured("acme failure", limit=3, api_key="tv-test-key")
 
     body = mock_post.call_args.kwargs["json"]
     assert body["query"] == "acme failure"
@@ -189,9 +177,8 @@ async def test_extract_returns_raw_content(monkeypatch: pytest.MonkeyPatch) -> N
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    body = await tavily_extract_structured("https://example.com/a")
+    body = await tavily_extract_structured("https://example.com/a", api_key="tv-test-key")
     assert body == "full article body text"
 
 
@@ -202,9 +189,8 @@ async def test_extract_returns_empty_when_no_results(monkeypatch: pytest.MonkeyP
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    assert await tavily_extract_structured("https://example.com/dead") == ""
+    assert await tavily_extract_structured("https://example.com/dead", api_key="tv-test-key") == ""
 
 
 async def test_extract_propagates_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -214,16 +200,8 @@ async def test_extract_propagates_http_error(monkeypatch: pytest.MonkeyPatch) ->
         "slopmortem.corpus.tavily.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
     with pytest.raises(httpx.HTTPStatusError):
-        await tavily_extract_structured("https://example.com/a")
-
-
-async def test_extract_missing_api_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Same key-missing contract as the search surface."""
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    with pytest.raises(RuntimeError, match="TAVILY_API_KEY"):
-        await tavily_extract_structured("https://example.com/a")
+        await tavily_extract_structured("https://example.com/a", api_key="tv-test-key")
 
 
 async def test_extract_posts_documented_body(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -231,9 +209,8 @@ async def test_extract_posts_documented_body(monkeypatch: pytest.MonkeyPatch) ->
     fake_resp = _extract_resp(200, {"results": []})
     mock_post = AsyncMock(return_value=fake_resp)
     monkeypatch.setattr("slopmortem.corpus.tavily.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    await tavily_extract_structured("https://example.com/a")
+    await tavily_extract_structured("https://example.com/a", api_key="tv-test-key")
 
     body = mock_post.call_args.kwargs["json"]
     assert body["urls"] == ["https://example.com/a"]

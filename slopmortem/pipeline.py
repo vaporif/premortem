@@ -1,9 +1,9 @@
 """Pipeline orchestration. All side-effecting deps injected; CLI wires them up.
 
-``BudgetExceededError`` truncates the run and returns a partial
-`Report` with ``budget_exceeded=True``. Per-candidate synthesis
-failures don't abort — ``synthesize_all`` returns them as exception entries
-which we drop before populating ``Report.candidates``.
+``BudgetExceededError`` truncates the run and returns a partial ``Report``
+with ``budget_exceeded=True``. Per-candidate synthesis failures don't abort;
+``synthesize_all`` returns them as exception entries which we drop before
+populating ``Report.candidates``.
 """
 
 from __future__ import annotations
@@ -78,16 +78,15 @@ class QueryPhase(StrEnum):
 class RecallDeps:
     """Long-lived deps the recall persist tail needs.
 
-    Bundled so non-recall callers don't thread four args through. The pipeline
-    raises ``RuntimeError`` when recall fires without these, so misconfig
-    surfaces at the call site instead of no-oping mid-run.
+    The pipeline raises ``RuntimeError`` when recall fires without these, so
+    misconfig surfaces at the call site instead of no-oping mid-run.
 
     ``tavily_search`` is the mandatory L0 search head; ``extract`` is the L3
-    fallback for GET-4xx hosts (Medium) and SPA shells (decrypt.co). Both
-    ride ``enable_tavily_recall_search``.
+    fallback for GET-4xx hosts and SPA shells. Both ride
+    ``enable_tavily_recall_search``.
 
     ``wayback=None`` lets production wiring construct ``WaybackEnricher()``
-    lazily; tests inject a fake to avoid hitting archive.org.
+    lazily; tests inject a fake to skip archive.org.
     """
 
     journal: MergeJournal
@@ -104,8 +103,8 @@ class RecallDeps:
 class QueryProgress(Protocol):
     """Phase-level progress hooks for ``slopmortem query``.
 
-    The default `NullQueryProgress` keeps the orchestrator decoupled
-    from any UI library; the CLI wires a Rich implementation.
+    ``NullQueryProgress`` keeps the orchestrator UI-library-free; the CLI
+    wires a Rich implementation.
     """
 
     def start_phase(self, phase: QueryPhase, total: int) -> None: ...
@@ -128,10 +127,9 @@ class NullQueryProgress:
 
 
 def cutoff_iso(years_filter: int | None) -> str | None:
-    """Compute the ISO date cutoff for *years_filter*.
+    """Compute the ISO date cutoff for ``years_filter``.
 
-    Floor to ``date()`` keeps the cutoff stable across the query's hour;
-    retrieve takes dates (``YYYY-MM-DD``), not timestamps.
+    Floor to ``date()``: retrieve takes ``YYYY-MM-DD``, not timestamps.
     """
     if years_filter is None:
         return None
@@ -172,8 +170,7 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
 ) -> _RecallOutcome:
     """Recall fallback: ``llm_recall`` → verify → persist → re-retrieve / re-rerank.
 
-    Runs at most once per query (no loop). Caller wraps in ``QueryProgress``
-    start/advance/end hooks; this helper only owns the LLM/HTTP work.
+    Runs at most once per query. Caller owns the ``QueryProgress`` hooks.
     """
     # Join the reranker's scored ids against the retrieve payloads so the
     # recall prompt's "already covered" hint block carries human-readable
@@ -326,15 +323,15 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
     sparse_encoder: SparseEncoder | None = None,
     recall_deps: RecallDeps | None = None,
 ) -> Report:
-    """Run the query pipeline end-to-end and assemble the `Report`.
+    """Run the query pipeline end-to-end and assemble the ``Report``.
 
-    Per-candidate synthesis exceptions are dropped silently; ``BudgetExceededError``
+    Per-candidate synthesis exceptions drop silently. ``BudgetExceededError``
     truncates the run and surfaces as ``pipeline_meta.budget_exceeded=True``.
 
     Provide ``recall_deps`` so the coverage-gap predicate can fire. Without
-    deps, predicate-driven recall logs and no-ops (the test path);
-    ``config.force_llm_recall=True`` raises ``RuntimeError`` instead, so
-    explicit operator opt-in surfaces misconfig.
+    them, predicate-driven recall logs and no-ops (test path);
+    ``force_llm_recall=True`` raises ``RuntimeError`` so operator opt-in
+    surfaces misconfig.
     """
     t0 = time.monotonic()
     successes: list[Synthesis] = []

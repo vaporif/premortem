@@ -187,11 +187,11 @@ def _render_no_comparables_banner(meta: PipelineMeta) -> str:
 
 
 def render(report: Report) -> str:
-    """Render *report* to plain markdown, stripping clickable links.
+    """Render ``report`` to plain markdown, stripping clickable links.
 
-    Inline links, reference-style links, and image markdown are stripped from
-    every prose field. Sources go out as plain URLs, one per line, so no
-    clickable autolink reaches a markdown viewer.
+    Inline links, reference-style links, and image markdown drop from every
+    prose field. Sources go out as plain URLs, one per line, so no clickable
+    autolink reaches a markdown viewer.
     """
     sections: list[str] = [
         f"# Slopmortem report for {report.input.name}",

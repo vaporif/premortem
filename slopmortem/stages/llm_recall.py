@@ -22,8 +22,7 @@ class PriorCandidateHint(BaseModel):
     """Human-readable hint for the recall prompt's "already covered" block.
 
     Carries the company name (not the slug id) plus the reranker's rationale
-    so Opus's dedup judgment has something to read. The pipeline joins
-    ``ScoredCandidate.candidate_id`` against retrieved payloads to build these.
+    so Opus's dedup judgment has something to read.
     """
 
     name: str
@@ -37,8 +36,8 @@ logger = logging.getLogger(__name__)
 class CoverageGapResult:
     """Coverage-gap counts plus the fire/don't-fire decision.
 
-    The pipeline emits ``qualifying``/``required`` on every query so eval can
-    sweep predicate thresholds against historical traces.
+    ``qualifying``/``required`` are emitted on every query so eval can sweep
+    predicate thresholds against historical traces.
     """
 
     qualifying: int
@@ -59,12 +58,12 @@ def compute_coverage_gap(
 ) -> CoverageGapResult:
     """Score the retrieve+rerank result against the LLM-recall predicate.
 
-    Counts candidates that are both high-quality (mean perspective >=
-    ``min_similarity_score``) and in-sector (own sector or the catch-all
-    ``"other"``). Fewer than ``n_synthesize`` qualifying → gap.
+    Counts candidates that are both high-quality (mean perspective ≥
+    ``min_similarity_score``) and in-sector (own sector or ``"other"``).
+    Fewer than ``n_synthesize`` qualifying → gap.
 
-    A ``pitch_sector`` of ``"other"`` short-circuits the in-sector check —
-    sector is uninformative there, so quality alone gates the count.
+    ``pitch_sector == "other"`` short-circuits the in-sector check: sector
+    is uninformative there, so quality alone gates the count.
     """
     by_id: dict[str, Candidate] = {c.canonical_id: c for c in retrieved}
     pitch_sector_unknown = pitch_sector == "other"
@@ -104,14 +103,12 @@ async def llm_recall(  # noqa: PLR0913 - every dependency is required at the cal
     """Ask the recall LLM (Opus) for comparable failures the corpus missed.
 
     Returns ``[]`` on transport failure, hard stops, or any wrapper-validation
-    error — the recall branch is best-effort. The cap is applied here so the
-    pipeline never has to slice a returned list itself.
+    error; the recall branch is best-effort. The cap is applied here so the
+    pipeline never slices a returned list itself.
 
-    ``tools`` is the list of tool specs Opus may call mid-reasoning to discover
-    candidates (today: just ``tavily_search`` built via ``recall_tools(config)``).
-    Pass ``[]`` to keep recall training-data-only. ``recall_max_tavily_calls``
-    is the per-recall budget surfaced to the prompt so Opus knows how many
-    searches it may issue before returning a final answer.
+    ``tools`` is the list Opus may call mid-reasoning (today:
+    ``tavily_search``). Pass ``[]`` for training-data-only recall.
+    ``recall_max_tavily_calls`` surfaces the per-recall budget in the prompt.
     """
     blocks = render_blocks(
         "llm_recall",

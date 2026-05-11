@@ -86,12 +86,10 @@ def _atomic_swap(*, tmp_dir: Path, real_dir: Path) -> None:
 def _tavily_off(config: Config) -> Generator[Config]:
     """Yield a ``Config`` with both Tavily features off.
 
-    Recording doesn't wire ``RecallDeps``, so the recall branch never fires
-    here; flipping ``enable_tavily_recall_search`` keeps the existing baseline
-    by ensuring the L0 search head can't reach live Tavily even if a future
-    edit threads recall through the recording path. Re-record with a
-    ``RecordingTavilySearch`` wrapper when eval rows are designed to exercise
-    the recall branch.
+    ``enable_tavily_recall_search`` is defensive: recording doesn't wire
+    ``RecallDeps`` today, but flipping it stops a future edit from quietly
+    threading recall through to live Tavily. Re-record with a
+    ``RecordingTavilySearch`` wrapper when an eval row exercises recall.
     """
     yield config.model_copy(
         update={
@@ -112,9 +110,9 @@ async def record_cassettes_for_inputs(  # noqa: PLR0913, PLR0915 — entry point
     progress: RecordProgress | None = None,
     max_concurrent_rows: int = _DEFAULT_MAX_CONCURRENT_ROWS,
 ) -> RecordResult:
-    """Record cassettes for every input in ``inputs`` under ``output_dir/<scope>/``.
+    """Record cassettes for every input under ``output_dir/<scope>/``.
 
-    Rows run under ``CapacityLimiter(max_concurrent_rows)`` — default keeps
+    Rows run under ``CapacityLimiter(max_concurrent_rows)``; the default keeps
     in-flight Sonnet calls under typical OpenRouter per-key limits. Failed
     rows clean their tmp dirs; the first failure re-raises after siblings
     settle. Tavily is forced off.
@@ -296,9 +294,9 @@ class _AggregateProgressBridge:
     """Funnel one row's ``QueryPhase`` advances into the shared ROWS bar.
 
     Sink total is pre-summed across rows so percentage tracks subtask
-    completion. ``set_phase_status`` is a no-op under parallel mode
-    (concurrent rows would race the status line). ``top_up`` settles rows
-    that fire fewer SYNTHESIZE advances than budgeted.
+    completion. ``set_phase_status`` is a no-op (concurrent rows would race
+    the status line). ``top_up`` settles rows that fire fewer SYNTHESIZE
+    advances than budgeted.
     """
 
     def __init__(self, sink: RecordProgress, ticks_per_row: int) -> None:

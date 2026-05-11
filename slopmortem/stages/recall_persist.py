@@ -1,22 +1,19 @@
 """Route a verified ``RawEntry`` through the existing ingest tail.
 
-The verifier (``stages.recall_verify``) hands off entries that passed L1-L4
-gating with ``markdown_text`` already populated. ``persist_recall_entry``
-runs them through the same tail crawler entries take — slop classify →
-facet+summarize → entity-resolve → journal/disk/qdrant write — so the
-load-bearing invariant from CLAUDE.md still holds: ``mark_complete`` only
-fires after both Qdrant and disk writes succeed.
+The verifier hands off entries that passed L1-L4 with ``markdown_text``
+populated. ``persist_recall_entry`` runs them through the same crawler tail
+(slop classify → facet+summarize → entity-resolve → journal/disk/qdrant
+write), preserving CLAUDE.md's invariant: ``mark_complete`` only fires
+after both Qdrant and disk writes succeed.
 
-The three phase helpers (``classify_phase`` / ``facet_summarize_fanout`` /
-``write_phase``) are lifted onto ``slopmortem.ingest``'s public surface for
-this one extra caller — the import-linter contract forbids reaching into
-``ingest._*`` from sibling packages. Don't introduce a new write path that
-bypasses the journal.
+The three phase helpers are lifted onto ``slopmortem.ingest``'s public
+surface for this one extra caller; import-linter forbids reaching into
+``ingest._*`` from sibling packages. Don't add a write path that bypasses
+the journal.
 
-``verification_tier`` rides through ``write_phase`` → ``_process_entry`` →
-``_build_payload`` → ``CandidatePayload.verification_tier`` and lands in the
-qdrant payload via ``model_dump``. ``deathness_verdict`` rides the same
-chain alongside it. No side-channel payload merge.
+``verification_tier`` and ``deathness_verdict`` ride through ``write_phase``
+→ ``_process_entry`` → ``_build_payload`` → ``CandidatePayload`` into the
+qdrant payload via ``model_dump``. No side-channel payload merge.
 """
 
 from __future__ import annotations
@@ -63,18 +60,15 @@ async def persist_recall_entry(  # noqa: PLR0913 - mirrors the ingest tail's dep
 ) -> None:
     """Persist one verified recall ``entry`` through the ingest tail.
 
-    Idempotency is delegated to ``classify_phase``: it short-circuits via
-    ``journal.is_terminal(entry.source, entry.source_id)`` when the source
-    id has already been written. The verifier keys ``source_id`` on
-    ``(name, homepage_url)`` so re-verifying the same vendor produces no
-    second journal row or qdrant point. A tier upgrade
-    (``evidence_only`` → ``wayback_anchored``) is *not* propagated by this
-    path — that's intentional; tier upgrades require an explicit re-write
-    tool, which is out of scope here.
+    Idempotency comes from ``classify_phase``'s
+    ``journal.is_terminal(entry.source, entry.source_id)`` check. The verifier
+    keys ``source_id`` on ``(name, homepage_url)`` so re-verifying the same
+    vendor produces no second journal row. A tier upgrade
+    (``evidence_only`` → ``wayback_anchored``) is *not* propagated here;
+    tier upgrades need an explicit re-write tool, out of scope.
 
-    ``enrichers=()`` because the verifier already filled ``markdown_text``
-    from the evidence body (or a Wayback snapshot when L4 corroborated).
-    Re-enriching would clobber that with a second extraction pass.
+    ``enrichers=()`` because the verifier already filled ``markdown_text``;
+    re-enriching would clobber it with a second extraction pass.
     """
     keepers = await classify_phase(
         [entry],

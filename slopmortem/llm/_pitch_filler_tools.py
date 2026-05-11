@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import cast
 
 import httpx
@@ -31,7 +30,7 @@ class PitchFillerSearchArgs(BaseModel):
     limit: int = _DEFAULT_LIMIT
 
 
-def build_pitch_filler_tavily_tool(*, max_chars_per_result: int = 2500) -> ToolSpec:
+def build_pitch_filler_tavily_tool(*, api_key: str, max_chars_per_result: int = 2500) -> ToolSpec:
     """Tavily search tool wired with raw_content truncation tuned for the filler.
 
     `include_raw_content=True` so the model gets enough body to synthesize
@@ -40,9 +39,6 @@ def build_pitch_filler_tavily_tool(*, max_chars_per_result: int = 2500) -> ToolS
     """
 
     async def _search(q: str, limit: int = _DEFAULT_LIMIT) -> str:
-        api_key = os.environ.get("TAVILY_API_KEY", "")
-        if not api_key:
-            return json.dumps({"error": "TAVILY_API_KEY not set", "results": []})
         try:
             resp = await safe_post(
                 _TAVILY_SEARCH_URL,

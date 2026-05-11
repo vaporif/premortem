@@ -1,9 +1,9 @@
 """Synthesize stage: one candidate → one ``synthesize`` call.
 
 ``synthesize_all`` uses the cache-warm pattern (first call alone, then
-`gather_resilient` on the rest) so one candidate's failure can't cancel
-the others. The tool-call loop, ``<untrusted_document>`` wrapping, and 5-turn
-bound live in ``slopmortem/llm/openrouter.py``.
+``gather_resilient`` on the rest) so one candidate's failure can't cancel
+the others. The tool-call loop, ``<untrusted_document>`` wrapping, and
+5-turn bound live in ``slopmortem/llm/openrouter.py``.
 """
 
 from __future__ import annotations
@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 def synthesize_prompt_kwargs(candidate: Candidate, *, pitch: str) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
     """Build the kwargs dict for the ``synthesize`` prompt template.
 
-    Shared by the production stage and tests so both stay in lockstep when
-    the template's variable list changes.
+    Shared with tests so both stay in lockstep when the template's variable
+    list changes.
     """
     payload = candidate.payload
     facets = payload.facets
@@ -86,15 +86,13 @@ async def synthesize(  # noqa: PLR0913 — every dependency is required at the c
     model: str | None = None,
     max_tokens: int | None = None,
 ) -> Synthesis:
-    """Synthesize one candidate against *ctx*.
+    """Synthesize one candidate against ``ctx``.
 
-    ``sources`` is passed through from ``candidate.payload.sources`` rather
-    than asked of the LLM — the LLM never sees provenance URLs, so asking
-    produced empty or hallucinated lists.
+    ``sources`` passes through from ``candidate.payload.sources``; the LLM
+    never sees provenance URLs, so asking produced hallucinated lists.
 
-    When ``where_diverged == "prompt_injection_attempted"`` (the
-    `_INJECTION_MARKER`), fires `SpanEvent.PROMPT_INJECTION_ATTEMPTED`
-    on the active Laminar span.
+    When ``where_diverged == _INJECTION_MARKER`` (``"prompt_injection_attempted"``),
+    fires ``SpanEvent.PROMPT_INJECTION_ATTEMPTED`` on the active Laminar span.
     """
     prompt = render_prompt(
         "synthesize",
@@ -146,11 +144,11 @@ async def synthesize_all(  # noqa: PLR0913 — mirrors ``synthesize`` for the fa
     max_tokens: int | None = None,
     on_candidate_done: Callable[[BaseException | None], None] | None = None,
 ) -> list[Synthesis | BaseException]:
-    """Fan out `synthesize` across *candidates* with cache-warm + resilient gather.
+    """Fan out ``synthesize`` across ``candidates`` with cache-warm + resilient gather.
 
-    First call runs alone so the prompt cache is populated before parallel
-    calls race to write it. The rest use `gather_resilient` so a single
-    failure doesn't cancel siblings — exceptions are returned in-list.
+    First call runs alone so the prompt cache populates before parallel
+    calls race to write it. The rest use ``gather_resilient``; per-candidate
+    failures come back as in-list exceptions instead of cancelling siblings.
     """
     if not candidates:
         return []
@@ -174,12 +172,12 @@ async def synthesize_all(  # noqa: PLR0913 — mirrors ``synthesize`` for the fa
 def drop_below_min_similarity(
     syntheses: list[Synthesis], *, min_similarity: float
 ) -> tuple[list[Synthesis], int]:
-    """Drop syntheses whose own similarity mean falls below *min_similarity*.
+    """Drop syntheses whose own similarity mean falls below ``min_similarity``.
 
     Synthesis sometimes re-scores a candidate lower than rerank did, so a
-    row that cleared the rerank-side filter can come back below the bar.
-    Returns ``(kept, dropped_count)`` so the caller can record
-    ``PipelineMeta.filtered_post_synth`` without recomputing.
+    row that cleared the rerank-side filter can come back below. Returns
+    ``(kept, dropped_count)`` so the caller can populate
+    ``PipelineMeta.filtered_post_synth`` directly.
     """
     kept = [s for s in syntheses if s.similarity.mean() >= min_similarity]
     dropped = len(syntheses) - len(kept)

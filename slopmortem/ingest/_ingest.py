@@ -80,8 +80,8 @@ def _emit_collected_events(result: IngestResult) -> None:
 def _record_error(result: IngestResult, entry_label: str, exc: BaseException) -> None:
     """Record per-entry failures on the parent ingest span.
 
-    Without this, swallowed per-entry exceptions only surface in stderr; the
-    parent ingest span returns OK and INGEST_ENTRY_FAILED carries no payload.
+    Without this, swallowed per-entry exceptions only show up in stderr; the
+    parent ingest span returns OK and ``INGEST_ENTRY_FAILED`` carries no payload.
     """
     if not Laminar.is_initialized():
         return
@@ -107,9 +107,9 @@ def _record_entry_failure(  # noqa: PLR0913 - one seam, every dep
     exc: BaseException,
     message: str,
 ) -> None:
-    """Caller still owns ``progress.advance_phase`` and ``continue``.
+    """Record an entry-level failure.
 
-    The write phase has two failure arms in one loop body.
+    Caller still owns ``progress.advance_phase`` and ``continue``.
     """
     label = f"{entry.source}:{entry.source_id}"
     logger.warning("ingest: %s", message)
@@ -135,13 +135,10 @@ async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branc
 ) -> list[tuple[RawEntry, str]]:
     """Enrich → extract body → slop-gate; return survivors as ``(entry, body)``.
 
-    Per-entry failures log and continue; only the run-level orchestrator can
-    short-circuit. Mutates ``result`` counters and ``result.span_events``.
-
-    Per-entry enrich+slop runs concurrently up to ``config.ingest_concurrency``;
-    counter mutations are coroutine-safe (anyio single-threaded loop).
-    ``gather_resilient`` preserves input order, so ``keepers`` matches the
-    previous sequential behaviour.
+    Per-entry failures log and continue (only the run-level orchestrator can
+    short-circuit). Mutates ``result`` counters and ``result.span_events``;
+    ``gather_resilient`` preserves input order so survivors line up with
+    ``entries``.
     """
     progress.start_phase(IngestPhase.CLASSIFY, total=len(entries))
     limiter = anyio.CapacityLimiter(config.ingest_concurrency)
@@ -304,8 +301,8 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
 ) -> None:
     """Per-entry: resolve → journal → disk → qdrant → mark_complete.
 
-    Per-entry failures isolate; ``BaseException`` (cancel / system-exit) re-raises
-    after surfacing which entry triggered it.
+    Per-entry failures isolate; ``BaseException`` (cancel/system-exit)
+    re-raises after surfacing which entry triggered it.
     """
     progress.start_phase(IngestPhase.WRITE, total=len(keepers))
     for (entry, body), fan in zip(keepers, fanout, strict=True):

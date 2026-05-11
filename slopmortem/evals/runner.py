@@ -114,10 +114,7 @@ def _load_dataset(path: Path) -> list[InputContext]:
 
 
 def _row_id(ctx: InputContext) -> str:
-    """Stable baseline key: ``ctx.name`` if set, else ``sha1(description)[:8]``.
-
-    Global uniqueness is enforced separately by ``_verify_unique_row_ids``.
-    """
+    """Stable baseline key: ``ctx.name`` if set, else ``sha1(description)[:8]``."""
     if ctx.name:
         return ctx.name
     return hashlib.sha1(ctx.description.encode(), usedforsecurity=False).hexdigest()[
@@ -199,10 +196,9 @@ async def _run_cassettes(
 ) -> dict[str, dict[str, object]]:
     """Run every row in cassette mode and return per-row scored results.
 
-    Per-row failures (missing cassette dir, ``NoCannedResponseError``,
-    ``NoCannedEmbeddingError``) log ``FAIL <row_id>: …`` and write
-    ``candidates_count=0``. Run-level failures (missing fixture,
-    ``CassetteFormatError``) print to stderr and exit 2.
+    Per-row failures (missing cassette dir, ``NoCanned*Error``) log
+    ``FAIL <row_id>: …`` and write ``candidates_count=0``. Run-level failures
+    (missing fixture, ``CassetteFormatError``) print to stderr and exit 2.
     """
     cfg = load_config()
     fixture_path = Path("tests/fixtures/corpus_fixture.jsonl")
@@ -296,8 +292,8 @@ def _diff_against_baseline(
 ) -> tuple[list[str], list[str]]:
     """Compute (regressions, warnings) between current and baseline.
 
-    Empty baseline (``{}``) means "no baseline, every row is new" — emits no
-    regressions, only forward-compat warnings.
+    Empty baseline (``{}``) means "no baseline, every row new" — emits only
+    forward-compat warnings.
     """
     regressions: list[str] = []
     warnings: list[str] = []

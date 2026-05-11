@@ -91,10 +91,10 @@ class SimilarityScores(BaseModel):
 class Facets(BaseModel):
     """Facets extracted from an input pitch. Closed-key half pins the taxonomy schema.
 
-    Closed enums are typed as ``Literal[*taxonomy_values]`` so Pydantic emits a
-    JSON-schema ``enum`` constraint that Anthropic's grammar-constrained
-    sampler enforces. Out-of-enum values can't reach this class; the LLM
-    can't generate them in the first place.
+    Closed enums use ``Literal[*taxonomy_values]`` so Pydantic emits a
+    JSON-schema ``enum`` constraint Anthropic's grammar-constrained sampler
+    enforces — out-of-enum values can't reach this class because the LLM
+    can't generate them.
     """
 
     sector: SectorLit
@@ -112,11 +112,11 @@ class Facets(BaseModel):
 class LLMSynthesis(BaseModel):
     """Fields the LLM emits for one candidate.
 
-    failure_date, lifespan_months, and sources are intentionally missing. The
-    dates are derived from CandidatePayload in stages.synthesize; sources are
-    passed through from CandidatePayload because the LLM never sees provenance
-    URLs (the body is plain text after extract_clean), so asking for them
-    produced empty or hallucinated lists that the host filter dropped.
+    ``failure_date``, ``lifespan_months``, and ``sources`` are absent on
+    purpose. Dates derive from ``CandidatePayload`` in ``stages.synthesize``;
+    sources pass through from ``CandidatePayload`` because the LLM never sees
+    provenance URLs (the body is plain text after ``extract_clean``) and
+    asking for them produced empty or hallucinated lists.
     """
 
     candidate_id: str
@@ -196,13 +196,11 @@ def _months_between(founding: date | None, failure: date | None) -> int | None:
 class CandidatePayload(BaseModel):
     """Persisted candidate doc: body, facets, provenance, text id.
 
-    ``sources`` is URL-only (empty when the upstream entry had no URL, e.g. CSV
-    imports). ``provenance_id`` is the synthetic ``"<source>:<source_id>"``
-    audit string that always identifies where the doc came from.
-
-    Splitting these stops the synthetic id from leaking into the synth host
-    allowlist: ``urlparse("curated:Celsius Network").hostname is None`` used
-    to drop every cited URL.
+    ``sources`` is URL-only (empty when the upstream entry had no URL, e.g.
+    CSV imports). ``provenance_id`` is the synthetic ``"<source>:<source_id>"``
+    audit string. Splitting them stops the synthetic id from leaking into the
+    synth host allowlist (``urlparse("curated:Celsius Network").hostname`` is
+    None and used to drop every cited URL).
     """
 
     name: str
@@ -276,19 +274,16 @@ _FAILURE_YEAR_MAX = 2030
 class RecallSuggestion(BaseModel):
     """One LLM-recalled comparable: company name plus optional URL hints.
 
-    Both ``homepage_url`` and ``evidence_url`` carry no field-level
-    ``HttpUrl`` format constraint because strict ``response_format`` mode on
-    both OpenAI and Anthropic rejects ``format``/``minLength``/``maxLength``
-    on strings and ``minimum``/``maximum`` on integers.
-    ``_validate_constraints`` below runs parse-equivalent validation so the
-    wire contract is "well-formed http(s) URL when present, year in [1990,
-    2030]" even though the schema sent upstream is just ``"type": "string"``
-    / ``"type": "integer"``.
+    ``homepage_url`` and ``evidence_url`` skip field-level ``HttpUrl`` format
+    because strict ``response_format`` (OpenAI + Anthropic) rejects
+    ``format``/``minLength``/``maxLength`` on strings and
+    ``minimum``/``maximum`` on integers. ``_validate_constraints`` enforces
+    the equivalent wire contract post-parse.
 
     ``evidence_url`` is the citation URL Opus saw in its own
-    ``tavily_search`` results (title + snippet mentioned the company AND
-    described a failure event). When present, the verifier skips its own L0
-    Tavily round-trip and threads the URL straight into L2-L5.
+    ``tavily_search`` results (title + snippet mentioned the company AND a
+    failure event). When present, the verifier skips its L0 round-trip and
+    threads the URL into L2-L5.
     """
 
     name: str
@@ -316,11 +311,10 @@ class RecallSuggestion(BaseModel):
 
 
 class RecallSuggestionList(BaseModel):
-    """Wrapper for the recall stage's array output, so the schema is a single object.
+    """Wrapper for the recall stage's array output.
 
-    Mirrors ``LlmRerankResult``: OpenRouter strict ``json_schema`` mode rejects
-    array roots. Wrap the list under ``suggestions`` so ``to_strict_response_schema``
-    emits an object schema the API will accept.
+    Mirrors ``LlmRerankResult``: OpenRouter strict ``json_schema`` rejects
+    array roots, so the list lives under ``suggestions``.
     """
 
     suggestions: list[RecallSuggestion]
@@ -363,13 +357,13 @@ class ConsolidatedRisk(BaseModel):
     """One pitch-applicable risk consolidated across comparables.
 
     Attributes:
-        summary: Imperative one-liner for the founder. Canonical wording the
+        summary: Imperative one-liner for the founder; canonical wording the
             LLM picks when merging paraphrases.
-        applies_because: Why this risk hits THIS pitch. Must reference a
-            concrete element (asset class, scale, customer type, product
-            feature). Empty string is invalid.
-        raised_by: candidate_ids that emitted any lesson contributing to this
-            risk. Always non-empty for kept risks.
+        applies_because: Why this risk hits THIS pitch. Must cite a concrete
+            element (asset class, scale, customer type, product feature).
+            Empty string invalid.
+        raised_by: candidate_ids contributing any lesson to this risk.
+            Non-empty for kept risks.
         severity: "high" | "medium" | "low". At most 4 highs per report.
     """
 

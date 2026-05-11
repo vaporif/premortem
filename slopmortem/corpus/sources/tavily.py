@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import os
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 import httpx
@@ -36,8 +36,11 @@ def _pick_raw_content(payload: object) -> str | None:
     return raw_content
 
 
+@dataclass
 class TavilyEnricher:
     """[Enricher] Tavily /extract client that recovers article bodies on empty entries."""
+
+    api_key: str
 
     async def enrich(self, entry: RawEntry) -> RawEntry:
         """Best-effort. Returns *entry* unchanged on failure or when the body is already there."""
@@ -47,12 +50,8 @@ class TavilyEnricher:
             return entry
         if not entry.url:
             return entry
-        api_key = os.environ.get("TAVILY_API_KEY", "")
-        if not api_key:
-            logger.warning("tavily enricher: TAVILY_API_KEY not set; skipping")
-            return entry
 
-        raw_content = await self._fetch_raw_content(entry.url, api_key)
+        raw_content = await self._fetch_raw_content(entry.url, self.api_key)
         if not raw_content:
             logger.info(
                 "tavily enricher: empty/no extract for %s:%s url=%s",

@@ -127,12 +127,11 @@ class QdrantCorpus:
     ) -> list[Candidate]:
         """Hybrid retrieve top-K candidates with FormulaQuery facet boost.
 
-        Inner ``Prefetch`` does dense+sparse RRF fusion; outer ``FormulaQuery``
-        adds a per-facet boost on top of ``$score`` (``"other"`` values skip).
-        Over-fetches chunks at ``k_retrieve * 4`` so the in-Python parent
-        collapse + alias-component dedup have room before truncating.
-        ``strict_deaths=True`` narrows the recency filter to "known failure_date
-        >= cutoff_iso" (branch A only).
+        Inner ``Prefetch`` does dense+sparse RRF; outer ``FormulaQuery`` adds
+        a per-facet boost on top of ``$score`` (``"other"`` values skip).
+        Over-fetches at ``k_retrieve * 4`` to leave room for parent-collapse
+        and alias-component dedup. ``strict_deaths=True`` narrows to branch A
+        (known ``failure_date >= cutoff_iso``).
         """
         from qdrant_client.models import (  # noqa: PLC0415 — keep top-level imports lean
             FieldCondition,
@@ -367,13 +366,11 @@ def canonical_path_for(post_mortems_root: Path, canonical_id: str) -> Path:
 
 
 def _and_filters(*filters: Filter | None) -> Filter | None:
-    """AND-combine zero or more optional ``Filter``s, dropping ``None``s.
+    """AND-combine optional ``Filter``s.
 
-    Nests (``Filter(must=[a, b])``) instead of merging ``must`` lists because
-    ``_build_recency_filter`` returns ``Filter(should=[…])`` when
-    ``strict_deaths=False`` — its ``must`` is ``None`` and clause-merging
-    would silently drop the ``should`` branches. The outer ``must=[…]``
-    wrapper AND-combines correctly regardless of clause shape.
+    Wraps in ``Filter(must=[…])`` rather than merging ``must`` lists:
+    ``_build_recency_filter`` can return ``Filter(should=[…])`` (must=None),
+    and clause-merging would silently drop those ``should`` branches.
     """
     present = [f for f in filters if f is not None]
     if not present:
@@ -384,15 +381,11 @@ def _and_filters(*filters: Filter | None) -> Filter | None:
 
 
 def _build_sector_filter(*, sector: str, strict: bool, exclude_other: bool) -> Filter | None:
-    """Hard payload filter on ``facets.sector``. ``None`` = no narrowing.
+    """Hard payload filter on ``facets.sector``; ``None`` = no narrowing.
 
-    ``strict=False`` keeps the legacy soft-boost behavior. ``strict=True`` pins
-    the pitch's sector. ``exclude_other=True`` drops the ``"other"`` safety
-    valve — only flip after auditing and reclassifying that bucket.
-
-    Returns ``None`` when ``pitch.sector == "other"`` regardless of flags: that
-    sector is uninformative, so filtering on it either matches noise or empties
-    the result.
+    Always ``None`` when ``sector == "other"``: that bucket is uninformative,
+    so filtering on it either matches noise or empties the result. Only flip
+    ``exclude_other`` after auditing and reclassifying ``"other"``.
     """
     if not strict or sector == "other":
         return None
@@ -448,9 +441,9 @@ def _build_recency_filter(*, cutoff_iso: str | None, strict_deaths: bool) -> Any
 
 
 def _payload_dict_to_candidate_payload(payload: dict[str, Any]) -> CandidatePayload:  # pyright: ignore[reportExplicitAny]
-    """Drop Qdrant-only keys so ``extra="forbid"`` won't trip if the model later turns strict.
+    """Drop Qdrant-only keys (``canonical_id``, ``chunk_idx``).
 
-    Strips ``canonical_id`` and ``chunk_idx``.
+    Pre-strips so a future ``extra="forbid"`` on the model won't trip.
     """
     cleaned = {k: v for k, v in payload.items() if k not in ("canonical_id", "chunk_idx")}
     return CandidatePayload.model_validate(cleaned)

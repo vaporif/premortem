@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
@@ -222,6 +221,7 @@ class TavilyNewsSource:
     def __init__(  # noqa: PLR0913 - YAML defaults overridable per-knob from CLI/config
         self,
         *,
+        api_key: str,
         queries: list[str] | None = None,
         start_year: int | None = None,
         end_year: int | None = None,
@@ -259,6 +259,7 @@ class TavilyNewsSource:
         self.min_score: float = _pick_float(min_score, defaults.get("min_score"), 0.3)
         self.search_depth: str = _pick_str(search_depth, defaults.get("search_depth"), "basic")
 
+        self.api_key = api_key
         self.rps = rps
         self.concurrency = concurrency
         self._mirrors: frozenset[str] = _load_mirror_domains()
@@ -357,11 +358,6 @@ class TavilyNewsSource:
         return kept
 
     async def fetch(self) -> AsyncIterator[RawEntry]:
-        api_key = os.environ.get("TAVILY_API_KEY", "")
-        if not api_key:
-            logger.warning("tavily_news: TAVILY_API_KEY not set; yielding no entries")
-            return
-
         descriptors = _build_call_descriptors(
             queries=self.queries, start_year=self.start_year, end_year=self.end_year
         )
@@ -376,7 +372,7 @@ class TavilyNewsSource:
             for d in descriptors
         ]
         results = await gather_resilient(
-            *(self._one_call(s, api_key=api_key, limiter=limiter) for s in specs)
+            *(self._one_call(s, api_key=self.api_key, limiter=limiter) for s in specs)
         )
 
         # ``_one_call`` swallows ``httpx.HTTPError`` / ``ValueError`` and returns

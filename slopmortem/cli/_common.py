@@ -1,8 +1,8 @@
 """Shared helpers used by 2+ subcommand modules.
 
-Lives here so subcommand files can import without forming circular dependencies
-through ``cli/__init__.py``. The leading underscore signals package-private;
-the import-linter contract enforces it.
+Lives here so subcommand files can import without circular dependencies via
+``cli/__init__.py``. Leading underscore signals package-private; import-linter
+enforces it.
 """
 
 from __future__ import annotations
@@ -55,10 +55,8 @@ def _maybe_setup_logging() -> None:
     """Configure stdlib logging from ``SLOPMORTEM_LOG`` env var.
 
     Off by default so library use of the CLI module doesn't hijack the root
-    logger. Set ``SLOPMORTEM_LOG=info`` (or ``debug``) to see per-entry ingest
-    progress (tavily fill lines, ingest save lines).
-    Third-party loggers (httpx, lmnr) are pinned to WARNING so the slopmortem
-    signal isn't drowned out.
+    logger. Set ``SLOPMORTEM_LOG=info`` (or ``debug``) for per-entry ingest
+    progress. Third-party loggers (httpx, lmnr) pin to WARNING.
     """
     level_name = os.environ.get("SLOPMORTEM_LOG", "").strip().lower()
     if not level_name:
@@ -122,7 +120,7 @@ def progress_context[T](
 ) -> contextlib.AbstractContextManager[T | None]:
     """Build the Rich phase bar context, or ``nullcontext`` when stderr isn't a tty.
 
-    Gates: ``SLOPMORTEM_NO_PROGRESS``, ``sys.stderr.isatty()``, Rich's
+    Gates: ``SLOPMORTEM_NO_PROGRESS``, ``sys.stderr.isatty()``, Rich
     ``is_terminal``. Non-tty users still see progress via ``SLOPMORTEM_LOG=info``.
     """
     if os.environ.get("SLOPMORTEM_NO_PROGRESS"):

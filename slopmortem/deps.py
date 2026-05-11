@@ -1,6 +1,6 @@
 """Production dependency builder for the query/replay pipeline.
 
-Lives at the package root (not under ``cli/``) so `slopmortem.evals.runner`
+Lives at the package root (not under ``cli/``) so ``slopmortem.evals.runner``
 can consume it for ``--live`` mode without reaching into CLI internals.
 """
 
@@ -13,12 +13,16 @@ from openai import AsyncOpenAI
 
 from slopmortem.budget import Budget
 from slopmortem.corpus import QdrantCorpus
-from slopmortem.corpus.tavily import tavily_extract_structured, tavily_search_structured
+from slopmortem.corpus.tavily import (
+    tavily_extract_structured,
+    tavily_search_structured,
+)
 from slopmortem.llm import OpenRouterClient, make_embedder
 
 if TYPE_CHECKING:
     from slopmortem.config import Config
     from slopmortem.corpus import Corpus
+    from slopmortem.corpus.tavily import TavilyHit
     from slopmortem.llm import EmbeddingClient, LLMClient
     from slopmortem.stages import SparseEncoder
     from slopmortem.stages.recall_verify import ExtractFn, TavilySearchFn
@@ -27,13 +31,12 @@ if TYPE_CHECKING:
 def build_deps(
     config: Config,
 ) -> tuple[LLMClient, EmbeddingClient, Corpus, Budget, SparseEncoder]:
-    """Build production deps for the query pipeline: LLM, embedder, corpus, budget, sparse encoder.
+    """Build production deps for the query pipeline.
 
-    The sparse encoder is the same callable both ``retrieve`` and
-    ``recall_persist`` need; threading it through ``build_deps`` keeps a
-    single owner so the recall branch can't fire without one wired up.
-    The fastembed model itself loads lazily on first call (see
-    ``slopmortem.corpus._embed_sparse``), so this stays cheap at startup.
+    The sparse encoder is the callable both ``retrieve`` and
+    ``recall_persist`` need; a single owner here keeps the recall branch
+    from firing without one wired up. The fastembed model itself loads
+    lazily on first call, so this stays cheap at startup.
     """
     from qdrant_client import AsyncQdrantClient  # noqa: PLC0415 - heavy dep, lazy import
 
@@ -67,27 +70,34 @@ def build_deps(
 
 
 def build_tavily_recall_search(config: Config) -> TavilySearchFn | None:
-    """Return ``tavily_search_structured`` when recall search is enabled, else ``None``.
+    """Return a ``TavilySearchFn`` bound to ``config.tavily_api_key``, or ``None``.
 
-    ``tavily_search_structured`` reads ``TAVILY_API_KEY`` at call time, so the
-    builder doesn't need to capture credentials. To disable recall entirely,
-    set ``enable_tavily_recall_search=False`` — the L0 search head is
-    mandatory under the new contract, so no Tavily means no recall.
+    Closure captures the key so the verifier doesn't have to thread
+    ``Config`` through. Set ``enable_tavily_recall_search=False`` to disable
+    recall entirely — the L0 search head is mandatory.
     """
     if not config.enable_tavily_recall_search:
         return None
-    return tavily_search_structured
+    api_key = config.tavily_api_key.get_secret_value()
+
+    async def search(q: str, limit: int) -> list[TavilyHit]:
+        return await tavily_search_structured(q, limit, api_key=api_key)
+
+    return search
 
 
 def build_tavily_recall_extract(config: Config) -> ExtractFn | None:
-    """Return ``tavily_extract_structured`` when recall search is enabled, else ``None``.
+    """Return an ``ExtractFn`` bound to ``config.tavily_api_key``, or ``None``.
 
-    Bundled under the same flag as the search head: the L3 extract fallback
-    rides whenever Tavily is wired in. Separate flag would add a config knob
-    no one's asked for; the verifier already drops gracefully when extract
-    returns empty or raises, so the only reason to gate extract independently
-    is Tavily quota — and quota is shared across both surfaces anyway.
+    Same flag as the search head: L3 extract rides whenever Tavily is wired
+    in. The verifier drops gracefully on empty/raised extract, and Tavily
+    quota is shared across both surfaces.
     """
     if not config.enable_tavily_recall_search:
         return None
-    return tavily_extract_structured
+    api_key = config.tavily_api_key.get_secret_value()
+
+    async def extract(url: str) -> str:
+        return await tavily_extract_structured(url, api_key=api_key)
+
+    return extract

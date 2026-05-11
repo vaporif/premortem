@@ -33,8 +33,8 @@ _HTTP_TOO_MANY_REQUESTS = 429
 class MidStreamError(Exception):
     """SSE chunk arrived at HTTP 200 with finish_reason='error'.
 
-    Carries the raw error payload so the retry layer can decide whether
-    ``error.code`` is transient (e.g. ``overloaded_error``) or fatal.
+    Carries the raw error payload so the retry layer can classify
+    ``error.code`` (e.g. ``overloaded_error``) as transient or fatal.
     """
 
     def __init__(self, error: object) -> None:
@@ -55,9 +55,9 @@ async def gather_with_limit[T](
     coros: Iterable[Coroutine[Any, Any, T]],  # pyright: ignore[reportExplicitAny]
     limit: int,
 ) -> list[T | Exception]:
-    """Run *coros* concurrently with at most *limit* in flight.
+    """Run ``coros`` concurrently with at most ``limit`` in flight.
 
-    Wraps ``gather_resilient`` behind a ``CapacityLimiter`` so callers can cap
+    ``gather_resilient`` behind a ``CapacityLimiter`` so callers can cap
     parallel OpenRouter calls at ``config.ingest_concurrency``.
     """
     limiter = anyio.CapacityLimiter(limit)
@@ -74,8 +74,7 @@ def _pin_anthropic_provider(
 ) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
     """Return ``extra_body`` with ``provider.order=["Anthropic"]`` set.
 
-    Caller-supplied ``provider`` settings win — only fills the gap when the
-    caller hasn't already constrained routing.
+    Caller-supplied ``provider`` wins; this only fills the gap.
     """
     merged: dict[str, Any] = dict(extra_body) if extra_body else {}  # pyright: ignore[reportExplicitAny]
     if "provider" in merged:
@@ -244,7 +243,7 @@ class OpenRouterClient:
 
         Mid-stream ``error.code='overloaded_error'`` is transient. Auth
         (401/403), 402 (no credits), 503 (no provider), and non-overloaded
-        mid-stream errors are fatal — re-raised immediately.
+        mid-stream errors are fatal.
         """
         sdk: Any = self._sdk  # pyright: ignore[reportExplicitAny]
         for attempt in range(self._max_retries + 1):

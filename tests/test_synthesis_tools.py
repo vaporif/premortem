@@ -126,7 +126,8 @@ async def test_tavily_calls_under_cap_pass_through(monkeypatch, tavily_key):
 
     calls: list[tuple[str, int]] = []
 
-    async def fake_real(q: str, limit: int = 5) -> str:
+    async def fake_real(q: str, limit: int = 5, *, api_key: str) -> str:
+        del api_key
         calls.append((q, limit))
         return f"hit:{q}"
 
@@ -147,7 +148,8 @@ async def test_third_tavily_call_returns_budget_message(monkeypatch, tavily_key)
     cfg = Config(enable_tavily_synthesis=True, tavily_calls_per_synthesis=2)
     real_calls: list[str] = []
 
-    async def fake_real(q: str, limit: int = 5) -> str:
+    async def fake_real(q: str, limit: int = 5, *, api_key: str) -> str:
+        del limit, api_key
         real_calls.append(q)
         return "ok"
 
@@ -166,10 +168,12 @@ async def test_tavily_search_and_extract_share_budget(monkeypatch, tavily_key):
     """The cap covers tavily_search and tavily_extract combined, not each independently."""
     cfg = Config(enable_tavily_synthesis=True, tavily_calls_per_synthesis=2)
 
-    async def fake_search(q: str, limit: int = 5) -> str:
+    async def fake_search(q: str, limit: int = 5, *, api_key: str) -> str:
+        del q, limit, api_key
         return "search-hit"
 
-    async def fake_extract(url: str) -> str:
+    async def fake_extract(url: str, *, api_key: str) -> str:
+        del url, api_key
         return "extract-hit"
 
     monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_search)
@@ -187,7 +191,8 @@ async def test_tavily_search_and_extract_share_budget(monkeypatch, tavily_key):
 async def test_each_synthesis_gets_a_fresh_budget(monkeypatch, tavily_key):
     cfg = Config(enable_tavily_synthesis=True, tavily_calls_per_synthesis=1)
 
-    async def fake_search(q: str, limit: int = 5) -> str:
+    async def fake_search(q: str, limit: int = 5, *, api_key: str) -> str:
+        del q, limit, api_key
         return "ok"
 
     monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_search)
@@ -250,8 +255,8 @@ async def test_recall_tools_bounded_search_caps_at_budget(monkeypatch, tavily_ke
     cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
     real_calls: list[str] = []
 
-    async def fake_real(q: str, limit: int = 5) -> str:
-        del limit
+    async def fake_real(q: str, limit: int = 5, *, api_key: str) -> str:
+        del limit, api_key
         real_calls.append(q)
         return f"hit:{q}"
 
@@ -276,12 +281,13 @@ async def test_recall_tools_shared_budget_caps_combined_calls(monkeypatch, tavil
     search_calls: list[str] = []
     extract_calls: list[str] = []
 
-    async def fake_search(q: str, limit: int = 5) -> str:
-        del limit
+    async def fake_search(q: str, limit: int = 5, *, api_key: str) -> str:
+        del limit, api_key
         search_calls.append(q)
         return f"hit:{q}"
 
-    async def fake_extract(url: str) -> str:
+    async def fake_extract(url: str, *, api_key: str) -> str:
+        del api_key
         extract_calls.append(url)
         return "body"
 

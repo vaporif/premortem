@@ -1,8 +1,8 @@
 # pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false
 """JSON-Schema helpers for tool definitions and OpenAI strict-mode response schemas.
 
-``jsonref`` ships no stubs; reportUnknown* is silenced file-wide and the
-shape we produced (a dict from ``model_json_schema()``) is asserted at use.
+``jsonref`` ships no stubs; ``reportUnknown*`` is silenced file-wide and the
+shape (a dict from ``model_json_schema()``) is asserted at use.
 """
 
 from __future__ import annotations
@@ -63,8 +63,8 @@ def to_strict_response_schema(
 ) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
     """Emit ``response_format.json_schema.schema`` for OpenAI strict mode.
 
-    Pydantic v2 drops defaulted fields from ``required``; OpenAI strict mode
-    wants every property required and nullability as ``anyOf:[T,null]``.
+    Pydantic v2 drops defaulted fields from ``required``; strict mode wants
+    every property required and nullability as ``anyOf:[T,null]``.
     """
     schema = model.model_json_schema()
     inlined = jsonref.replace_refs(schema, proxies=False, lazy_load=False)
@@ -81,15 +81,15 @@ def _build_bounded_tavily_pair(
     *,
     cap: int,
     label: str,
+    api_key: str,
     search_description: str | None = None,
     extract_description: str | None = None,
 ) -> list[ToolSpec]:
     """Build the (search, extract) ToolSpec pair under one shared call quota.
 
-    Search and extract share the same ``used``/``cap`` counter, so hitting the
-    cap on either surface refuses on the other. ``label`` rides into the
-    refusal string for log/trace attribution. Descriptions fall back to the
-    tool default; recall overrides them.
+    Search and extract share the same ``used``/``cap`` counter, so the cap
+    on one surface also refuses on the other. ``label`` rides into the
+    refusal string. Descriptions fall back to the tool default.
     """
     from slopmortem.corpus import _tools_impl  # noqa: PLC0415 - break import cycle
     from slopmortem.corpus._tools_impl import tavily_extract, tavily_search  # noqa: PLC0415
@@ -103,14 +103,14 @@ def _build_bounded_tavily_pair(
             return refusal
         used += 1
         # Attribute lookup at call time so tests can monkeypatch the impl.
-        return await _tools_impl.tavily_search_async(q, limit)
+        return await _tools_impl.tavily_search_async(q, limit, api_key=api_key)
 
     async def _bounded_extract(*, url: str) -> str:
         nonlocal used
         if used >= cap:
             return refusal
         used += 1
-        return await _tools_impl.tavily_extract_async(url)
+        return await _tools_impl.tavily_extract_async(url, api_key=api_key)
 
     return [
         ToolSpec(
@@ -142,6 +142,7 @@ def synthesis_tools(config: Config) -> list[ToolSpec]:
             _build_bounded_tavily_pair(
                 cap=config.tavily_calls_per_synthesis,
                 label="synthesis",
+                api_key=config.tavily_api_key.get_secret_value(),
             )
         )
     return tools
@@ -150,11 +151,10 @@ def synthesis_tools(config: Config) -> list[ToolSpec]:
 def recall_tools(config: Config) -> list[ToolSpec]:
     """Tools available to the recall LLM (Opus) during candidate discovery.
 
-    Both ``tavily_search`` and ``tavily_extract`` share a single
-    ``config.recall_max_tavily_calls`` quota — Opus uses search to find
-    candidate articles and extract to read the body of high-stakes picks
-    before committing to a suggestion. Returns an empty list when the
-    enable flag is off or the cap is 0 (recall stays training-data-only).
+    ``tavily_search`` and ``tavily_extract`` share a single
+    ``recall_max_tavily_calls`` quota — Opus uses search to find candidate
+    articles and extract to read high-stakes picks before committing.
+    Returns ``[]`` when the flag is off or the cap is 0.
     """
     if not config.enable_tavily_recall_search:
         return []
@@ -163,6 +163,7 @@ def recall_tools(config: Config) -> list[ToolSpec]:
     return _build_bounded_tavily_pair(
         cap=config.recall_max_tavily_calls,
         label="recall",
+        api_key=config.tavily_api_key.get_secret_value(),
         search_description=(
             "Search the live web for failed or struggling startups in this "
             "vertical. Returns title, url, snippet for the top matches. Use "
