@@ -7,16 +7,14 @@ signature contract (no closures, no bound methods).
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from slopmortem.corpus.tavily import (
-    TAVILY_SEARCH_URL as _TAVILY_SEARCH_URL,
-)
-from slopmortem.corpus.tavily import (
+    TAVILY_SEARCH_URL,
     parse_tavily_response,
+    tavily_api_key,
 )
 from slopmortem.http import safe_post
 from slopmortem.models import (
@@ -138,15 +136,6 @@ async def _search_corpus(
     return hits
 
 
-def _tavily_api_key() -> str:
-    """Read at call time — tool callables are passed bare to OpenRouter and can't carry config."""
-    key = os.environ.get("TAVILY_API_KEY", "")
-    if not key:
-        msg = "TAVILY_API_KEY not set; --tavily-synthesis path is unavailable"
-        raise RuntimeError(msg)
-    return key
-
-
 async def tavily_search_async(q: str, limit: int = 5) -> str:
     r"""Search Tavily; return ``- title — url\n  snippet`` lines or ``"(no results)"``.
 
@@ -155,8 +144,8 @@ async def tavily_search_async(q: str, limit: int = 5) -> str:
     is load-bearing for cassette matching on the synthesis tool-call loop.
     """
     resp = await safe_post(
-        _TAVILY_SEARCH_URL,
-        json={"api_key": _tavily_api_key(), "query": q, "max_results": limit},
+        TAVILY_SEARCH_URL,
+        json={"api_key": tavily_api_key(), "query": q, "max_results": limit},
     )
     resp.raise_for_status()
     payload: object = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
@@ -170,7 +159,7 @@ async def tavily_extract_async(url: str) -> str:
     """Return ``""`` when no results."""
     resp = await safe_post(
         TAVILY_EXTRACT_URL,
-        json={"api_key": _tavily_api_key(), "urls": [url]},
+        json={"api_key": tavily_api_key(), "urls": [url]},
     )
     resp.raise_for_status()
     payload = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design

@@ -28,6 +28,7 @@ __all__ = [
     "TAVILY_SNIPPET_CHARS",
     "TavilyHit",
     "parse_tavily_response",
+    "tavily_api_key",
     "tavily_search_structured",
 ]
 
@@ -45,25 +46,23 @@ class TavilyHit(BaseModel):
     published_date: str | None = None
 
 
-def _tavily_api_key() -> str:
-    """Read at call time so the helper stays usable from contexts without ``Config``."""
+def tavily_api_key() -> str:
+    """Return ``TAVILY_API_KEY`` from env or raise; canonical helper for both Tavily surfaces.
+
+    Read at call time so the helper stays usable from contexts without ``Config``
+    (LLM tool callables are passed bare to OpenRouter and can't carry settings).
+    """
     key = os.environ.get("TAVILY_API_KEY", "")
     if not key:
-        msg = "TAVILY_API_KEY not set; Tavily search is unavailable"
+        msg = "TAVILY_API_KEY not set; Tavily search unavailable"
         raise RuntimeError(msg)
     return key
 
 
 def parse_tavily_response(payload: object, limit: int) -> list[TavilyHit]:
-    """Coerce a Tavily ``/search`` JSON body into typed hits.
+    """Parse Tavily ``/search`` JSON into typed hits.
 
-    The payload comes from ``httpx.Response.json()`` (typed ``Any``) so each
-    field is coerced at this boundary. Snippet is truncated to
-    ``TAVILY_SNIPPET_CHARS`` to match the formatted-string surface.
-
-    Public (no leading underscore) only because ``_tools_impl`` shares it
-    to keep both Tavily surfaces in lockstep — external callers should use
-    ``tavily_search_structured`` instead.
+    Snippets are capped at ``TAVILY_SNIPPET_CHARS``.
     """
     if not isinstance(payload, dict):
         return []
@@ -99,7 +98,7 @@ async def tavily_search_structured(q: str, limit: int) -> list[TavilyHit]:
     """
     resp = await safe_post(
         TAVILY_SEARCH_URL,
-        json={"api_key": _tavily_api_key(), "query": q, "max_results": limit},
+        json={"api_key": tavily_api_key(), "query": q, "max_results": limit},
     )
     resp.raise_for_status()
     payload: object = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
