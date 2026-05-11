@@ -7,7 +7,7 @@
 
 You give it a pitch, it finds dead startups that tried something similar.
 
-`slopmortem` runs locally. LLM calls go through OpenRouter (Sonnet + Haiku by default). Qdrant runs where you want (docker-compose is added for ease of use).
+`slopmortem` runs locally. LLM calls go through OpenRouter (Sonnet + Haiku by default). Qdrant runs where you want (there's a `docker-compose.yml` in the repo if you'd rather not run your own).
 
 Pipeline diagram, query/ingest flow, and source layout live in [`docs/architecture.md`](docs/architecture.md).
 
@@ -36,12 +36,15 @@ just ingest                          # ~$0.75 for 50 entries with all enrichers;
 just query "your pitch here"         # ~$0.10 warm / ~$0.30 cold cache; or `just query-debug` to skip rerank+synth
 ```
 
-Ingest picks up curated + HN automatically. Useful flags:
+Ingest pulls from curated + HN by default. Useful flags:
 
-- `--crunchbase-csv PATH` — pull from a Crunchbase dump (see below)
-- `--enrich-wayback` — chase 404s through the Wayback Machine; recommended alongside the Crunchbase slice since most 2015 homepages are long gone
-- `--tavily-enrich` — fill missing context from Tavily search
+- `--crunchbase-csv PATH` — turn on the Crunchbase adapter for this run (see below)
+- `--enable-tavily-news` — add a Tavily news source for shutdown-event coverage; needs `TAVILY_API_KEY`. Window with `--tavily-news-start-year/--tavily-news-end-year`, cap with `--tavily-news-max-emit`, depth with `--tavily-news-search-depth basic|advanced` (1 vs 2 Tavily credits per query).
+- `--only-source curated|hn_algolia|crunchbase_csv|tavily_news` — run a single source; its `--enable-*` flag fires for you
+- `--limit N` — first N entries across sources, in order curated → HN → Crunchbase → TavilyNews. Cheap live smoke test.
+- `--no-pitch-filler` / `--no-title-pre-filter` — disable the HN pitch-filler (Tavily-backed body synth) and the Haiku title gate. Both auto-enable when HN is in the source set; you only need these to opt out.
 - `--dry-run` — count without writing; `--force` bypasses the per-source skip key
+- `--post-mortems-root PATH` — override the `./post_mortems/` tree
 
 <details>
 <summary><b>Crunchbase setup</b></summary>
@@ -85,7 +88,7 @@ Bringing a different model? Add a row to `EMBED_DIMS` in `slopmortem/llm/openai_
 
 Every LLM and HTTP call made during tests or evals replays from `tests/fixtures/cassettes/` (pytest-recording, vcrpy underneath). `FakeLLMClient` + `FakeEmbeddingClient` cover the rest, so `just test` and `just eval` are free and offline.
 
-`just eval` runs the seed dataset through the pipeline against recorded cassettes; deterministic, asserted against `tests/evals/baseline.json`. `just eval-record` re-records against live OpenRouter + local fastembed under a `--max-cost-usd 2.0` ceiling. `just eval-record-corpus` regenerates the seed corpus fixture from `tests/fixtures/corpus_fixture_inputs.yml` (~$0.30–$1 with fastembed). Both record commands cost real money — manual triggers, never CI.
+`just eval` runs the seed dataset through the pipeline against recorded cassettes; deterministic, asserted against `tests/evals/baseline.json`. `just eval-record` re-records against live OpenRouter + local fastembed under a `--max-cost-usd 2.0` ceiling. `just eval-record-corpus` regenerates the seed corpus fixture from `tests/fixtures/corpus_fixture_inputs.yml` (~$0.30–$1 with fastembed). Both record commands cost real money, so trigger them by hand. Don't wire either into CI.
 
 `just smoke-live` hits live OpenRouter on a manual trigger, roughly weekly, to catch silent SDK/model/routing shifts. `slopmortem replay <dataset>` re-runs a saved JSONL through current code without re-burning the LLM bill — useful when iterating on prompts.
 
