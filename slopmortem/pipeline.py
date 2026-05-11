@@ -82,9 +82,7 @@ class RecallDeps:
     silently no-oping mid-run.
 
     ``tavily_search`` is required: the L0 search head is mandatory under the
-    new contract. To disable recall entirely, set
-    ``config.enable_tavily_recall_search=False`` and pass ``recall_deps=None``
-    instead of constructing ``RecallDeps`` with a no-op search callable.
+    new contract.
 
     ``wayback`` defaults to ``None`` so production wiring can omit it and
     let the pipeline construct a fresh ``WaybackEnricher()``; tests inject

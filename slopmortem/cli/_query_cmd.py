@@ -216,7 +216,6 @@ async def _build_recall_deps(
     """
     tavily_search = build_tavily_recall_search(config)
     if tavily_search is None:
-        # enable_tavily_recall_search=False — recall is off entirely under the new contract.
         return None
     # Local imports keep the cold-start cost off the import path; mirrors
     # the ``_ingest_cmd.py`` pattern of deferring heavyweight deps.

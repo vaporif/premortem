@@ -5,7 +5,7 @@ Return UP TO {{ cap }} suggestions as a JSON object with a single key `suggestio
 - name: the company's common name (no "Inc." / "Ltd.")
 - category: the vertical or sub-sector you're matching against the pitch (free text, e.g. "Web3 security audits")
 - status: one of "dead" (shut down), "absorbed" (acquired in distress / shell-of-itself), "struggling" (publicly down-rounded, layoffs, missed milestones), or "bruised" (alive but materially diminished)
-- homepage_url: the company's homepage or last-known main site. homepage_url is OPTIONAL — return null if you don't remember the exact homepage. Don't fabricate. The pipeline discovers a citation URL downstream via web search, so you have no reason to invent one yourself.
+- homepage_url: the company's homepage or last-known main site. OPTIONAL: return null if you don't remember the exact URL — don't fabricate one. The pipeline discovers a citation URL downstream via web search, so there's no reason to invent one here.
 - failure_year: the year the failure / distress event occurred (1990-2030)
 - one_liner: a single sentence describing what the company did and how it failed
 

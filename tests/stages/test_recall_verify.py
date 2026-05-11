@@ -123,9 +123,11 @@ def _discovered(name: str = "Hexagate") -> str:
     The Task 3 cutover stripped ``RecallSuggestion.evidence_url``; tests
     that used to read ``sug.evidence_url`` now compute the same shape from
     the suggestion name so fixtures key off the same string the verifier
-    receives via ``discovered_url=``.
+    receives via ``discovered_url=``. Hostname matches the sibling L2/L3/L5
+    test files so URL fixtures read uniformly across the recall_verify
+    suite.
     """
-    return f"https://news.example.com/{name.lower()}-shutdown"
+    return f"https://news.example/{name.lower()}-shutdown"
 
 
 class _FakeWayback:
@@ -719,8 +721,8 @@ async def test_recall_source_id_collapses_on_same_homepage(
     """
     sug = _suggestion()
     first_url = _discovered(sug.name)
-    other_url = "https://other-news.example.com/hexagate-update"
-    diff_vendor_url = "https://news.example.com/hexagate-different-vendor"
+    other_url = "https://other-news.example/hexagate-update"
+    diff_vendor_url = "https://news.example/hexagate-different-vendor"
     diff_vendor = sug.model_copy(
         update={"homepage_url": "https://hexagate.different-tld.example.org/"},
     )

@@ -67,11 +67,12 @@ def build_deps(
 
 
 def build_tavily_recall_search(config: Config) -> TavilySearchFn | None:
-    """Return a ``TavilySearchFn`` closure, or ``None`` when recall search is disabled.
+    """Return ``tavily_search_structured`` when recall search is enabled, else ``None``.
 
-    ``tavily_search_structured`` reads ``TAVILY_API_KEY`` at call time, so this
-    closure only captures ``config`` for future knob threading; today it's
-    effectively a pass-through.
+    ``tavily_search_structured`` reads ``TAVILY_API_KEY`` at call time, so the
+    builder doesn't need to capture credentials. To disable recall entirely,
+    set ``enable_tavily_recall_search=False`` — the L0 search head is
+    mandatory under the new contract, so no Tavily means no recall.
     """
     if not config.enable_tavily_recall_search:
         return None

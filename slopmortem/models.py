@@ -279,11 +279,10 @@ class RecallSuggestion(BaseModel):
     The optional ``homepage_url`` carries no field-level ``HttpUrl`` format
     constraint because strict ``response_format`` mode on both OpenAI and
     Anthropic rejects ``format``/``minLength``/``maxLength`` on strings and
-    ``minimum``/``maximum`` on integers. Parse-equivalent validation runs in
-    ``_validate_constraints`` below, so the wire contract stays
-    "well-formed http(s) URL when present, year in [1990, 2030]" even though
-    the schema sent upstream is just ``"type": "string"`` / ``"type":
-    "integer"``.
+    ``minimum``/``maximum`` on integers. ``_validate_constraints`` below runs
+    parse-equivalent validation so the wire contract is "well-formed http(s)
+    URL when present, year in [1990, 2030]" even though the schema sent
+    upstream is just ``"type": "string"`` / ``"type": "integer"``.
     """
 
     name: str
