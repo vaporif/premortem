@@ -35,6 +35,7 @@ from slopmortem.pipeline import RecallDeps, run_query
 from slopmortem.stages import synthesize_prompt_kwargs
 from slopmortem.stages.recall_persist import persist_recall_entry
 from slopmortem.stages.recall_verify import _recall_source_id
+from tests.stages.test_recall_search_head import FakeTavilySearch
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -528,22 +529,6 @@ class _NoOpWayback:
         return entry
 
 
-class _FakeTavilySearch:
-    """Fake ``TavilySearchFn`` — returns one canned Alpha hit per call.
-
-    The verifier's L0 head filters hits by company name in title-or-snippet,
-    so a single hit covering the recalled name (``Alpha``) works for every
-    query in this test file.
-    """
-
-    def __init__(self, hits: list[TavilyHit]) -> None:
-        self._hits = hits
-
-    async def __call__(self, q: str, limit: int) -> list[TavilyHit]:
-        del q
-        return self._hits[:limit]
-
-
 def _alpha_tavily_hits() -> list[TavilyHit]:
     return [
         TavilyHit(
@@ -666,7 +651,7 @@ async def _make_recall_deps(tmp_path: Path) -> RecallDeps:
         journal=journal,
         slop_classifier=FakeSlopClassifier(default_score=0.0),
         post_mortems_root=tmp_path / "post_mortems",
-        tavily_search=_FakeTavilySearch(hits=_alpha_tavily_hits()),
+        tavily_search=FakeTavilySearch(default=_alpha_tavily_hits()),
         wayback=_NoOpWayback(),
     )
 
