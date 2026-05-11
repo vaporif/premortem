@@ -124,6 +124,9 @@ def test_ingest_default_auto_enables_title_pre_filter_for_hn_algolia(
 def test_ingest_default_without_tavily_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default sources include hn_algolia → pitch filler requires TAVILY_API_KEY."""
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    # Disable the query-side recall L0 head so the ingest CLI's own pitch-filler
+    # gate is the only TAVILY_API_KEY check left at load time.
+    monkeypatch.setenv("ENABLE_TAVILY_RECALL_SEARCH", "false")
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     runner = CliRunner()
     result = runner.invoke(app, ["ingest", "--dry-run"])
@@ -146,6 +149,9 @@ def test_only_source_crunchbase_skips_enricher_auto_enable(
         return MagicMock(dry_run=True, processed=0)
 
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    # The query-side recall L0 head also wants TAVILY_API_KEY; this test isn't
+    # exercising the query path, so disable it to keep the ingest-only contract.
+    monkeypatch.setenv("ENABLE_TAVILY_RECALL_SEARCH", "false")
     monkeypatch.setattr("slopmortem.cli._ingest_cmd.ingest", fake_ingest)
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     csv = tmp_path / "cb.csv"
@@ -217,6 +223,9 @@ def test_ingest_with_crunchbase_csv_appends_source(
 
 def test_enable_tavily_news_without_api_key_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    # Recall-side L0 also wants TAVILY_API_KEY but is unrelated to this test;
+    # disable it so the only error path is the ingest CLI's --enable-tavily-news check.
+    monkeypatch.setenv("ENABLE_TAVILY_RECALL_SEARCH", "false")
     monkeypatch.setattr("slopmortem.cli._ingest_cmd._build_ingest_deps", _fake_deps)
     runner = CliRunner()
     result = runner.invoke(app, ["ingest", "--enable-tavily-news", "--dry-run"])

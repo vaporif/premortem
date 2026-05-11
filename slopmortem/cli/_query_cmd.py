@@ -28,7 +28,7 @@ from slopmortem.cli._common import (
 )
 from slopmortem.config import load_config
 from slopmortem.corpus import set_query_corpus
-from slopmortem.deps import build_deps
+from slopmortem.deps import build_deps, build_tavily_recall_search
 from slopmortem.models import InputContext
 from slopmortem.pipeline import RecallDeps, cutoff_iso, run_query
 from slopmortem.render import render
@@ -203,13 +203,21 @@ async def _build_recall_deps(
     config: Config,
     *,
     llm: LLMClient,
-) -> RecallDeps:
-    """Construct ``RecallDeps`` for every non-debug query.
+) -> RecallDeps | None:
+    """Construct ``RecallDeps`` for every non-debug query, or ``None`` when recall is off.
 
     The recall branch can fire on any query whose coverage-gap predicate
     trips, so deps are built up front. Cold-start cost is dominated by
     ``MergeJournal.init()`` (sqlite open + table check), well under 50ms.
+
+    Returns ``None`` when ``enable_tavily_recall_search=False`` — the L0
+    search head is mandatory under the new contract, so disabling Tavily
+    disables the entire recall branch.
     """
+    tavily_search = build_tavily_recall_search(config)
+    if tavily_search is None:
+        # enable_tavily_recall_search=False — recall is off entirely under the new contract.
+        return None
     # Local imports keep the cold-start cost off the import path; mirrors
     # the ``_ingest_cmd.py`` pattern of deferring heavyweight deps.
     from slopmortem.corpus import MergeJournal  # noqa: PLC0415
@@ -230,6 +238,7 @@ async def _build_recall_deps(
         journal=journal,
         slop_classifier=classifier,
         post_mortems_root=post_mortems_root,
+        tavily_search=tavily_search,
     )
 
 

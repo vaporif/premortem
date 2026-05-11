@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 
 from slopmortem.budget import Budget
 from slopmortem.corpus import QdrantCorpus
+from slopmortem.corpus.tavily import tavily_search_structured
 from slopmortem.llm import OpenRouterClient, make_embedder
 
 if TYPE_CHECKING:
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from slopmortem.corpus import Corpus
     from slopmortem.llm import EmbeddingClient, LLMClient
     from slopmortem.stages import SparseEncoder
+    from slopmortem.stages.recall_verify import TavilySearchFn
 
 
 def build_deps(
@@ -62,3 +64,15 @@ def build_deps(
     )
 
     return llm, embedder, corpus, budget, sparse_encoder
+
+
+def build_tavily_recall_search(config: Config) -> TavilySearchFn | None:
+    """Return a ``TavilySearchFn`` closure, or ``None`` when recall search is disabled.
+
+    ``tavily_search_structured`` reads ``TAVILY_API_KEY`` at call time, so this
+    closure only captures ``config`` for future knob threading; today it's
+    effectively a pass-through.
+    """
+    if not config.enable_tavily_recall_search:
+        return None
+    return tavily_search_structured

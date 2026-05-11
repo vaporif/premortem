@@ -44,6 +44,17 @@ recall_score_factor = 0.9
 recall_deathness_min_confidence = 0.7
 recall_struggling_min_confidence = 0.85
 
+# Toggle the recall L0 search head. When true, each recall suggestion gets
+# one Tavily search to discover an evidence URL before the L2 verifier
+# fires. When false, the recall branch is disabled entirely (L0 is
+# mandatory under the new contract). Needs TAVILY_API_KEY.
+enable_tavily_recall_search = true
+
+# Per-suggestion Tavily result cutoff for the recall L0 search head. The
+# verifier walks the top N hits looking for one whose title-or-snippet
+# contains the company name (and a death keyword as a tie-breaker).
+tavily_recall_max_results = 5
+
 # Slop classifier threshold during ingest. Above this, docs go to
 # post_mortems/quarantine/ instead of canonical/. Higher = more permissive.
 slop_threshold = 0.7

@@ -160,8 +160,12 @@ def test_tavily_enabled_without_key_rejected(tmp_path, monkeypatch):
 def test_tavily_disabled_does_not_require_key(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    cfg = Config()
+    # All three Tavily call sites must be off — recall L0 defaults on per the
+    # search-then-verify contract, so it has to be explicitly disabled to make
+    # the no-key Config legal.
+    cfg = Config(enable_tavily_recall_search=False)
     assert cfg.enable_tavily_synthesis is False
+    assert cfg.enable_tavily_recall_search is False
     assert cfg.tavily_api_key.get_secret_value() == ""
 
 

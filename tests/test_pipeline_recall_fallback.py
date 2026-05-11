@@ -23,6 +23,7 @@ from conftest import llm_canned_key
 from slopmortem.budget import Budget
 from slopmortem.config import Config
 from slopmortem.corpus import MergeJournal, extract_clean
+from slopmortem.corpus.tavily import TavilyHit
 from slopmortem.ingest import FakeSlopClassifier
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.llm.client import CompletionResult
@@ -219,7 +220,6 @@ def _recall_payload() -> str:
                     "status": "dead",
                     "homepage_url": _ALPHA_HOMEPAGE,
                     "failure_year": 2024,
-                    "evidence_url": _ALPHA_EVIDENCE,
                     "one_liner": "Alpha did Web3 audits and shut down in 2024.",
                 },
                 {
@@ -228,7 +228,6 @@ def _recall_payload() -> str:
                     "status": "struggling",
                     "homepage_url": _BETA_HOMEPAGE,
                     "failure_year": 2024,
-                    "evidence_url": _BETA_EVIDENCE,
                     "one_liner": "Beta did Web3 audits.",
                 },
             ]
@@ -475,6 +474,45 @@ class _NoOpWayback:
         return entry
 
 
+class _FakeTavilySearch:
+    """Fake for ``TavilySearchFn`` — returns canned hits for every call.
+
+    The verifier's L0 head filters hits by company name on title-or-snippet,
+    so a single ``default`` list covering every recalled name works: each
+    suggestion's query reaches the verifier with the same hits, and only the
+    name-matching one survives.
+    """
+
+    def __init__(self, default: list[TavilyHit]) -> None:
+        self._default = default
+        self.calls: list[tuple[str, int]] = []
+
+    async def __call__(self, q: str, limit: int) -> list[TavilyHit]:
+        self.calls.append((q, limit))
+        return self._default[:limit]
+
+
+def _tavily_hits() -> list[TavilyHit]:
+    """Hits for Alpha (dead, with death keyword) and Beta (no death keyword).
+
+    Alpha's hit clears L0 as the primary (name + death keyword in title);
+    Beta's hit clears L0 as the fallback (name-only). L3 then drops Beta
+    because the article body never mentions a death keyword.
+    """
+    return [
+        TavilyHit(
+            title="Alpha shutdown its operations",
+            url=_ALPHA_EVIDENCE,
+            snippet="Alpha announced shutdown after losing key clients in 2024.",
+        ),
+        TavilyHit(
+            title="Beta announces Series B",
+            url=_BETA_EVIDENCE,
+            snippet="Beta raised a fresh round to expand its audit team.",
+        ),
+    ]
+
+
 # Body the verifier will plant on the persisted entry. After Task 3's combine,
 # the verifier wraps the cleaned news body in a ``# Failure citation`` section
 # (and a ``# Vendor description (archived)`` section when Wayback anchored —
@@ -626,6 +664,7 @@ async def _make_recall_deps(tmp_path: Path) -> RecallDeps:
         journal=journal,
         slop_classifier=FakeSlopClassifier(default_score=0.0),
         post_mortems_root=tmp_path / "post_mortems",
+        tavily_search=_FakeTavilySearch(default=_tavily_hits()),
         wayback=_NoOpWayback(),
     )
 

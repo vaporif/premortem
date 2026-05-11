@@ -124,6 +124,15 @@ class Config(BaseSettings):
 
     tavily_calls_per_synthesis: int = Field(default=2, ge=0)
 
+    # Recall L0: when True, the recall verifier discovers a citation URL via
+    # Tavily search before the L2 HEAD/GET gate. When False, the recall branch
+    # is disabled entirely (the L0 step is mandatory under the new contract).
+    # Needs TAVILY_API_KEY.
+    enable_tavily_recall_search: bool = True
+
+    # Per-suggestion Tavily result cutoff for the recall L0 search head.
+    tavily_recall_max_results: int = Field(default=5, ge=1, le=10)
+
     openrouter_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
     tavily_api_key: SecretStr = SecretStr("")
@@ -172,6 +181,12 @@ class Config(BaseSettings):
             msg = (
                 "enable_pitch_filler=True requires tavily_api_key "
                 "(the filler's tavily_search tool needs the Tavily API key)"
+            )
+            raise ValueError(msg)
+        if self.enable_tavily_recall_search and not self.tavily_api_key.get_secret_value():
+            msg = (
+                "enable_tavily_recall_search=True requires tavily_api_key "
+                "(the recall verifier's L0 search head needs the Tavily API key)"
             )
             raise ValueError(msg)
         if self.embedding_provider == "openai" and not self.openai_api_key.get_secret_value():
