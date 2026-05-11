@@ -1,0 +1,727 @@
+schema_version: '1.0'
+recorded_at: '2026-05-11T12:42:49.900923+00:00'
+queries:
+- variant: pipe
+  company: CipherTrace
+  failure_year: 2024
+  query: '"CipherTrace" shutdown|closed|bankrupt|"Chapter 11" 2024'
+  results:
+  - title: CipherTrace Shuts Down Some Services - CNC Intelligence
+    url: https://cncintel.com/ciphertrace-update-march-14-2024/
+    content: Mastercard-owned CipherTrace’s recent announcement about pulling the plug on some key services is a big deal
+      for the cryptocurrency tracing industry. While the recent developments with CipherTrace have sparked discussions within
+      the industry, it’s important to recognize the strength and reliability of cryptocurrency tracing technologies. Notably,
+      in the Daubert hearing related to the Bitcoin Fog case, Chainalysis’ data was scrutinized and ultimately upheld by a
+      federal court, affirming its reliability. This underscores the continued trust and validity of blockchain analysis tools
+      in supporting law enforcement and legal proceedings. CipherTrace is a cryptocurrency tracing and investigation firm
+      offering products that help financial institutions create crypto risk profiles, trace transactions, and ensure anti-money
+      laundering compliance. In 2021, MasterCard acquired CipherTrace with the stated goal of enhancing its crypto capabilities
+      and positioning itself for a future in which cryptocurrencies play an essential financial role. Among other perks, CipherTrace’s
+      technology and capabilities allowed MasterCard to create risk profiles and enhance the transparency of transactions.
+    published_date: null
+  - title: Mastercard-owned CipherTrace tells clients it is shutting down key ...
+    url: https://fortune.com/crypto/2024/03/13/mastercard-ciphertrace-blockchain-analytics-chainalysis-bitcoin-fog/
+    content: The Mastercard-owned crypto analytics firm CipherTrace is informing clients that it is pulling the plug on key
+      services, according to people
+    published_date: null
+  - title: Mastercard-owned CipherTrace tells clients it is shutting down key ...
+    url: https://finance.yahoo.com/news/mastercard-owned-ciphertrace-tells-clients-220438951.html
+    content: The Mastercard-owned crypto analytics firm CipherTrace is informing clients that it is pulling the plug on key
+      services, according to people familiar with the
+    published_date: null
+  - title: What are the implications of CipherTrace's service discontinuation ...
+    url: https://www.facebook.com/groups/cncintelligenceinc/posts/734954192096272/
+    content: 'Here are a few rewritten summaries that match all the above criteria: 1. Digital asset recovery services for
+      cryptocurrency victims 2.'
+    published_date: null
+  - title: cifr-20241231 - SEC.gov
+    url: https://www.sec.gov/Archives/edgar/data/1819989/000181998925000005/cifr-20241231.htm
+    content: Our active portfolio and development pipeline is expected to consist of more than 3.0 GW of capacity across 11
+      sites. We currently operate four bitcoin mining
+    published_date: null
+- variant: pipe
+  company: BlockFi
+  failure_year: 2023
+  query: '"BlockFi" shutdown|closed|bankrupt|"Chapter 11" 2023'
+  results:
+  - title: Official Committee of Unsecured Creditors of BlockFi
+    url: https://blockfiofficialcommittee.com/
+    content: This is the website for the Official Committee of Unsecured Creditors of BlockFi. The Final BlockFi Chapter 11
+      Plan was approved on September 25, 2023.
+    published_date: null
+  - title: BlockFi Bankruptcy Help -- Updated Mar 2023
+    url: https://straffilaw.com/blockfi-bankruptcy-help/
+    content: Forbes reports that the motion is a welcome opportunity to customers who had their assets frozen by BlockFi in
+      New Jersey after it filed Chapter 11 Bankruptcy.
+    published_date: null
+  - title: 'BlockFi declares bankruptcy in aftershock of FTX''s collapse : NPR'
+    url: https://www.npr.org/2022/11/28/1139431115/blockfi-ftx-bankruptcy-chapter-11
+    content: '# Crypto company BlockFi declares bankruptcy in the first big aftershock of FTX''s fall. Another crypto company
+      has fallen, as contagion from the collapse of cryptocurrency exchange FTX spreads across the industry: BlockFi says
+      it has filed for bankruptcy. Announcing its plans to file for Chapter 11 reorganization in New Jersey, where the company
+      is based, BlockFi noted FTX''s own bankruptcy proceedings will lead to delays. BlockFi''s restructuring underscores
+      "significant" risks of contagion within the "crypto ecosystem," as well as potential deficiencies in how the companies
+      manage risks, said Monsur Husain, a senior director at the agency. But BlockFi was especially at risk of collapsing
+      in recent days because it has "significant exposure to FTX and associated corporate entities," as the company''s co-founders,
+      CEO Zac Prince and COO Flori Marquez, put it in a letter to customers two weeks ago. BlockFi, a cryptocurrency lender,
+      has filed for Chapter 11 bankruptcy. BlockFi, a cryptocurrency lender, has filed for Chapter 11 bankruptcy.'
+    published_date: null
+  - title: BlockFi Inc. Files Chapter 11 Bankruptcy
+    url: https://ofi.la.gov/blockfi-inc-files-chapter-11-bankruptcy/
+    content: '##### Deferred Presentment and Small Loan Legislation - Effective August 1, 2025. 2025 Deferred Presentment
+      and Small Loan Legislation. On November 28, 2022, BlockFi Inc. and eight affiliates filed a petition for relief under
+      chapter 11 of the Bankruptcy Code in the United States Bankruptcy Court for the District of New Jersey (Case No. 22-19361
+      MBK). In parallel with these chapter 11 cases, BlockFi International Ltd. a Bermuda incorporated company, also filed
+      a petition with the Supreme Court of Bermuda for the appointment of joint provisional liquidators pursuant to section
+      161(e) of Bermuda’s Companies Act. Chapter 11 is a type of bankruptcy designed to allow insolvent companies to restructure
+      their financial obligations, through reorganization, sale or otherwise. Customers of these BlockFi companies may wish
+      to consult with their own counsel about how the bankruptcy proceeding will affect their rights and the value of their
+      accounts.'
+    published_date: null
+  - title: BlockFi Claims Collateral Sale Violated Ch. 11 Stay | Cole Schotz
+    url: https://www.coleschotz.com/news-and-publications/blockfi-claims-collateral-sale-violated-ch-11-stay/
+    content: '... BlockFi''s Chapter 11 filing was supposed to shut down attempts to take its assets. BlockFi is represented
+      by Michael D. Sirota and Warren A'
+    published_date: null
+- variant: pipe
+  company: Celsius Network
+  failure_year: 2022
+  query: '"Celsius Network" shutdown|closed|bankrupt|"Chapter 11" 2022'
+  results:
+  - title: Celsius Network Files Chapter 11 Bankruptcy | Department of Financial Regulation
+    url: https://dfr.vermont.gov/consumer-alert/celsius-network-files-chapter-11-bankruptcy
+    content: Celsius Network (“Celsius”) is a cryptocurrency company, unlicensed in Vermont, that offers its customers interest-bearing
+      crypto accounts. On July 13, 2022, Celsius and several of its affiliates commenced voluntary Chapter 11 bankruptcy proceedings
+      in the U.S. Bankruptcy Court for the Southern District of New York. Chapter 11 is a type of bankruptcy designed to allow
+      insolvent companies to restructure their financial obligations, through reorganization, sale or otherwise. As a result,
+      there is little law on how digital assets will be treated in a bankruptcy proceeding and whether or not account holders
+      will be able to sell or get back their cryptocurrency assets. Investors in Celsius may wish to consult with their own
+      counsel about how the bankruptcy proceeding will affect their rights and the value of their investment in Celsius. For
+      Vermont residents, if you have questions or wish to file a complaint, please contact the Department. You may file a
+      complaint through the Securities division section of the Department’s web site at .
+    published_date: null
+  - title: Crypto lender Celsius Network cleared to exit bankruptcy - Reuters
+    url: https://www.reuters.com/markets/deals/crypto-lender-celsius-network-cleared-exit-bankruptcy-2023-11-09/
+    content: New Jersey-based Celsius filed for Chapter 11 protection in July 2022, one month after freezing customer accounts
+      to prevent withdrawals.
+    published_date: null
+  - title: Celsius Network Files Chapter 11 Bankruptcy
+    url: https://ofi.la.gov/celsius-network-files-chapter-11-bankruptcy/
+    content: '##### Deferred Presentment and Small Loan Legislation - Effective August 1, 2025. 2025 Deferred Presentment
+      and Small Loan Legislation. # Celsius Network Files Chapter 11 Bankruptcy. Celsius Network (Celsius) is a cryptocurrency
+      company that offers its customers interest-bearing crypto accounts. On July 13, 2022, Celsius and several of its affiliates
+      commenced voluntary Chapter 11 bankruptcy proceedings in the U.S. Bankruptcy Court for the Southern District of New
+      York. Very few cryptocurrency companies have filed bankruptcy proceedings to date in the United States. Customers of
+      Celsius may wish to consult with their own counsel about how the bankruptcy proceeding will affect their rights and
+      the value of their accounts with Celsius. Links from the OFI website to other websites are provided solely as a convenience
+      to visitors. If you use these links, you will leave the OFI website. If you decide to access any of the linked third-party
+      websites, you do so solely at your own risk.'
+    published_date: null
+  - title: Celsius Network LLC, et al.
+    url: https://cases.stretto.com/celsius/
+    content: On July 13, 2022, Celsius Network LLC and certain of its affiliates (collectively, the “Celsius Debtors”) filed
+      voluntary petitions for relief under Chapter 11 of the United States Bankruptcy Code in the U.S. Bankruptcy Court for
+      the Southern District of New York. The cases of the Debtors are pending before the Honorable Martin Glenn in the U.S.
+      Bankruptcy Court for the Southern District of New York and are being jointly administered under Case No. 22-10964. On
+      November 9, 2023, the Bankruptcy Court entered the Findings of Fact, Conclusions of Law, and Order Confirming the Modified
+      Joint Chapter 11 Plan of Celsius Network LLC and Its Debtor Affiliates (the “Confirmation Order”), pursuant to which
+      the Bankruptcy Court approved and confirmed the Modified Chapter 11 Plan of Reorganization of Celsius Network LLC and
+      Its Debtor Affiliates (the “Plan”).
+    published_date: null
+  - title: Celsius Bankruptcy | ArentFox Schiff
+    url: https://www.afslaw.com/services/metaverse-blockchain-digital-assets/crypto-blockchain-bankruptcy/celsius-bankruptcy
+    content: '## Footer. # Celsius Bankruptcy. Celsius Network LLC, along with seven of its affiliates (collectively, Celsius),
+      operate one of the largest cryptocurrency financial platforms in the industry. Celsius launched its platform in 2018
+      and quickly grew; on the date Celsius filed for chapter 11 relief, its platform had 1.7 million registered users and
+      approximately $6 billion in assets. According to Celsius, its bankruptcy filing stemmed from the collapse of cryptocurrency
+      trading prices during the crypto winter. In addition to the collapse in price, waves of negative media commentary regarding
+      Celsius and the cryptocurrency industry, in general, drove users to withdraw their cryptocurrency from Celsius in large
+      amounts and at a rapid pace, forcing Celsius to freeze user withdrawals in June 2022. Celsius has yet to file a plan
+      of reorganization, and it remains to be seen whether Celsius will identify a buyer willing to purchase substantially
+      of Celsius’ assets. ### Petitions for Debtor-Affiliates. ## Sub footer.'
+    published_date: null
+- variant: pipe
+  company: FTX
+  failure_year: 2022
+  query: '"FTX" shutdown|closed|bankrupt|"Chapter 11" 2022'
+  results:
+  - title: FTX Files Chapter 11 Bankruptcy
+    url: https://ofi.la.gov/ftx-files-chapter-11-bankruptcy/
+    content: '##### Deferred Presentment and Small Loan Legislation - Effective August 1, 2025. 2025 Deferred Presentment
+      and Small Loan Legislation. On November 11, 2022, cryptocurrency exchange FTX Trading Ltd., incorporated in Antigua
+      and Barbuda and headquartered in The Bahamas, also called FTX.com, filed a petition for relief under Chapter 11 of the
+      Bankruptcy Code in the Bankruptcy Court for the District of Delaware (Case No. 22-11068 JTD) reporting between $10 to
+      $50 billion dollars in both assets and liabilities. The company sought jointly administered bankruptcy protection for
+      more than 130 affiliated entities (Case No. 22-11066 through 22-11177) including West Realm Shires Services Inc., FTX
+      US and Alameda Research Ltd. These entities were not registered under Louisiana Securities Law. Chapter 11 is a type
+      of bankruptcy designed to allow insolvent companies to restructure their financial obligations, through reorganization,
+      sale or otherwise. Very few cryptocurrency companies have filed bankruptcy proceedings to date in the United States.
+      Links from the OFI website to other websites are provided solely as a convenience to visitors.'
+    published_date: null
+  - title: 'Cryptocurrency exchange FTX files for Chapter 11 bankruptcy : NPR'
+    url: https://www.npr.org/2022/11/11/1136166792/cryptocurrency-exchange-ftx-files-for-chapter-11-bankruptcy
+    content: '# Cryptocurrency exchange FTX files for Chapter 11 bankruptcy. `<iframe src="https://www.npr.org/player/embed/1136166792/1136166793"
+      width="100%" height="290" frameborder="0" scrolling="no" title="NPR embedded audio player">`. FTX, one of the world''s
+      largest cryptocurrency exchanges, filed for Chapter 11 bankruptcy Friday. It took less than a week for the company,
+      and its once-popular CEO, to wipe out financially. Today one of the largest platforms for trading cryptocurrency filed
+      for bankruptcy. It''s called FTX, a company that earlier this year was paying for commercials like this one, which aired
+      during the Super Bowl. It shows a crypto booster trying to win over a skeptical Larry David. GURA: Well, on Friday,
+      before the markets opened, FTX announced on Twitter it filed for bankruptcy. And critically, the company also announced
+      its founder, Sam Bankman-Fried, who is barely 30 years old, by the way - Bankman-Fried is no longer FTX''s CEO. Here
+      he is at a conference recalling how he got into this business.'
+    published_date: null
+  - title: Sam Bankman-Fried steps down, FTX files for bankruptcy
+    url: https://www.cnbc.com/2022/11/11/sam-bankman-frieds-cryptocurrency-exchange-ftx-files-for-bankruptcy.html
+    content: '# Sam Bankman-Fried steps down as FTX CEO as his crypto exchange files for bankruptcy. * Sam Bankman-Fried''s
+      cryptocurrency exchange FTX has filed for bankruptcy. Sam Bankman-Fried, founder and chief executive officer of FTX
+      Cryptocurrency Derivatives Exchange, during an interview on an episode of Bloomberg Wealth with David Rubenstein in
+      New York, US, on Wednesday, Aug 17, 2022. Sam Bankman-Fried''s cryptocurrency exchange FTX has filed for Chapter 11
+      bankruptcy protection in the U.S., according to a company statement posted on Twitter. **Update:** FTX founder Sam Bankman-Fried
+      sentenced to 25 years for crypto fraud, to pay $11 billion in forfeiture. Approximately 130 additional affiliated companies
+      are part of the proceedings, including Alameda Research, Bankman-Fried''s crypto trading firm, and FTX.us, the company''s
+      U.S. subsidiary. In the 23-page bankruptcy filing obtained by CNBC, FTX indicates it has more than 100,000 creditors,
+      assets in the range of $10 billion to $50 billion, as well as liabilities in the range of $10 billion to $50 billion.
+      FTX''s Sam Bankman-Fried resigns as CEO.'
+    published_date: null
+  - title: FTX Emerges from Bankruptcy Under $14+ Billion Plan | Sullivan & Cromwell LLP
+    url: https://www.sullcrom.com/About/Rankings/2025/January/FTX-Emerges-Bankruptcy-Under-14-Billion-Plan
+    content: S&C helped negotiate a string of novel settlements with governmental authorities and non-U.S. insolvency trustees,
+      clearing the way for FTX to return to all non-governmental creditors *substantially more than 100 percent* of the amount
+      normally due under the Bankruptcy Code. The extraordinary efforts of the S&C team coordinating this case were commended
+      by Judge Dorsey, who described this as a “model case for how to deal with a very complex Chapter 11 bankruptcy proceeding.”.
+      S&C’s unique strength in assembling multidisciplinary teams for major bankruptcies, investigations and litigation enabled
+      a novel strategy to be set and executed with billions of dollars at stake. *The Wall Street Journal* wrote that this
+      outcome “seemed unthinkable when [FTX] collapsed into bankruptcy in 2022,” adding that soon after FTX filed for bankruptcy,
+      customer claims could be purchased for as little as three cents on the dollar. The team was led by Restructuring partners
+      Andy Dietderich, Jim Bromley, Brian Glueckstein and Alexa Kranzley, and S&C lawyers in dozens of other practice areas
+      and offices around the world.
+    published_date: null
+  - title: FTX bankruptcy | Law | Research Starters | EBSCO Research
+    url: https://www.ebsco.com/research-starters/law/ftx-bankruptcy
+    content: FTX bankruptcy refers to the fall of the FTX cryptocurrency exchange, founded by Sam Bankman-Fried, which began
+      in November 2022. The situation escalated after a report revealed that Alameda Research, another company owned by Bankman-Fried,
+      held a large amount of FTX's cryptocurrency token, FTT. This revelation led to a significant drop in FTT's value and
+      triggered a search for new investments, which ultimately failed as a deal with competitor Binance fell through. On November
+      11, 2022, both FTX and Alameda Research filed for bankruptcy, and Bankman-Fried resigned as CEO. The *FTX bankruptcy*
+      refers to the collapse of the FTX cryptocurrency exchange, owned by Sam Bankman-Fried, beginning in November 2022. On
+      November 2, 2022, CoinDesk published a piece stating that a trading company called Alameda Research, also owned by Bankman-Fried,
+      held a disproportionately large amount of FTX’s cryptocurrency token, or asset, called FTT. On November 11, Alameda
+      Research and FTX declared bankruptcy and Bankman-Fried stepped down as CEO of FTX.
+    published_date: null
+- variant: pipe
+  company: Voyager Digital
+  failure_year: 2022
+  query: '"Voyager Digital" shutdown|closed|bankrupt|"Chapter 11" 2022'
+  results:
+  - title: Voyager Digital Files Chapter 11 Bankruptcy | Department of Financial Regulation
+    url: https://dfr.vermont.gov/consumer-alert/voyager-digital-files-chapter-11-bankruptcy
+    content: (Voyager) is a cryptocurrency company, unlicensed in Vermont, that offers its customers interest-bearing crypto
+      accounts. On July 6, 2022, Voyager announced it and its U.S. affiliates have commenced voluntary Chapter 11 bankruptcy
+      proceedings in the U.S. Bankruptcy Court for the Southern District of New York. Chapter 11 is a type of bankruptcy designed
+      to allow insolvent companies to restructure their financial obligations, through reorganization, sale or otherwise.
+      As a result, there is little law on how digital assets will be treated in a bankruptcy proceeding and whether or not
+      account holders will be able to sell or get back their cryptocurrency assets. Voyager’s bankruptcy filings state that
+      the company does not maintain a separate cryptocurrency wallet for each customer; instead, all cryptocurrency assets
+      are combined into a commingled wallet and swept from the commingled wallet to a third-party custodian account. Voyager’s
+      initial plan to exit bankruptcy states that it expects account holders to be “impaired” under the plan. This means that
+      the company expects that the rights of account holders will be negatively affected by the plan.
+    published_date: null
+  - title: Voyager Files for Bankruptcy Days After Freezing Withdrawals
+    url: https://blockworks.com/news/voyager-files-for-bankruptcy-days-after-freezing-withdrawals
+    content: July 6, 2022 03:17 am ... Less than a week after suspending trading and withdrawals on its network, Voyager Digital
+      filed for Chapter 11 bankruptcy on Wednesday.
+    published_date: null
+  - title: Voyager Digital Ltd. files for chapter 11 proceedings under ... - Fasken
+    url: https://www.fasken.com/en/experience/2023/08/voyager-digital-ltd-files-for-chapter-11-proceedings-under-the-companies-creditors-arrangement-act
+    content: In July 2022, Voyager Digital Ltd. (Voyager), a publicly traded cryptocurrency platform, filed for Chapter 11
+      bankruptcy protection.
+    published_date: null
+  - title: Crypto firm Voyager Digital files for Chapter 11 bankruptcy protection
+    url: https://www.cnbc.com/2022/07/06/crypto-firm-voyager-digital-files-for-chapter-11-bankruptcy-protection.html
+    content: '# Crypto brokerage Voyager Digital files for Chapter 11 bankruptcy protection. * Voyager commenced bankruptcy
+      proceedings in the U.S. Bankruptcy Court for the Southern District of New York on Tuesday. * Sam Bankman-Fried''s Alameda
+      Research is listed as Voyager''s largest creditor, with an unsecured claim of $75 million. Voyager commenced bankruptcy
+      proceedings in the U.S. Bankruptcy Court for the Southern District of New York on Tuesday, according to a filing from
+      the company. In a statement, the company said it has roughly $1.3 billion of crypto on its platform and holds more than
+      $350 million in cash on behalf of customers at New York''s Metropolitan Commercial Bank. Voyager suffered huge losses
+      from its exposure to crypto hedge fund Three Arrows Capital, which went bust last week after defaulting on loans from
+      a number of firms in the industry — including $650 million from Voyager. Alameda was listed as Voyager''s largest creditor
+      in the bankruptcy filing Tuesday, with an unsecured claim of $75 million.'
+    published_date: null
+  - title: Voyager Digital Holdings, Inc., et al., Official Committee of ... - Epiq 11
+    url: https://dm.epiq11.com/case/voyagercommittee/info
+    content: On July 5, 2022, Voyager Digital Holdings, Inc. and two (2) affiliated debtors (collectively, the "Debtors"),
+      filed voluntary Chapter 11 petitions in the United
+    published_date: null
+- variant: comma
+  company: CipherTrace
+  failure_year: 2024
+  query: '"CipherTrace" shutdown, closed, bankrupt, Chapter 11 2024'
+  results:
+  - title: Mastercard-owned CipherTrace tells clients it is shutting down key ...
+    url: https://fortune.com/crypto/2024/03/13/mastercard-ciphertrace-blockchain-analytics-chainalysis-bitcoin-fog/
+    content: The Mastercard-owned crypto analytics firm CipherTrace is informing clients that it is pulling the plug on key
+      services, according to people
+    published_date: null
+  - title: Mastercard-owned CipherTrace tells clients it is shutting down key ...
+    url: https://finance.yahoo.com/news/mastercard-owned-ciphertrace-tells-clients-220438951.html
+    content: The Mastercard-owned crypto analytics firm CipherTrace is informing clients that it is pulling the plug on key
+      services, according to people familiar with the
+    published_date: null
+  - title: CipherTrace Shuts Down Some Services - CNC Intelligence
+    url: https://cncintel.com/ciphertrace-update-march-14-2024/
+    content: Mastercard-owned CipherTrace’s recent announcement about pulling the plug on some key services is a big deal
+      for the cryptocurrency tracing industry. While the recent developments with CipherTrace have sparked discussions within
+      the industry, it’s important to recognize the strength and reliability of cryptocurrency tracing technologies. Notably,
+      in the Daubert hearing related to the Bitcoin Fog case, Chainalysis’ data was scrutinized and ultimately upheld by a
+      federal court, affirming its reliability. This underscores the continued trust and validity of blockchain analysis tools
+      in supporting law enforcement and legal proceedings. CipherTrace is a cryptocurrency tracing and investigation firm
+      offering products that help financial institutions create crypto risk profiles, trace transactions, and ensure anti-money
+      laundering compliance. In 2021, MasterCard acquired CipherTrace with the stated goal of enhancing its crypto capabilities
+      and positioning itself for a future in which cryptocurrencies play an essential financial role. Among other perks, CipherTrace’s
+      technology and capabilities allowed MasterCard to create risk profiles and enhance the transparency of transactions.
+    published_date: null
+  - title: Every transaction is etched in digital stone! Forget vanishing acts ...
+    url: https://www.facebook.com/VinniePolitanCourtTV/posts/every-transaction-is-etched-in-digital-stone-forget-vanishing-actsblockchains-wa/1454800819349261/
+    content: CipherTrace provides a suite for crypto risk monitoring and ... "Following the Chapter 11 bankruptcy filings
+      - FTX US and FTX [dot]
+    published_date: null
+  - title: cifr-20241231 - SEC.gov
+    url: https://www.sec.gov/Archives/edgar/data/1819989/000181998925000005/cifr-20241231.htm
+    content: Cipher Mining Inc. was incorporated as a Delaware corporation on August 27, 2021 in connection with the closing
+      of a transaction (the “Business Combination”)
+    published_date: null
+- variant: comma
+  company: BlockFi
+  failure_year: 2023
+  query: '"BlockFi" shutdown, closed, bankrupt, Chapter 11 2023'
+  results:
+  - title: Cryptocurrency lender BlockFi has filed for Chapter 11 bankruptcy ...
+    url: https://www.facebook.com/Reuters/posts/cryptocurrency-lender-blockfi-has-filed-for-chapter-11-bankruptcy-protection-the/588744033116333/
+    content: In filing for bankruptcy, BlockFi hopes to still continue business operations. Bitfront crypto exchange shuts
+      down • This coming March 2023,
+    published_date: null
+  - title: BlockFi to shut web platform this month | The Block
+    url: https://www.theblock.co/post/293667/blockfi-to-shut-web-platform-this-month-will-let-users-access-funds-via-coinbase
+    content: In September 2023, the bankruptcy court approved BlockFi's Chapter 11 plan to pay back its 10,000 creditors.
+      As a centralized lender, BlockFi
+    published_date: null
+  - title: BlockFi Claims Collateral Sale Violated Ch. 11 Stay | Cole Schotz
+    url: https://www.coleschotz.com/news-and-publications/blockfi-claims-collateral-sale-violated-ch-11-stay/
+    content: Cryptocurrency exchange BlockFi Inc. is asking a New Jersey bankruptcy judge to find a Chinese investment firm
+      in contempt for selling off millions of dollars in crypto collateral days after BlockFi’s Chapter 11 filing was supposed
+      to shut down attempts to take its assets. As the law continues to evolve on these matters, please note that this article
+      is current as of date and time of publication and may not reflect subsequent developments. The content and interpretation
+      of the issues addressed herein is subject to change. Cole Schotz P.C. disclaims any and all liability with respect to
+      actions taken or not taken based on any or all of the contents of this publication to the fullest extent permitted by
+      law. Do not act or refrain from acting upon the information contained in this publication without obtaining legal, financial
+      and tax advice. For further information, please do not hesitate to reach out to your firm contact or to any of the attorneys
+      listed in this publication.
+    published_date: null
+  - title: BlockFi bankruptcy administrator and DOJ agree to dismiss $35M lawsuit  — TradingView News
+    url: https://www.tradingview.com/news/cointelegraph:0dd839ada094b:0-blockfi-bankruptcy-administrator-and-doj-agree-to-dismiss-35m-lawsuit/
+    content: '# BlockFi bankruptcy administrator and DOJ agree to dismiss $35M lawsuit. The administrator overseeing BlockFi’s
+      bankruptcy wind-down and the US Department of Justice (DOJ) have reached a settlement to dismiss a $35 million crypto
+      asset transfer lawsuit involving the crypto lender. Kaplan of the US Bankruptcy Court for the District of New Jersey
+      on Friday, according to court filings. The lawsuit, filed in May 2023, sought to transfer over $35 million in crypto
+      assets from BlockFi to the US government. The DOJ said it had warrants to seize the funds from the BlockFi accounts
+      of two Estonian citizens in a criminal fraud case unrelated to BlockFi’s bankruptcy. At the time, the DOJ argued that
+      the US Bankruptcy Court for the District of New Jersey did not have the jurisdiction to prevent BlockFi from transferring
+      the assets. Mohsin Meghji, Plan Administrator for BlockFi’s wind-down estates, represented the crypto firm in the case.
+      The bankruptcy court approved BlockFi’s Chapter 11 plan in September 2023 to repay over 10,000 creditors.'
+    published_date: null
+  - title: BlockFi ends $35m dispute with DOJ in closing chapter of bankruptcy
+    url: https://finance.yahoo.com/news/blockfi-ends-35m-dispute-doj-095427164.html
+    content: The suit, filed in May 2023, accused the DOJ of violating bankruptcy protections by attempting to transfer control
+      of crypto assets that may
+    published_date: null
+- variant: comma
+  company: Celsius Network
+  failure_year: 2022
+  query: '"Celsius Network" shutdown, closed, bankrupt, Chapter 11 2022'
+  results:
+  - title: Celsius Network Files Chapter 11 Bankruptcy
+    url: https://dfr.vermont.gov/consumer-alert/celsius-network-files-chapter-11-bankruptcy
+    content: Celsius Network (“Celsius”) is a cryptocurrency company, unlicensed in Vermont, that offers its customers interest-bearing
+      crypto accounts. On July 13, 2022, Celsius and several of its affiliates commenced voluntary Chapter 11 bankruptcy proceedings
+      in the U.S. Bankruptcy Court for the Southern District of New York. Chapter 11 is a type of bankruptcy designed to allow
+      insolvent companies to restructure their financial obligations, through reorganization, sale or otherwise. As a result,
+      there is little law on how digital assets will be treated in a bankruptcy proceeding and whether or not account holders
+      will be able to sell or get back their cryptocurrency assets. Investors in Celsius may wish to consult with their own
+      counsel about how the bankruptcy proceeding will affect their rights and the value of their investment in Celsius. For
+      Vermont residents, if you have questions or wish to file a complaint, please contact the Department. You may file a
+      complaint through the Securities division section of the Department’s web site at .
+    published_date: null
+  - title: Celsius Network Files for Chapter 11 Bankruptcy - CoinDesk
+    url: https://www.coindesk.com/business/2022/07/14/celsius-files-for-chapter-11-bankrupcty
+    content: Celsius Network, the crypto lender that is facing a liquidity crisis, has filed for Chapter 11 bankruptcy protection
+      in the U.S. Bankruptcy
+    published_date: null
+  - title: Celsius Network LLC, et al. - Stretto
+    url: https://cases.stretto.com/celsius/
+    content: On July 13, 2022, Celsius Network LLC and certain of its affiliates (collectively, the “Celsius Debtors”) filed
+      voluntary petitions for relief under Chapter 11 of the United States Bankruptcy Code in the U.S. Bankruptcy Court for
+      the Southern District of New York. The cases of the Debtors are pending before the Honorable Martin Glenn in the U.S.
+      Bankruptcy Court for the Southern District of New York and are being jointly administered under Case No. 22-10964. On
+      November 9, 2023, the Bankruptcy Court entered the Findings of Fact, Conclusions of Law, and Order Confirming the Modified
+      Joint Chapter 11 Plan of Celsius Network LLC and Its Debtor Affiliates (the “Confirmation Order”), pursuant to which
+      the Bankruptcy Court approved and confirmed the Modified Chapter 11 Plan of Reorganization of Celsius Network LLC and
+      Its Debtor Affiliates (the “Plan”).
+    published_date: null
+  - title: Celsius files for Chapter 11 bankruptcy after freezing withdrawals | Fortune
+    url: https://fortune.com/2022/07/13/celsius-files-bankruptcy-chapter-11-withdrawals/
+    content: '# Crypto lender Celsius files for bankruptcy a month after freezing customer withdrawals. Crypto lender Celsius
+      Network filed for Chapter 11 bankruptcy, a month after it froze customer withdrawals and joining other casualties battered
+      by a rout in digital assets. Celsius, which has $167 million cash on hand, said it took the step to stabilize its business
+      and work out a restructuring for all stakeholders. The company, which had amassed more than $20 billion in assets by
+      offering interest rates as high as 18% to customers who deposited their cryptocurrencies, had paused all withdrawals
+      as well as some other functions in mid-June, citing “extreme market conditions.”. In its statement Wednesday, Celsius
+      called that pause a “difficult but necessary decision.” Without the halt, it said, “the acceleration of withdrawals
+      would have allowed certain customers —- those who were first to act — to be paid in full while leaving others behind
+      to wait for Celsius to harvest value from illiquid or longer-term asset deployment activities before they receive a
+      recovery.”.'
+    published_date: null
+  - title: 'Settling Scores: Celsius'' Chapter 11 Debt Resolution'
+    url: https://news.law.fordham.edu/jcfl/2024/04/05/settling-scores-celsius-chapter-11-debt-resolution/
+    content: After suspending withdrawals in June 2022, cryptocurrency exchange Celsius Network has emerged from Chapter 11
+      Bankruptcy, ushering in the
+    published_date: null
+- variant: comma
+  company: FTX
+  failure_year: 2022
+  query: '"FTX" shutdown, closed, bankrupt, Chapter 11 2022'
+  results:
+  - title: FTX Files Chapter 11 Bankruptcy
+    url: https://ofi.la.gov/ftx-files-chapter-11-bankruptcy/
+    content: '##### Deferred Presentment and Small Loan Legislation - Effective August 1, 2025. 2025 Deferred Presentment
+      and Small Loan Legislation. On November 11, 2022, cryptocurrency exchange FTX Trading Ltd., incorporated in Antigua
+      and Barbuda and headquartered in The Bahamas, also called FTX.com, filed a petition for relief under Chapter 11 of the
+      Bankruptcy Code in the Bankruptcy Court for the District of Delaware (Case No. 22-11068 JTD) reporting between $10 to
+      $50 billion dollars in both assets and liabilities. The company sought jointly administered bankruptcy protection for
+      more than 130 affiliated entities (Case No. 22-11066 through 22-11177) including West Realm Shires Services Inc., FTX
+      US and Alameda Research Ltd. These entities were not registered under Louisiana Securities Law. Chapter 11 is a type
+      of bankruptcy designed to allow insolvent companies to restructure their financial obligations, through reorganization,
+      sale or otherwise. Very few cryptocurrency companies have filed bankruptcy proceedings to date in the United States.
+      Links from the OFI website to other websites are provided solely as a convenience to visitors.'
+    published_date: null
+  - title: Sam Bankman-Fried steps down, FTX files for bankruptcy - CNBC
+    url: https://www.cnbc.com/2022/11/11/sam-bankman-frieds-cryptocurrency-exchange-ftx-files-for-bankruptcy.html
+    content: '# Sam Bankman-Fried steps down as FTX CEO as his crypto exchange files for bankruptcy. * Sam Bankman-Fried''s
+      cryptocurrency exchange FTX has filed for bankruptcy. Sam Bankman-Fried, founder and chief executive officer of FTX
+      Cryptocurrency Derivatives Exchange, during an interview on an episode of Bloomberg Wealth with David Rubenstein in
+      New York, US, on Wednesday, Aug 17, 2022. Sam Bankman-Fried''s cryptocurrency exchange FTX has filed for Chapter 11
+      bankruptcy protection in the U.S., according to a company statement posted on Twitter. **Update:** FTX founder Sam Bankman-Fried
+      sentenced to 25 years for crypto fraud, to pay $11 billion in forfeiture. Approximately 130 additional affiliated companies
+      are part of the proceedings, including Alameda Research, Bankman-Fried''s crypto trading firm, and FTX.us, the company''s
+      U.S. subsidiary. In the 23-page bankruptcy filing obtained by CNBC, FTX indicates it has more than 100,000 creditors,
+      assets in the range of $10 billion to $50 billion, as well as liabilities in the range of $10 billion to $50 billion.
+      FTX''s Sam Bankman-Fried resigns as CEO.'
+    published_date: null
+  - title: Cryptocurrency exchange FTX files for Chapter 11 bankruptcy - NPR
+    url: https://www.npr.org/2022/11/11/1136166792/cryptocurrency-exchange-ftx-files-for-chapter-11-bankruptcy
+    content: '# Cryptocurrency exchange FTX files for Chapter 11 bankruptcy. `<iframe src="https://www.npr.org/player/embed/1136166792/1136166793"
+      width="100%" height="290" frameborder="0" scrolling="no" title="NPR embedded audio player">`. FTX, one of the world''s
+      largest cryptocurrency exchanges, filed for Chapter 11 bankruptcy Friday. It took less than a week for the company,
+      and its once-popular CEO, to wipe out financially. Today one of the largest platforms for trading cryptocurrency filed
+      for bankruptcy. It''s called FTX, a company that earlier this year was paying for commercials like this one, which aired
+      during the Super Bowl. It shows a crypto booster trying to win over a skeptical Larry David. GURA: Well, on Friday,
+      before the markets opened, FTX announced on Twitter it filed for bankruptcy. And critically, the company also announced
+      its founder, Sam Bankman-Fried, who is barely 30 years old, by the way - Bankman-Fried is no longer FTX''s CEO. Here
+      he is at a conference recalling how he got into this business.'
+    published_date: null
+  - title: FTX start bankruptcy proceedings in U.S. - Axios
+    url: https://www.axios.com/2022/11/11/ftx-starts-bankruptcy-proceedings-us
+    content: FTX Group companies, which includes FTX Trading Ltd as well as FTX US, started Chapter 11 proceedings in the
+      U.S., according to a statement.
+    published_date: null
+  - title: FTX Emerges from Bankruptcy Under $14+ Billion Plan
+    url: https://www.sullcrom.com/About/Rankings/2025/January/FTX-Emerges-Bankruptcy-Under-14-Billion-Plan
+    content: S&C helped negotiate a string of novel settlements with governmental authorities and non-U.S. insolvency trustees,
+      clearing the way for FTX to return to all non-governmental creditors *substantially more than 100 percent* of the amount
+      normally due under the Bankruptcy Code. The extraordinary efforts of the S&C team coordinating this case were commended
+      by Judge Dorsey, who described this as a “model case for how to deal with a very complex Chapter 11 bankruptcy proceeding.”.
+      S&C’s unique strength in assembling multidisciplinary teams for major bankruptcies, investigations and litigation enabled
+      a novel strategy to be set and executed with billions of dollars at stake. *The Wall Street Journal* wrote that this
+      outcome “seemed unthinkable when [FTX] collapsed into bankruptcy in 2022,” adding that soon after FTX filed for bankruptcy,
+      customer claims could be purchased for as little as three cents on the dollar. The team was led by Restructuring partners
+      Andy Dietderich, Jim Bromley, Brian Glueckstein and Alexa Kranzley, and S&C lawyers in dozens of other practice areas
+      and offices around the world.
+    published_date: null
+- variant: comma
+  company: Voyager Digital
+  failure_year: 2022
+  query: '"Voyager Digital" shutdown, closed, bankrupt, Chapter 11 2022'
+  results:
+  - title: Voyager Digital Files Chapter 11 Bankruptcy
+    url: https://dfr.vermont.gov/consumer-alert/voyager-digital-files-chapter-11-bankruptcy
+    content: (Voyager) is a cryptocurrency company, unlicensed in Vermont, that offers its customers interest-bearing crypto
+      accounts. On July 6, 2022, Voyager announced it and its U.S. affiliates have commenced voluntary Chapter 11 bankruptcy
+      proceedings in the U.S. Bankruptcy Court for the Southern District of New York. Chapter 11 is a type of bankruptcy designed
+      to allow insolvent companies to restructure their financial obligations, through reorganization, sale or otherwise.
+      As a result, there is little law on how digital assets will be treated in a bankruptcy proceeding and whether or not
+      account holders will be able to sell or get back their cryptocurrency assets. Voyager’s bankruptcy filings state that
+      the company does not maintain a separate cryptocurrency wallet for each customer; instead, all cryptocurrency assets
+      are combined into a commingled wallet and swept from the commingled wallet to a third-party custodian account. Voyager’s
+      initial plan to exit bankruptcy states that it expects account holders to be “impaired” under the plan. This means that
+      the company expects that the rights of account holders will be negatively affected by the plan.
+    published_date: null
+  - title: Crypto firm Voyager Digital files for Chapter 11 bankruptcy protection
+    url: https://www.cnbc.com/2022/07/06/crypto-firm-voyager-digital-files-for-chapter-11-bankruptcy-protection.html
+    content: '# Crypto brokerage Voyager Digital files for Chapter 11 bankruptcy protection. * Voyager commenced bankruptcy
+      proceedings in the U.S. Bankruptcy Court for the Southern District of New York on Tuesday. * Sam Bankman-Fried''s Alameda
+      Research is listed as Voyager''s largest creditor, with an unsecured claim of $75 million. Voyager commenced bankruptcy
+      proceedings in the U.S. Bankruptcy Court for the Southern District of New York on Tuesday, according to a filing from
+      the company. In a statement, the company said it has roughly $1.3 billion of crypto on its platform and holds more than
+      $350 million in cash on behalf of customers at New York''s Metropolitan Commercial Bank. Voyager suffered huge losses
+      from its exposure to crypto hedge fund Three Arrows Capital, which went bust last week after defaulting on loans from
+      a number of firms in the industry — including $650 million from Voyager. Alameda was listed as Voyager''s largest creditor
+      in the bankruptcy filing Tuesday, with an unsecured claim of $75 million.'
+    published_date: null
+  - title: Voyager Bankruptcy | ArentFox Schiff
+    url: https://www.afslaw.com/services/metaverse-blockchain-digital-assets/crypto-blockchain-bankruptcy/voyager-bankruptcy
+    content: '## Footer. # Voyager Bankruptcy. Voyager Digital Holdings, Inc. along with its two co-debtors (Voyager) operates
+      a cryptocurrency brokerage platform and custodial services for the storage of cryptocurrency, as well as offering lending
+      programs to customers. Voyager pinned its bankruptcy filing on the continuing effects of the COVID-19 pandemic, inflation,
+      and the war in Ukraine on the world economy, as well as the onset of the crypto winter. In June 2022, Voyager found
+      that its loan of 15,250 Bitcoin and 350 million USD Coin to Three Arrows Capital, worth approximately $670 million,
+      was at risk of being unpaid, and Voyager issued a notice of default and acceleration to 3AC. Voyager filed for chapter
+      11 with a proposed plan of reorganization and sought a plan sponsor in exchange for partial or full ownership of the
+      reorganized Voyager. Voyager previously held an auction and selected West Realm Shires Inc. However, after FTX US filed
+      for chapter 11 in November 2022, the bid was terminated, and Voyager reopened the bidding process. ## Sub footer.'
+    published_date: null
+  - title: New Chapter 11 Filing - Voyager Digital | Cole Schotz
+    url: https://www.coleschotz.com/new-chapter-11-filing-voyager-digital/
+    content: On July 5, 2022, the Toronto stock exchange halted trading of Voyager Digital Ltd. The Debtors say their filings
+      were driven by the recent drops
+    published_date: null
+  - title: Crypto lender Voyager Digital files for bankruptcy - Reuters
+    url: https://www.reuters.com/technology/crypto-lender-voyager-files-bankruptcy-2022-07-06/
+    content: U.S. crypto lender Voyager Digital said on Wednesday it had filed for bankruptcy, becoming another casualty of
+      a dramatic fall in prices
+    published_date: null
+- variant: prose
+  company: CipherTrace
+  failure_year: 2024
+  query: '"CipherTrace" shutdown or closed or bankrupt or "Chapter 11" 2024'
+  results:
+  - title: Mastercard-owned CipherTrace tells clients it is shutting down key ...
+    url: https://fortune.com/crypto/2024/03/13/mastercard-ciphertrace-blockchain-analytics-chainalysis-bitcoin-fog/
+    content: CipherTrace has begun to inform clients that it is shutting down key products. The Mastercard-owned crypto analytics
+      firm CipherTrace is
+    published_date: null
+  - title: CipherTrace Shuts Down Some Services - CNC Intelligence
+    url: https://cncintel.com/ciphertrace-update-march-14-2024/
+    content: Mastercard-owned CipherTrace’s recent announcement about pulling the plug on some key services is a big deal
+      for the cryptocurrency tracing industry. While the recent developments with CipherTrace have sparked discussions within
+      the industry, it’s important to recognize the strength and reliability of cryptocurrency tracing technologies. Notably,
+      in the Daubert hearing related to the Bitcoin Fog case, Chainalysis’ data was scrutinized and ultimately upheld by a
+      federal court, affirming its reliability. This underscores the continued trust and validity of blockchain analysis tools
+      in supporting law enforcement and legal proceedings. CipherTrace is a cryptocurrency tracing and investigation firm
+      offering products that help financial institutions create crypto risk profiles, trace transactions, and ensure anti-money
+      laundering compliance. In 2021, MasterCard acquired CipherTrace with the stated goal of enhancing its crypto capabilities
+      and positioning itself for a future in which cryptocurrencies play an essential financial role. Among other perks, CipherTrace’s
+      technology and capabilities allowed MasterCard to create risk profiles and enhance the transparency of transactions.
+    published_date: null
+  - title: cifr-20241231 - SEC.gov
+    url: https://www.sec.gov/Archives/edgar/data/1819989/000181998925000005/cifr-20241231.htm
+    content: If we are unable to receive adequate power supply and are forced to reduce or shut down our operations due to
+      the availability or cost of electrical power, it
+    published_date: null
+  - title: Mastercard-owned CipherTrace tells clients it is shutting down key ...
+    url: https://finance.yahoo.com/news/mastercard-owned-ciphertrace-tells-clients-220438951.html
+    content: The Mastercard-owned crypto analytics firm CipherTrace is informing clients that it is pulling the plug on key
+      services, according to people familiar with the
+    published_date: null
+  - title: 'Blockchain Bites: Microsoft offers in-browser digital wallet, FDIC ...'
+    url: https://piperalderman.com.au/insight/blockchain-bites-microsoft-offers-in-browser-digital-wallet-fdic-forces-signature-bank-to-drop-crypto-customers-alleged-de-banking-of-us-crypto-us-government-appeals-voyager-sale-stables-and-mast/
+    content: Under its chapter 11 bankruptcy plan, Voyager was permitted the ... CipherTrace and Ekata, with trust and security
+      at the core. While
+    published_date: null
+- variant: prose
+  company: BlockFi
+  failure_year: 2023
+  query: '"BlockFi" shutdown or closed or bankrupt or "Chapter 11" 2023'
+  results:
+  - title: BlockFi bankruptcy administrator and DOJ agree to dismiss $35M ...
+    url: https://www.tradingview.com/news/cointelegraph:0dd839ada094b:0-blockfi-bankruptcy-administrator-and-doj-agree-to-dismiss-35m-lawsuit/
+    content: '# BlockFi bankruptcy administrator and DOJ agree to dismiss $35M lawsuit. The administrator overseeing BlockFi’s
+      bankruptcy wind-down and the US Department of Justice (DOJ) have reached a settlement to dismiss a $35 million crypto
+      asset transfer lawsuit involving the crypto lender. Kaplan of the US Bankruptcy Court for the District of New Jersey
+      on Friday, according to court filings. The lawsuit, filed in May 2023, sought to transfer over $35 million in crypto
+      assets from BlockFi to the US government. The DOJ said it had warrants to seize the funds from the BlockFi accounts
+      of two Estonian citizens in a criminal fraud case unrelated to BlockFi’s bankruptcy. At the time, the DOJ argued that
+      the US Bankruptcy Court for the District of New Jersey did not have the jurisdiction to prevent BlockFi from transferring
+      the assets. Mohsin Meghji, Plan Administrator for BlockFi’s wind-down estates, represented the crypto firm in the case.
+      The bankruptcy court approved BlockFi’s Chapter 11 plan in September 2023 to repay over 10,000 creditors.'
+    published_date: null
+  - title: BlockFi Gets Few More Weeks To Find Bankruptcy Exit Plan
+    url: https://blockworks.com/news/blockfi-bankruptcy-exit-plan
+    content: Bankrupt crypto lender BlockFi has been allowed to extend the deadline for its Chapter 11 plan to mid-May. by
+      Shalini Nagarajan /. April 20, 2023 04:23 am.
+    published_date: null
+  - title: Crypto lender BlockFi begins post-bankruptcy wind-down - Reuters
+    url: https://www.reuters.com/technology/crypto-lender-blockfi-emerges-bankruptcy-2023-10-24/
+    content: BlockFi emerged from bankruptcy on Tuesday, saying it will wind down operations and begin returning crypto assets
+      to customers 11 months
+    published_date: null
+  - title: Cryptocurrency lender BlockFi has filed for Chapter 11 bankruptcy ...
+    url: https://www.facebook.com/Reuters/posts/cryptocurrency-lender-blockfi-has-filed-for-chapter-11-bankruptcy-protection-the/588744033116333/
+    content: Cryptocurrency lender BlockFi has filed for Chapter 11 bankruptcy protection, the latest industry casualty after
+      the firm was hurt by
+    published_date: null
+  - title: Distressed crypto firm BlockFi has filed for Chapter 11 bankruptcy ...
+    url: https://www.instagram.com/p/ClgpokpuLE7/
+    content: Distressed crypto firm BlockFi has filed for Chapter 11 bankruptcy protection in the United States Bankruptcy
+      Court for the District of New
+    published_date: null
+- variant: prose
+  company: Celsius Network
+  failure_year: 2022
+  query: '"Celsius Network" shutdown or closed or bankrupt or "Chapter 11" 2022'
+  results:
+  - title: Celsius Network Files Chapter 11 Bankruptcy
+    url: https://ofi.la.gov/celsius-network-files-chapter-11-bankruptcy/
+    content: '##### Deferred Presentment and Small Loan Legislation - Effective August 1, 2025. 2025 Deferred Presentment
+      and Small Loan Legislation. # Celsius Network Files Chapter 11 Bankruptcy. Celsius Network (Celsius) is a cryptocurrency
+      company that offers its customers interest-bearing crypto accounts. On July 13, 2022, Celsius and several of its affiliates
+      commenced voluntary Chapter 11 bankruptcy proceedings in the U.S. Bankruptcy Court for the Southern District of New
+      York. Very few cryptocurrency companies have filed bankruptcy proceedings to date in the United States. Customers of
+      Celsius may wish to consult with their own counsel about how the bankruptcy proceeding will affect their rights and
+      the value of their accounts with Celsius. Links from the OFI website to other websites are provided solely as a convenience
+      to visitors. If you use these links, you will leave the OFI website. If you decide to access any of the linked third-party
+      websites, you do so solely at your own risk.'
+    published_date: null
+  - title: Embattled crypto lender Celsius files for bankruptcy protection - CNBC
+    url: https://www.cnbc.com/2022/07/13/embattled-crypto-lender-celsius-informs-state-regulators-that-its-filing-for-bankruptcy-imminently-source-says-.html
+    content: Crypto company Celsius has filed for Chapter 11 bankruptcy protection after a month of turmoil. In a Wednesday
+      statement, Celsius said it
+    published_date: null
+  - title: 'Settling Scores: Celsius'' Chapter 11 Debt Resolution'
+    url: https://news.law.fordham.edu/jcfl/2024/04/05/settling-scores-celsius-chapter-11-debt-resolution/
+    content: After suspending withdrawals in June 2022, cryptocurrency exchange Celsius Network has emerged from Chapter 11
+      Bankruptcy, ushering in the
+    published_date: null
+  - title: Celsius Network LLC, et al. - Stretto
+    url: https://cases.stretto.com/celsius/
+    content: On July 13, 2022, Celsius Network LLC and certain of its affiliates (collectively, the “Celsius Debtors”) filed
+      voluntary petitions for relief under Chapter 11 of the United States Bankruptcy Code in the U.S. Bankruptcy Court for
+      the Southern District of New York. The cases of the Debtors are pending before the Honorable Martin Glenn in the U.S.
+      Bankruptcy Court for the Southern District of New York and are being jointly administered under Case No. 22-10964. On
+      November 9, 2023, the Bankruptcy Court entered the Findings of Fact, Conclusions of Law, and Order Confirming the Modified
+      Joint Chapter 11 Plan of Celsius Network LLC and Its Debtor Affiliates (the “Confirmation Order”), pursuant to which
+      the Bankruptcy Court approved and confirmed the Modified Chapter 11 Plan of Reorganization of Celsius Network LLC and
+      Its Debtor Affiliates (the “Plan”).
+    published_date: null
+  - title: Crypto lender under Chapter 11 bankruptcy sues firm - Yahoo Finance
+    url: https://finance.yahoo.com/news/crypto-lender-under-chapter-11-184706384.html
+    content: It filed for Chapter 11 bankruptcy in July 2022. In August 2024, Celsius filed a lawsuit against Tether, the
+      issuer of the USDT stablecoin,
+    published_date: null
+- variant: prose
+  company: FTX
+  failure_year: 2022
+  query: '"FTX" shutdown or closed or bankrupt or "Chapter 11" 2022'
+  results:
+  - title: Sam Bankman-Fried steps down, FTX files for bankruptcy - CNBC
+    url: https://www.cnbc.com/2022/11/11/sam-bankman-frieds-cryptocurrency-exchange-ftx-files-for-bankruptcy.html
+    content: '# Sam Bankman-Fried steps down as FTX CEO as his crypto exchange files for bankruptcy. * Sam Bankman-Fried''s
+      cryptocurrency exchange FTX has filed for bankruptcy. Sam Bankman-Fried, founder and chief executive officer of FTX
+      Cryptocurrency Derivatives Exchange, during an interview on an episode of Bloomberg Wealth with David Rubenstein in
+      New York, US, on Wednesday, Aug 17, 2022. Sam Bankman-Fried''s cryptocurrency exchange FTX has filed for Chapter 11
+      bankruptcy protection in the U.S., according to a company statement posted on Twitter. **Update:** FTX founder Sam Bankman-Fried
+      sentenced to 25 years for crypto fraud, to pay $11 billion in forfeiture. Approximately 130 additional affiliated companies
+      are part of the proceedings, including Alameda Research, Bankman-Fried''s crypto trading firm, and FTX.us, the company''s
+      U.S. subsidiary. In the 23-page bankruptcy filing obtained by CNBC, FTX indicates it has more than 100,000 creditors,
+      assets in the range of $10 billion to $50 billion, as well as liabilities in the range of $10 billion to $50 billion.
+      FTX''s Sam Bankman-Fried resigns as CEO.'
+    published_date: null
+  - title: FTX Files Chapter 11 Bankruptcy
+    url: https://ofi.la.gov/ftx-files-chapter-11-bankruptcy/
+    content: '##### Deferred Presentment and Small Loan Legislation - Effective August 1, 2025. 2025 Deferred Presentment
+      and Small Loan Legislation. On November 11, 2022, cryptocurrency exchange FTX Trading Ltd., incorporated in Antigua
+      and Barbuda and headquartered in The Bahamas, also called FTX.com, filed a petition for relief under Chapter 11 of the
+      Bankruptcy Code in the Bankruptcy Court for the District of Delaware (Case No. 22-11068 JTD) reporting between $10 to
+      $50 billion dollars in both assets and liabilities. The company sought jointly administered bankruptcy protection for
+      more than 130 affiliated entities (Case No. 22-11066 through 22-11177) including West Realm Shires Services Inc., FTX
+      US and Alameda Research Ltd. These entities were not registered under Louisiana Securities Law. Chapter 11 is a type
+      of bankruptcy designed to allow insolvent companies to restructure their financial obligations, through reorganization,
+      sale or otherwise. Very few cryptocurrency companies have filed bankruptcy proceedings to date in the United States.
+      Links from the OFI website to other websites are provided solely as a convenience to visitors.'
+    published_date: null
+  - title: Bankruptcy of FTX - Wikipedia
+    url: https://en.wikipedia.org/wiki/Bankruptcy_of_FTX
+    content: The bankruptcy of FTX, a Bahamas-based cryptocurrency exchange, began in November 2022. The collapse of FTX,
+      caused by a spike in customer withdrawals.
+    published_date: null
+  - title: 'FTX Collapse November 2022: What Happened & Lessons ... - Bitget'
+    url: https://www.bitget.com/academy/ftx-collapse-nov-202
+    content: 'FTX Collapse November 2022: What Happened & Lessons for Crypto Security. This article examines the collapse
+      of FTX in November 2022, focusing on the events surrounding Sam Bankman-Fried''s final days at the company''s offices
+      on November 8, 2022, the systemic failures that led to the exchange''s bankruptcy, and the broader implications for
+      cryptocurrency exchange security and user protection. On November 8, 2022, FTX offices became the epicenter of one of
+      the most dramatic collapses in cryptocurrency history. What began as a liquidity crisis rapidly escalated into a full-scale
+      bankruptcy filing within days, exposing an $8 billion shortfall in customer funds. The events of that week revealed
+      systematic misuse of customer deposits, inadequate risk controls, and a complete breakdown of the separation between
+      FTX and its affiliated trading firm, Alameda Research. Following a CoinDesk report on November 2 that revealed Alameda
+      Research''s balance sheet was heavily concentrated in FTT tokens (FTX''s native token), confidence in the platform had
+      evaporated.'
+    published_date: null
+  - title: FTX Emerges from Bankruptcy Under $14+ Billion Plan
+    url: https://www.sullcrom.com/About/Rankings/2025/January/FTX-Emerges-Bankruptcy-Under-14-Billion-Plan
+    content: S&C helped negotiate a string of novel settlements with governmental authorities and non-U.S. insolvency trustees,
+      clearing the way for FTX to return to all non-governmental creditors *substantially more than 100 percent* of the amount
+      normally due under the Bankruptcy Code. The extraordinary efforts of the S&C team coordinating this case were commended
+      by Judge Dorsey, who described this as a “model case for how to deal with a very complex Chapter 11 bankruptcy proceeding.”.
+      S&C’s unique strength in assembling multidisciplinary teams for major bankruptcies, investigations and litigation enabled
+      a novel strategy to be set and executed with billions of dollars at stake. *The Wall Street Journal* wrote that this
+      outcome “seemed unthinkable when [FTX] collapsed into bankruptcy in 2022,” adding that soon after FTX filed for bankruptcy,
+      customer claims could be purchased for as little as three cents on the dollar. The team was led by Restructuring partners
+      Andy Dietderich, Jim Bromley, Brian Glueckstein and Alexa Kranzley, and S&C lawyers in dozens of other practice areas
+      and offices around the world.
+    published_date: null
+- variant: prose
+  company: Voyager Digital
+  failure_year: 2022
+  query: '"Voyager Digital" shutdown or closed or bankrupt or "Chapter 11" 2022'
+  results:
+  - title: Voyager Digital Files Chapter 11 Bankruptcy
+    url: https://dfr.vermont.gov/consumer-alert/voyager-digital-files-chapter-11-bankruptcy
+    content: (Voyager) is a cryptocurrency company, unlicensed in Vermont, that offers its customers interest-bearing crypto
+      accounts. On July 6, 2022, Voyager announced it and its U.S. affiliates have commenced voluntary Chapter 11 bankruptcy
+      proceedings in the U.S. Bankruptcy Court for the Southern District of New York. Chapter 11 is a type of bankruptcy designed
+      to allow insolvent companies to restructure their financial obligations, through reorganization, sale or otherwise.
+      As a result, there is little law on how digital assets will be treated in a bankruptcy proceeding and whether or not
+      account holders will be able to sell or get back their cryptocurrency assets. Voyager’s bankruptcy filings state that
+      the company does not maintain a separate cryptocurrency wallet for each customer; instead, all cryptocurrency assets
+      are combined into a commingled wallet and swept from the commingled wallet to a third-party custodian account. Voyager’s
+      initial plan to exit bankruptcy states that it expects account holders to be “impaired” under the plan. This means that
+      the company expects that the rights of account holders will be negatively affected by the plan.
+    published_date: null
+  - title: Voyager co-founder fined $750K after Chapter 11 collapse - TheStreet
+    url: https://www.thestreet.com/crypto/bankruptcy/bankrupt-voyager-cofounder-stephen-ehrlich-cftc-fine-chapter-11
+    content: The once high-flying crypto lender Voyager Digital Ltd., which filed for Chapter 11 bankruptcy in July 2022,
+      has returned to headlines after
+    published_date: null
+  - title: Voyager Files for Bankruptcy Days After Freezing Withdrawals
+    url: https://blockworks.com/news/voyager-files-for-bankruptcy-days-after-freezing-withdrawals
+    content: July 6, 2022 03:17 am ... Less than a week after suspending trading and withdrawals on its network, Voyager Digital
+      filed for Chapter 11 bankruptcy on Wednesday.
+    published_date: null
+  - title: U.S. crypto lender Voyager Digital said on Wednesday it had filed for ...
+    url: https://www.facebook.com/BusinessRecorder/posts/us-crypto-lender-voyager-digital-said-on-wednesday-it-had-filed-for-bankruptcy-b/5554821071235461/
+    content: Voyager filed for Chapter 11 bankruptcy in New York in early July after halting customer transactions on its
+      platform amid the contagion hedge
+    published_date: null
+  - title: Texas State Securities Board Enters Consent Order with Voyager Digital Entities | Texas State Securities Board
+    url: https://www.ssb.texas.gov/news-publications/texas-state-securities-board-enters-consent-order-voyager-digital-entities
+    content: '## Main navigation. # Texas State Securities Board Enters Consent Order with Voyager Digital Entities. AUSTIN,
+      Texas — March 23, 2026 — The Texas State Securities Board announced today the entry of a Consent Order dated March 20,
+      2026, resolving allegations against Voyager Digital Ltd., Voyager Digital Holdings, Inc., and Voyager Digital, LLC (collectively,
+      Voyager). The Consent Order follows an investigation by the TSSB’s Enforcement Division into Voyager’s securities-related
+      activities under the Texas Securities Act. Voyager operated a cryptocurrency brokerage platform that allowed customers
+      to buy, sell, trade, and store digital assets. On April 12, 2022, the TSSB initiated administrative enforcement proceedings
+      against Voyager by issuing a Notice of Hearing alleging violations of state securities laws. On July 5, 2022, Voyager
+      filed for Chapter 11 bankruptcy protection in the United States Bankruptcy Court for the Southern District of New York.
+      ## Footer main navigation. Texas State Securities Board Home. ### Texas State Securities Board. ### Texas Links. Report
+      fraud, waste, or abuse of state resources to the State Auditor''s Office or call (800) 892-8348.'
+    published_date: null
