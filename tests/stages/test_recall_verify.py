@@ -16,6 +16,7 @@ from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.stages import recall_verify as _rv
 from slopmortem.stages.recall_verify import (
     _DEATH_KEYWORDS,
+    DeathnessConfig,
     VerificationTier,
     verify_and_persist_all,
     verify_suggestion,
@@ -30,10 +31,12 @@ if TYPE_CHECKING:
 
 
 _DEATHNESS_PASS = '{"verdict": "dead", "confidence": 0.95, "evidence_quote": "shut down"}'  # noqa: S105 - JSON literal, not a credential
-_DEATHNESS_MODEL = "test-haiku"
-_DEATHNESS_MAX_TOKENS = 128
-_DEATHNESS_MIN_CONFIDENCE = 0.7
-_STRUGGLING_MIN_CONFIDENCE = 0.85
+_DEATHNESS = DeathnessConfig(
+    model="test-haiku",
+    max_tokens=128,
+    min_confidence=0.7,
+    struggling_min_confidence=0.85,
+)
 # Default extract fake: returns "" so any L3 fallback call drops without
 # recovering. Most tests in this file don't exercise the extract path; the
 # fake exists to satisfy the required ``extract=`` kwarg.
@@ -220,10 +223,7 @@ async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
     assert wb.calls == []
@@ -245,10 +245,7 @@ async def test_l2_rejects_ssrf_evidence(monkeypatch: pytest.MonkeyPatch) -> None
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
 
@@ -269,10 +266,7 @@ async def test_l2_rejects_httpx_error_evidence(monkeypatch: pytest.MonkeyPatch) 
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
 
@@ -297,10 +291,7 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
     assert wb.calls == []
@@ -326,10 +317,7 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
 
@@ -350,10 +338,7 @@ async def test_l3_rejects_evidence_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
 
@@ -377,10 +362,7 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -417,10 +399,7 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -453,10 +432,7 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -487,10 +463,7 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -519,10 +492,7 @@ async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) 
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -561,10 +531,7 @@ async def test_l4_wayback_short_circuits_when_homepage_is_none(
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -643,10 +610,7 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
         tavily_search=tavily,
         tavily_recall_max_results=5,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert {e.source_id for e in out} == {p[0].source_id for p in persisted}
     assert len(out) == 2
@@ -690,10 +654,7 @@ async def test_verify_skips_persist_for_dropped_suggestions(
         tavily_search=_tavily_for([sug]),
         tavily_recall_max_results=5,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out == []
     assert persisted == []
@@ -716,10 +677,7 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, _tier, _verdict = out
@@ -767,10 +725,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     second = await verify_suggestion(
         sug,
@@ -778,10 +733,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     third = await verify_suggestion(
         diff_vendor,
@@ -789,10 +741,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert first is not None
     assert second is not None
@@ -835,15 +784,12 @@ async def test_l5_drops_when_alive(monkeypatch: pytest.MonkeyPatch) -> None:
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
     assert len(llm.calls) == 1
-    assert llm.calls[0]["model"] == _DEATHNESS_MODEL
-    assert llm.calls[0]["max_tokens"] == _DEATHNESS_MAX_TOKENS
+    assert llm.calls[0]["model"] == _DEATHNESS.model
+    assert llm.calls[0]["max_tokens"] == _DEATHNESS.max_tokens
 
 
 async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -861,10 +807,7 @@ async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> 
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
 
@@ -886,10 +829,7 @@ async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> 
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -912,10 +852,7 @@ async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> Non
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
 
@@ -933,9 +870,6 @@ async def test_l5_drops_on_transport_failure(monkeypatch: pytest.MonkeyPatch) ->
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None

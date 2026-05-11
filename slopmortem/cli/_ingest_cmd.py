@@ -9,10 +9,8 @@ quarantine row and routes survivors back out of the quarantine tree.
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import os
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, cast
@@ -26,7 +24,12 @@ from rich.table import Table
 
 from slopmortem.budget import Budget
 from slopmortem.cli import app
-from slopmortem.cli._common import _maybe_init_tracing, _maybe_setup_logging
+from slopmortem.cli._common import (
+    _STDERR_CONSOLE,
+    _maybe_init_tracing,
+    _maybe_setup_logging,
+    progress_context,
+)
 from slopmortem.cli_progress import RichPhaseProgress
 from slopmortem.config import load_config
 from slopmortem.corpus import (
@@ -410,12 +413,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             )
         )
 
-    # Same TTY-gating logic as ``_query_cmd._progress_context`` — Rich's Live
-    # mode splats frames into stdout when it can't do cursor positioning
-    # (``just``'s pty, some CI shells), so we layer Python's TTY check, the
-    # ``SLOPMORTEM_NO_PROGRESS`` env escape, and Rich's own ``is_terminal``
-    # probe before attaching the bar.
-    progress_ctx = _ingest_progress_context()
+    progress_ctx = progress_context(RichIngestProgress)
     # Print escaping exceptions before Rich tears down — Progress.__exit__
     # clears the screen, so a traceback interleaved with bar redraws disappears.
     err_console = Console(stderr=True)
@@ -575,25 +573,7 @@ async def _build_ingest_deps(
 
 class RichIngestProgress(RichPhaseProgress[IngestPhase]):
     def __init__(self) -> None:
-        super().__init__(INGEST_PHASE_LABELS)
-
-
-def _ingest_progress_context() -> contextlib.AbstractContextManager[RichIngestProgress | None]:
-    """Same gating contract as ``_query_cmd._progress_context``.
-
-    Three gates: ``SLOPMORTEM_NO_PROGRESS`` env escape hatch, Python's
-    fileno-level TTY check on stderr, and Rich's own ``is_terminal`` probe.
-    See the query-side helper for the full rationale; both ingest and query
-    use ``RichPhaseProgress`` with ``Console(stderr=True)``, so the same
-    splatting failure mode applies.
-    """
-    if os.environ.get("SLOPMORTEM_NO_PROGRESS"):
-        return contextlib.nullcontext()
-    if not sys.stderr.isatty():
-        return contextlib.nullcontext()
-    if not Console(stderr=True).is_terminal:
-        return contextlib.nullcontext()
-    return RichIngestProgress()
+        super().__init__(INGEST_PHASE_LABELS, console=_STDERR_CONSOLE)
 
 
 def _render_ingest_result(console: Console, result: IngestResult, budget: Budget) -> None:

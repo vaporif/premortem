@@ -51,6 +51,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
@@ -148,6 +149,21 @@ _L3_MIN_BODY_CHARS: Final = 500
 
 
 type VerificationTier = Literal["wayback_anchored", "evidence_only"]
+
+
+@dataclass(frozen=True, slots=True)
+class DeathnessConfig:
+    """L5 deathness gate knobs bundled for ``verify_suggestion``/``_l5_decide``.
+
+    Bundled so the four-field knob set doesn't thread through three call-stack
+    layers as separate kwargs every time a verifier is invoked. Populated from
+    ``Config`` at the pipeline; tests build it inline.
+    """
+
+    model: str
+    max_tokens: int
+    min_confidence: float
+    struggling_min_confidence: float
 
 
 def _recall_source_id(suggestion: RecallSuggestion) -> str:
@@ -275,15 +291,12 @@ async def _l5_deathness_judgment(
         return None
 
 
-async def _l5_decide(  # noqa: PLR0913 - mirrors the deathness knob set passed through from config
+async def _l5_decide(
     *,
     suggestion: RecallSuggestion,
     body: str,
     llm: LLMClient,
-    model: str,
-    max_tokens: int,
-    min_confidence: float,
-    struggling_min_confidence: float,
+    deathness: DeathnessConfig,
 ) -> _AdmitVerdict | None:
     """L5 verdict: returns the admitted verdict, or ``None`` to drop.
 
@@ -295,8 +308,8 @@ async def _l5_decide(  # noqa: PLR0913 - mirrors the deathness knob set passed t
         suggestion=suggestion,
         body=body,
         llm=llm,
-        model=model,
-        max_tokens=max_tokens,
+        model=deathness.model,
+        max_tokens=deathness.max_tokens,
     )
     if judgment is None:
         _emit_event(SpanEvent.RECALL_REJECTED_L5_LOW_CONFIDENCE)
@@ -309,7 +322,11 @@ async def _l5_decide(  # noqa: PLR0913 - mirrors the deathness knob set passed t
         )
         _emit_event(SpanEvent.RECALL_REJECTED_L5_ALIVE)
         return None
-    threshold = min_confidence if judgment.verdict == "dead" else struggling_min_confidence
+    threshold = (
+        deathness.min_confidence
+        if judgment.verdict == "dead"
+        else deathness.struggling_min_confidence
+    )
     if judgment.confidence < threshold:
         logger.info(
             "recall_verify: L5 %s confidence %.2f below threshold %.2f for %r",
@@ -709,17 +726,14 @@ async def _l2_l3_fetch_body(
     )
 
 
-async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from config
+async def verify_suggestion(  # noqa: PLR0913 - verifier signature carries L0-L5 deps + the deathness bundle
     suggestion: RecallSuggestion,
     *,
     discovered_url: str,
     wayback: Enricher,
     llm: LLMClient,
     extract: ExtractFn,
-    model_recall_deathness: str,
-    max_tokens_recall_deathness: int,
-    min_confidence: float,
-    struggling_min_confidence: float,
+    deathness: DeathnessConfig,
 ) -> tuple[RawEntry, VerificationTier, _AdmitVerdict] | None:
     """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops.
 
@@ -756,10 +770,7 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
         suggestion=suggestion,
         body=evidence_body,
         llm=llm,
-        model=model_recall_deathness,
-        max_tokens=max_tokens_recall_deathness,
-        min_confidence=min_confidence,
-        struggling_min_confidence=struggling_min_confidence,
+        deathness=deathness,
     )
     if verdict is None:
         return None
@@ -794,7 +805,7 @@ async def verify_suggestion(  # noqa: PLR0913 - L5 needs LLM + four knobs from c
     ignore_inputs=["suggestions", "persist", "wayback", "llm", "tavily_search", "extract"],
     ignore_output=True,
 )
-async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knobs flow through from pipeline
+async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; recall fan-out takes every dep at this seam
     suggestions: list[RecallSuggestion],
     *,
     wayback: Enricher,
@@ -803,10 +814,7 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
     tavily_search: TavilySearchFn,
     extract: ExtractFn,
     tavily_recall_max_results: int,
-    model_recall_deathness: str,
-    max_tokens_recall_deathness: int,
-    min_confidence: float,
-    struggling_min_confidence: float,
+    deathness: DeathnessConfig,
     concurrency: int = _DEFAULT_CONCURRENCY,
 ) -> list[RawEntry]:
     """Verify each suggestion under a capacity limiter; persist accepted entries.
@@ -831,10 +839,7 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; deathness knob
                 wayback=wayback,
                 llm=llm,
                 extract=extract,
-                model_recall_deathness=model_recall_deathness,
-                max_tokens_recall_deathness=max_tokens_recall_deathness,
-                min_confidence=min_confidence,
-                struggling_min_confidence=struggling_min_confidence,
+                deathness=deathness,
             )
         if verified is None:
             return None

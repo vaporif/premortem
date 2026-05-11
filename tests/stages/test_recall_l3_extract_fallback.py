@@ -17,7 +17,10 @@ import httpx
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.stages import recall_verify as _rv
-from slopmortem.stages.recall_verify import verify_suggestion
+from slopmortem.stages.recall_verify import (
+    DeathnessConfig,
+    verify_suggestion,
+)
 from slopmortem.tracing import SpanEvent
 from tests.stages.test_recall_search_head import FakeTavilyExtract
 
@@ -26,10 +29,12 @@ if TYPE_CHECKING:
 
 
 _DEATHNESS_PASS = '{"verdict": "dead", "confidence": 0.95, "evidence_quote": "shut down"}'  # noqa: S105 - JSON literal, not a credential
-_DEATHNESS_MODEL = "test-haiku"
-_DEATHNESS_MAX_TOKENS = 128
-_DEATHNESS_MIN_CONFIDENCE = 0.7
-_STRUGGLING_MIN_CONFIDENCE = 0.85
+_DEATHNESS = DeathnessConfig(
+    model="test-haiku",
+    max_tokens=128,
+    min_confidence=0.7,
+    struggling_min_confidence=0.85,
+)
 
 _FILLER_SENTENCE = (
     "The board cited prolonged headwinds, falling renewal rates, and a stalled "
@@ -179,10 +184,7 @@ async def test_l3_extract_fallback_recovers_on_l2_get_4xx(
         wayback=_FakeWayback(),
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=extract,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     assert extract.calls == [discovered]
@@ -218,10 +220,7 @@ async def test_l3_extract_fallback_recovers_on_body_too_short(
         wayback=_FakeWayback(),
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=extract,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     assert extract.calls == [discovered]
@@ -253,10 +252,7 @@ async def test_l3_extract_fallback_drops_when_extract_also_empty(
         wayback=_FakeWayback(),
         llm=_FakeLLM(),  # blocker: L5 must not run
         extract=extract,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
     assert extract.calls == [discovered]
@@ -283,10 +279,7 @@ async def test_l3_extract_fallback_drops_when_extract_raises(
         wayback=_FakeWayback(),
         llm=_FakeLLM(),
         extract=extract,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
     assert extract.calls == [discovered]
@@ -319,10 +312,7 @@ async def test_l3_no_extract_fallback_on_name_missing(
         wayback=_FakeWayback(),
         llm=_FakeLLM(),
         extract=extract,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is None
     assert extract.calls == []

@@ -16,7 +16,7 @@ from typer.testing import CliRunner
 
 from slopmortem.budget import Budget
 from slopmortem.cli import app
-from slopmortem.cli._query_cmd import _progress_context
+from slopmortem.cli._common import RichQueryProgress, progress_context
 from slopmortem.models import (
     InputContext,
     PerspectiveScore,
@@ -212,7 +212,7 @@ def test_progress_context_returns_nullcontext_when_env_disables(
     monkeypatch.setenv("SLOPMORTEM_NO_PROGRESS", "1")
     monkeypatch.setattr("sys.stderr.isatty", lambda: True)
     monkeypatch.setattr("rich.console.Console.is_terminal", True)
-    with _progress_context() as bar:
+    with progress_context(RichQueryProgress) as bar:
         assert bar is None
 
 
@@ -222,7 +222,7 @@ def test_progress_context_returns_nullcontext_when_stderr_not_tty(
     """Non-TTY stderr (piped/redirected) disables the bar."""
     monkeypatch.delenv("SLOPMORTEM_NO_PROGRESS", raising=False)
     monkeypatch.setattr("sys.stderr.isatty", lambda: False)
-    with _progress_context() as bar:
+    with progress_context(RichQueryProgress) as bar:
         assert bar is None
 
 
@@ -237,5 +237,5 @@ def test_progress_context_returns_nullcontext_when_rich_rejects_terminal(
     monkeypatch.delenv("SLOPMORTEM_NO_PROGRESS", raising=False)
     monkeypatch.setattr("sys.stderr.isatty", lambda: True)
     monkeypatch.setattr("rich.console.Console.is_terminal", False)
-    with _progress_context() as bar:
+    with progress_context(RichQueryProgress) as bar:
         assert bar is None

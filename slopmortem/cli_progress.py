@@ -99,9 +99,10 @@ class RichPhaseProgress[PhaseT: StrEnum]:
     def __init__(
         self,
         labels: dict[PhaseT, str],
+        console: Console | None = None,
     ) -> None:
         self._labels = labels
-        self._console = Console(stderr=True)
+        self._console = console if console is not None else Console(stderr=True)
         self._progress = Progress(
             SpinnerColumn(),
             TextColumn("{task.description}", justify="left"),

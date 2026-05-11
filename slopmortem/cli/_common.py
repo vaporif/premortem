@@ -7,12 +7,16 @@ the import-linter contract enforces it.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
+import sys
 from typing import TYPE_CHECKING
 
 import typer
 from lmnr import Laminar
+from rich.console import Console
+from rich.logging import RichHandler
 from rich.panel import Panel
 
 from slopmortem.cli_progress import RichPhaseProgress
@@ -20,20 +24,32 @@ from slopmortem.pipeline import QueryPhase
 from slopmortem.tracing import init_tracing
 
 if TYPE_CHECKING:
-    from rich.console import Console
+    from collections.abc import Callable
 
     from slopmortem.config import Config
     from slopmortem.models import Report
+
+# Shared between ``_maybe_setup_logging``'s ``RichHandler`` and every
+# ``RichPhaseProgress`` instance the CLI builds. Live's render-height
+# tracking only stays consistent when log lines and bar refreshes go
+# through the same ``Console``: ``Console.print`` acquires Live's lock
+# and prints above the live region. A stdlib ``StreamHandler`` (or a
+# second ``Console(stderr=True)``) would write past Live's redirect
+# proxy and orphan a copy of the phase table per log line.
+_STDERR_CONSOLE = Console(stderr=True)
+
 
 # ``__all__`` flags these underscore-prefixed names as intentional package-private
 # exports so basedpyright stops reporting reportPrivateUsage at the import sites
 # in ``_*_cmd.py``.
 __all__ = [
     "_QUERY_PHASE_LABELS",
+    "_STDERR_CONSOLE",
     "RichQueryProgress",
     "_maybe_init_tracing",
     "_maybe_setup_logging",
     "_render_query_footer",
+    "progress_context",
 ]
 
 
@@ -52,7 +68,20 @@ def _maybe_setup_logging() -> None:
     level = getattr(logging, level_name.upper(), None)
     if not isinstance(level, int):
         return
-    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # RichHandler routes records through ``_STDERR_CONSOLE.print``, which is
+    # Live-aware: it pauses the live region, prints above it, and resumes.
+    # A plain ``StreamHandler`` would capture the original ``sys.stderr`` at
+    # construction time and bypass Live's redirect proxy, leaving one stranded
+    # copy of the phase table per emitted record.
+    handler = RichHandler(
+        console=_STDERR_CONSOLE,
+        show_path=False,
+        markup=False,
+        rich_tracebacks=False,
+    )
+    # ``force=True`` so we still install our handler if an earlier import
+    # (Laminar, test runner) already touched the root logger.
+    logging.basicConfig(level=level, format="%(name)s: %(message)s", handlers=[handler], force=True)
     for noisy in ("httpx", "httpcore", "lmnr", "urllib3"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
@@ -87,7 +116,27 @@ _QUERY_PHASE_LABELS: dict[QueryPhase, str] = {
 
 class RichQueryProgress(RichPhaseProgress[QueryPhase]):
     def __init__(self) -> None:
-        super().__init__(_QUERY_PHASE_LABELS)
+        super().__init__(_QUERY_PHASE_LABELS, console=_STDERR_CONSOLE)
+
+
+def progress_context[T](
+    factory: Callable[[], contextlib.AbstractContextManager[T]],
+) -> contextlib.AbstractContextManager[T | None]:
+    """TTY-gated factory for the Rich phase bar. ``None`` when the bar is suppressed.
+
+    Three independent gates: ``SLOPMORTEM_NO_PROGRESS`` env escape hatch,
+    Python's fileno-level TTY check on stderr, and Rich's own ``is_terminal``
+    probe. Non-tty environments (redirected stderr, CI without a pty) fall
+    back to ``nullcontext`` — stdlib logging still surfaces the same info via
+    ``SLOPMORTEM_LOG=info``.
+    """
+    if os.environ.get("SLOPMORTEM_NO_PROGRESS"):
+        return contextlib.nullcontext()
+    if not sys.stderr.isatty():
+        return contextlib.nullcontext()
+    if not Console(stderr=True).is_terminal:
+        return contextlib.nullcontext()
+    return factory()
 
 
 def _render_query_footer(console: Console, report: Report) -> None:

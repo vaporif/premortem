@@ -37,6 +37,7 @@ from slopmortem.stages import (
     verify_and_persist_all,
 )
 from slopmortem.stages.llm_recall import PriorCandidateHint
+from slopmortem.stages.recall_verify import DeathnessConfig
 from slopmortem.tracing import SpanEvent, git_sha, mint_run_id
 
 if TYPE_CHECKING:
@@ -256,10 +257,12 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         tavily_search=recall_deps.tavily_search,
         extract=recall_deps.extract,
         tavily_recall_max_results=config.tavily_recall_max_results,
-        model_recall_deathness=config.model_recall_deathness,
-        max_tokens_recall_deathness=config.max_tokens_recall_deathness,
-        min_confidence=config.recall_deathness_min_confidence,
-        struggling_min_confidence=config.recall_struggling_min_confidence,
+        deathness=DeathnessConfig(
+            model=config.model_recall_deathness,
+            max_tokens=config.max_tokens_recall_deathness,
+            min_confidence=config.recall_deathness_min_confidence,
+            struggling_min_confidence=config.recall_struggling_min_confidence,
+        ),
     )
     persisted_count = len(verified)
     if not verified:

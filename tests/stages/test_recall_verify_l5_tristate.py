@@ -25,17 +25,23 @@ from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, ren
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.stages.recall_persist import persist_recall_entry
-from slopmortem.stages.recall_verify import _recall_source_id, verify_suggestion
+from slopmortem.stages.recall_verify import (
+    DeathnessConfig,
+    _recall_source_id,
+    verify_suggestion,
+)
 from tests.stages.test_recall_search_head import FakeTavilyExtract
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-_DEATHNESS_MODEL = "test-haiku"
-_DEATHNESS_MAX_TOKENS = 128
-_DEATHNESS_MIN_CONFIDENCE = 0.7
-_STRUGGLING_MIN_CONFIDENCE = 0.85
+_DEATHNESS = DeathnessConfig(
+    model="test-haiku",
+    max_tokens=128,
+    min_confidence=0.7,
+    struggling_min_confidence=0.85,
+)
 # Default extract fake: returns "" so any L3 fallback call drops without
 # recovering. These tests don't exercise the extract path.
 _NEVER_EXTRACT = FakeTavilyExtract()
@@ -200,10 +206,7 @@ async def test_l5_tristate_thresholds(
         wayback=_FakeWayback(),
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     if expect_admit:
         assert out is not None
@@ -246,10 +249,7 @@ async def test_l5_news_body_and_persisted_combined_when_anchored(
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out
@@ -289,10 +289,7 @@ async def test_persisted_body_omits_wayback_section_when_not_anchored(
         wayback=_FakeWayback(enriched_text=None),
         llm=llm,
         extract=_NEVER_EXTRACT,
-        model_recall_deathness=_DEATHNESS_MODEL,
-        max_tokens_recall_deathness=_DEATHNESS_MAX_TOKENS,
-        min_confidence=_DEATHNESS_MIN_CONFIDENCE,
-        struggling_min_confidence=_STRUGGLING_MIN_CONFIDENCE,
+        deathness=_DEATHNESS,
     )
     assert out is not None
     entry, tier, verdict = out

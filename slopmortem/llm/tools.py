@@ -77,52 +77,73 @@ def to_strict_response_schema(
     return cast("dict[str, Any]", dict(inlined))  # pyright: ignore[reportExplicitAny]
 
 
+def _build_bounded_tavily_pair(
+    *,
+    cap: int,
+    label: str,
+    search_description: str | None = None,
+    extract_description: str | None = None,
+) -> list[ToolSpec]:
+    """Build the (search, extract) ToolSpec pair under one shared call quota.
+
+    Both bounds share the same ``used``/``cap`` budget so a caller that hits
+    the cap on either surface refuses on the other too. ``label`` rides in
+    the refusal string so log/trace inspection tells synthesis vs recall
+    apart. Descriptions fall back to the underlying tool's default — recall
+    overrides them to nudge Opus on when to reach for each surface.
+    """
+    from slopmortem.corpus import _tools_impl  # noqa: PLC0415 - break import cycle
+    from slopmortem.corpus._tools_impl import tavily_extract, tavily_search  # noqa: PLC0415
+
+    used = 0
+    refusal = f"tavily call budget exceeded ({cap} per {label}); refusing"
+
+    async def _bounded_search(*, q: str, limit: int = 5) -> str:
+        nonlocal used
+        if used >= cap:
+            return refusal
+        used += 1
+        # Attribute lookup at call time so tests can monkeypatch the impl.
+        return await _tools_impl.tavily_search_async(q, limit)
+
+    async def _bounded_extract(*, url: str) -> str:
+        nonlocal used
+        if used >= cap:
+            return refusal
+        used += 1
+        return await _tools_impl.tavily_extract_async(url)
+
+    return [
+        ToolSpec(
+            name=tavily_search.name,
+            description=search_description or tavily_search.description,
+            args_model=tavily_search.args_model,
+            fn=_bounded_search,
+        ),
+        ToolSpec(
+            name=tavily_extract.name,
+            description=extract_description or tavily_extract.description,
+            args_model=tavily_extract.args_model,
+            fn=_bounded_extract,
+        ),
+    ]
+
+
 def synthesis_tools(config: Config) -> list[ToolSpec]:
     """Build the synthesis tool list (Tavily inclusion is config-gated)."""
-    from slopmortem.corpus import _tools_impl  # noqa: PLC0415 - break import cycle
     from slopmortem.corpus._tools_impl import (  # noqa: PLC0415 - break import cycle
         get_post_mortem,
         search_corpus,
-        tavily_extract,
-        tavily_search,
     )
 
     tools = [get_post_mortem, search_corpus]
     if config.enable_tavily_synthesis:
         # Per-synthesize() quota (default ≤2 calls), shared across both tools.
-        used = 0
-        cap = config.tavily_calls_per_synthesis
-
-        async def _bounded_search(*, q: str, limit: int = 5) -> str:
-            nonlocal used
-            if used >= cap:
-                return f"tavily call budget exceeded ({cap} per synthesis); refusing"
-            used += 1
-            # Attribute lookup at call time so tests can monkeypatch the impl.
-            return await _tools_impl.tavily_search_async(q, limit)
-
-        async def _bounded_extract(*, url: str) -> str:
-            nonlocal used
-            if used >= cap:
-                return f"tavily call budget exceeded ({cap} per synthesis); refusing"
-            used += 1
-            return await _tools_impl.tavily_extract_async(url)
-
         tools.extend(
-            [
-                ToolSpec(
-                    name=tavily_search.name,
-                    description=tavily_search.description,
-                    args_model=tavily_search.args_model,
-                    fn=_bounded_search,
-                ),
-                ToolSpec(
-                    name=tavily_extract.name,
-                    description=tavily_extract.description,
-                    args_model=tavily_extract.args_model,
-                    fn=_bounded_extract,
-                ),
-            ]
+            _build_bounded_tavily_pair(
+                cap=config.tavily_calls_per_synthesis,
+                label="synthesis",
+            )
         )
     return tools
 
@@ -140,46 +161,18 @@ def recall_tools(config: Config) -> list[ToolSpec]:
         return []
     if config.recall_max_tavily_calls <= 0:
         return []
-    from slopmortem.corpus import _tools_impl  # noqa: PLC0415 - break import cycle
-    from slopmortem.corpus._tools_impl import tavily_extract, tavily_search  # noqa: PLC0415
-
-    used = 0
-    cap = config.recall_max_tavily_calls
-
-    async def _bounded_search(*, q: str, limit: int = 5) -> str:
-        nonlocal used
-        if used >= cap:
-            return f"tavily call budget exceeded ({cap} per recall); refusing"
-        used += 1
-        return await _tools_impl.tavily_search_async(q, limit)
-
-    async def _bounded_extract(*, url: str) -> str:
-        nonlocal used
-        if used >= cap:
-            return f"tavily call budget exceeded ({cap} per recall); refusing"
-        used += 1
-        return await _tools_impl.tavily_extract_async(url)
-
-    return [
-        ToolSpec(
-            name=tavily_search.name,
-            description=(
-                "Search the live web for failed or struggling startups in this "
-                "vertical. Returns title, url, snippet for the top matches. Use "
-                "when your training memory is thin for the pitch's specific niche."
-            ),
-            args_model=tavily_search.args_model,
-            fn=_bounded_search,
+    return _build_bounded_tavily_pair(
+        cap=config.recall_max_tavily_calls,
+        label="recall",
+        search_description=(
+            "Search the live web for failed or struggling startups in this "
+            "vertical. Returns title, url, snippet for the top matches. Use "
+            "when your training memory is thin for the pitch's specific niche."
         ),
-        ToolSpec(
-            name=tavily_extract.name,
-            description=(
-                "Fetch the readable body of an article URL found via tavily_search. "
-                "Use sparingly — only when a search snippet alone leaves you "
-                "uncertain whether the article actually describes failure/distress "
-                "for the company you remember."
-            ),
-            args_model=tavily_extract.args_model,
-            fn=_bounded_extract,
+        extract_description=(
+            "Fetch the readable body of an article URL found via tavily_search. "
+            "Use sparingly — only when a search snippet alone leaves you "
+            "uncertain whether the article actually describes failure/distress "
+            "for the company you remember."
         ),
-    ]
+    )

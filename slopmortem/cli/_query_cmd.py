@@ -7,9 +7,7 @@ stdout (with ``--stdout``) or to ``.slopmortem/runs/<utc-ts>-<slug>.md``.
 
 from __future__ import annotations
 
-import contextlib
 import functools
-import os
 import re
 import sys
 from datetime import UTC, datetime
@@ -27,6 +25,7 @@ from slopmortem.cli._common import (
     _maybe_init_tracing,
     _maybe_setup_logging,
     _render_query_footer,
+    progress_context,
 )
 from slopmortem.config import load_config
 from slopmortem.corpus import set_query_corpus
@@ -61,28 +60,6 @@ def _query_run_path(ctx: InputContext) -> Path:
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     base = ctx.name if ctx.name and ctx.name != "(unnamed)" else ctx.description
     return _RUNS_DIR / f"{ts}-{_slugify(base)}.md"
-
-
-def _progress_context() -> contextlib.AbstractContextManager[RichQueryProgress | None]:
-    """Decide whether the live Rich progress bar is safe to render.
-
-    Rich's Live mode splats each frame as a new line when it can't do cursor
-    positioning (e.g., ``just``'s pty wrapper, some CI shells). In those cases
-    every tick redraws the whole phase table and the user sees the bar
-    repeated many times. Disable the bar instead — stdlib logging still
-    surfaces the same info via ``SLOPMORTEM_LOG=info``.
-
-    Three independent gates: ``SLOPMORTEM_NO_PROGRESS`` env escape hatch,
-    Python's fileno-level TTY check on stderr, and Rich's own ``is_terminal``
-    probe (which catches the pty-but-not-cursor-positionable case).
-    """
-    if os.environ.get("SLOPMORTEM_NO_PROGRESS"):
-        return contextlib.nullcontext()
-    if not sys.stderr.isatty():
-        return contextlib.nullcontext()
-    if not Console(stderr=True).is_terminal:
-        return contextlib.nullcontext()
-    return RichQueryProgress()
 
 
 @app.command("query")
@@ -180,7 +157,7 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
         return
     recall_deps = await _build_recall_deps(config, llm=llm)
 
-    progress_ctx = _progress_context()
+    progress_ctx = progress_context(RichQueryProgress)
     err_console = Console(stderr=True)
     try:
         with progress_ctx as bar:
