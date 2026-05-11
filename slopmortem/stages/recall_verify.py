@@ -30,8 +30,8 @@ L5 — Deathness judgment. L1-L4 only prove a URL exists, serves content,
      synthesis can weight terminal vs distress citations differently.
 
 The verified ``RawEntry`` rides a ``VerificationTier`` sibling argument to
-the persistence helper (Task 5). ``RawEntry`` itself is unchanged across
-non-recall sources.
+the persistence helper. ``RawEntry`` itself is unchanged across non-recall
+sources.
 """
 
 from __future__ import annotations
@@ -144,7 +144,7 @@ type VerificationTier = Literal["wayback_anchored", "evidence_only"]
 
 
 def _recall_source_id(suggestion: RecallSuggestion) -> str:
-    """Stable id keyed on (name, homepage_url) per the plan.
+    """Stable id keyed on (name, homepage_url).
 
     Two suggestions for the same vendor (same homepage) collapse to one
     ``source_id`` regardless of which article cited them; a different
