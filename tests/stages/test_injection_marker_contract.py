@@ -7,14 +7,11 @@ that fails when only one of the three is renamed.
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from slopmortem.llm.prompts import _PROMPT_DIR
 from slopmortem.stages.synthesize import _INJECTION_MARKER
 from slopmortem.tracing.events import SpanEvent
 
-_PROMPT_PATH = (
-    Path(__file__).resolve().parents[2] / "slopmortem" / "llm" / "prompts" / "synthesize.j2"
-)
+_PROMPT_PATH = _PROMPT_DIR / "synthesize.j2"
 
 
 def test_injection_marker_matches_span_event() -> None:
