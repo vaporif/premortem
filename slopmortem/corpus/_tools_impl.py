@@ -1,6 +1,6 @@
 """Tool implementations exposed to the LLM via OpenRouter function-calling.
 
-Corpus tools delegate to a module-level ``Corpus`` bound via ``_set_corpus``
+Corpus tools delegate to a module-level ``Corpus`` bound via ``set_query_corpus``
 so the functions stay plain ``async def`` and match the ``ToolSpec``
 signature contract (no closures, no bound methods).
 """
@@ -38,7 +38,6 @@ __all__ = [
     "SearchHit",
     "TavilyExtractArgs",
     "TavilySearchArgs",
-    "_set_corpus",
     "get_post_mortem",
     "search_corpus",
     "set_query_corpus",
@@ -92,14 +91,10 @@ class TavilyExtractArgs(BaseModel):
 _corpus: Corpus | None = None
 
 
-def _set_corpus(c: Corpus) -> None:
+def set_query_corpus(c: Corpus) -> None:
+    """Wire the module-level corpus reference that the LLM tool callables read."""
     global _corpus  # noqa: PLW0603 — the module-level binding is the public init surface
     _corpus = c
-
-
-def set_query_corpus(c: Corpus) -> None:
-    """Public re-export of ``_set_corpus`` so callers don't reach past the ``corpus`` façade."""
-    _set_corpus(c)
 
 
 async def _get_post_mortem(canonical_id: str, max_chars: int = 8000) -> str:

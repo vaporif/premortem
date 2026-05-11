@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from slopmortem.corpus._tools_impl import _get_post_mortem, _search_corpus, _set_corpus
+from slopmortem.corpus._tools_impl import _get_post_mortem, _search_corpus, set_query_corpus
 
 if TYPE_CHECKING:
     from slopmortem.models import Candidate, Facets
@@ -27,7 +27,7 @@ class _FakeCorpus:
     """Minimal Corpus stand-in; Task 9 only reads ``get_post_mortem`` / ``search_corpus``.
 
     A no-op ``query`` exists to satisfy the structural `Corpus`
-    protocol for ``_set_corpus``'s signature.
+    protocol for ``set_query_corpus``'s signature.
     """
 
     def __init__(
@@ -91,7 +91,7 @@ def fixture_corpus():
             }
         ],
     )
-    _set_corpus(corpus)
+    set_query_corpus(corpus)
     try:
         yield corpus
     finally:

@@ -430,12 +430,12 @@ git commit -m "cleanup: honest URL narrowing in pitch_filler"
 **Pros:** One name for one function.
 **Cons:** None.
 
-- [ ] **Step 1: Confirm and enumerate all callers of `_set_corpus`**
+- [x] **Step 1: Confirm and enumerate all callers of `_set_corpus`**
 
 Run: `git grep -n '_set_corpus' slopmortem/ tests/`
 Expected: matches inside `_tools_impl.py` AND `tests/test_synthesis_tools.py` (the test file imports and calls the private name). Update the test file in this task — switch the import and the call site to `set_query_corpus`.
 
-- [ ] **Step 2: Inline the body and delete the alias**
+- [x] **Step 2: Inline the body and delete the alias**
 
 In `slopmortem/corpus/_tools_impl.py:95-102`, change:
 
@@ -461,12 +461,12 @@ def set_query_corpus(c: Corpus) -> None:
 
 Remove `_set_corpus` from `__all__` if it appears there.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add slopmortem/corpus/_tools_impl.py tests/test_synthesis_tools.py
