@@ -1,10 +1,8 @@
 {"name": "ledgermint", "description": "B2B SaaS that automates monthly close for US-based mid-market controllers; charges per-seat with a per-transaction overage tier."}
-{"name": "vitalcue", "description": "Consumer healthtech app for chronic-illness patients in Germany and France; sells a monthly subscription bundling symptom tracking with on-demand telehealth."}
 {"name": "gridspring", "description": "Hardware-with-service play: rents grid-edge battery packs to small US commercial buildings to shave demand charges, with a 5-year service contract.", "years_filter": 3}
 {"name": "kakikaki", "description": "B2C marketplace connecting Tokyo and Seoul beauty influencers with their fans for paid 1:1 video consults; takes a 20% transaction fee."}
 {"name": "kappa-cli", "description": "Developer-focused B2B SaaS that ships a CLI plus a hosted control plane for managing ephemeral preview environments across cloud providers."}
 {"name": "yume-tutor", "description": "Consumer edtech app for K-12 students in Indonesia and the Philippines; combines AI tutoring with weekly small-group sessions on a tiered freemium model."}
-{"name": "helixthread", "description": "B2B biotech SaaS that licenses a wet-lab assay-management platform to academic spinouts and small CROs.", "years_filter": 10}
 {"name": "smolpark", "description": "Ad-supported B2C social app where users post 30-second voice notes from a single recurring location; viral in college towers."}
 {"name": "lastmile-iq", "description": "B2B logistics SaaS that gives US regional 3PLs a route-optimizer plus a dispatcher cockpit; per-driver subscription with usage overages."}
 {"name": "shardbright", "description": "B2C gaming studio shipping a free-to-play 4X strategy title across iOS, Android and Steam, monetized through cosmetics and a battle pass."}
