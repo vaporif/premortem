@@ -15,7 +15,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, NamedTuple, cast
 
 import httpx
 import yaml
@@ -40,12 +40,9 @@ type Variant = Literal["pipe", "comma", "prose"]
 _VARIANTS: tuple[Variant, ...] = ("pipe", "comma", "prose")
 
 
-class Company:
-    __slots__ = ("failure_year", "name")
-
-    def __init__(self, name: str, failure_year: int) -> None:
-        self.name: str = name
-        self.failure_year: int = failure_year
+class Company(NamedTuple):
+    name: str
+    failure_year: int
 
 
 _COMPANIES: tuple[Company, ...] = (
@@ -62,7 +59,6 @@ def _build_query(variant: Variant, name: str, year: int) -> str:
         return f'"{name}" shutdown|closed|bankrupt|"Chapter 11" {year}'
     if variant == "comma":
         return f'"{name}" shutdown, closed, bankrupt, Chapter 11 {year}'
-    # natural prose
     return f'"{name}" shutdown or closed or bankrupt or "Chapter 11" {year}'
 
 
@@ -74,17 +70,18 @@ def _tavily_api_key() -> str:
     return key
 
 
-async def _tavily_search(client: httpx.AsyncClient, query: str) -> list[dict[str, str | None]]:
+async def _tavily_search(
+    client: httpx.AsyncClient, api_key: str, query: str
+) -> list[dict[str, str | None]]:
     resp = await client.post(
         _TAVILY_SEARCH_URL,
         json={
-            "api_key": _tavily_api_key(),
+            "api_key": api_key,
             "query": query,
             "max_results": _MAX_RESULTS,
         },
     )
     resp.raise_for_status()
-    # httpx.Response.json() is typed as Any; narrow once at the boundary and cast.
     payload_any: object = resp.json()  # pyright: ignore[reportAny]
     if not isinstance(payload_any, dict):
         msg = "unexpected Tavily payload shape (not an object)"
@@ -160,13 +157,14 @@ async def _record() -> None:
 
     _CASSETTE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+    api_key = _tavily_api_key()
     queries: list[dict[str, object]] = []
     async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_S) as client:
         for variant in _VARIANTS:
             for company in _COMPANIES:
                 query = _build_query(variant, company.name, company.failure_year)
                 logger.info("[%s] %s: %s", variant, company.name, query)
-                results = await _tavily_search(client, query)
+                results = await _tavily_search(client, api_key, query)
                 queries.append(
                     {
                         "variant": variant,
@@ -198,7 +196,7 @@ async def _record() -> None:
 def main() -> int:
     try:
         asyncio.run(_record())
-    except RuntimeError:
+    except (RuntimeError, httpx.HTTPError):
         logger.exception("recorder failed")
         return 1
     return 0

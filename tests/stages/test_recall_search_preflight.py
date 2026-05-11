@@ -4,9 +4,9 @@ The cassette at ``tests/fixtures/cassettes/recall/tavily_search_preflight.yaml``
 captured by ``scripts/record_tavily_preflight.py`` — one live Tavily call per
 ``(variant, company)`` for the three query syntaxes (pipe-OR, comma-OR, prose) and
 five known-dead Web3 startups. This test is read-only over that artifact: it
-recomputes per-variant hit rates and asserts the **winning variant** clears 4/5.
-Losing variants' rates are logged but not asserted on — the gate only cares that
-*some* variant works well enough to unblock Task 1.
+recomputes per-variant hit rates and asserts the **plan's chosen variant (prose)**
+clears 4/5. Other variants' rates are logged but not asserted on — the gate only
+cares that the variant the plan picked still works well enough to unblock Task 1.
 """
 
 from __future__ import annotations
@@ -24,9 +24,12 @@ if TYPE_CHECKING:
 type Variant = Literal["pipe", "comma", "prose"]
 _VARIANTS: tuple[Variant, ...] = ("pipe", "comma", "prose")
 
-# Prose wins on tie-break: Tavily is a natural-language search engine and pipe-OR
-# is not documented as a supported operator (see the plan's Open Questions §1).
-_WINNER: Variant = "prose"
+# The plan picked prose as the safe baseline (see Open Questions §1: Tavily is a
+# natural-language engine; pipe-OR is not a documented operator). Hard-coded on
+# purpose: if a re-record drops prose below the gate, this test SHOULD fail loudly
+# so someone revisits the choice. Computing the winner dynamically would silently
+# swap the gate target and hide that regression.
+_PLAN_CHOSEN_VARIANT: Variant = "prose"
 _MIN_HITS_REQUIRED = 4
 _EXPECTED_COMPANY_COUNT = 5
 
@@ -40,7 +43,6 @@ _CASSETTE_PATH = (
 
 
 def _is_usable_hit(name: str, hit: Mapping[str, str | None]) -> bool:
-    """Return True when the company name appears in the result's title or content body."""
     needle = name.casefold()
     title = (hit.get("title") or "").casefold()
     content = (hit.get("content") or "").casefold()
@@ -69,13 +71,7 @@ def _hit_counts_by_variant(
 
 
 def _coerce_variant(value: object) -> Variant | None:
-    if value == "pipe":
-        return "pipe"
-    if value == "comma":
-        return "comma"
-    if value == "prose":
-        return "prose"
-    return None
+    return value if value in _VARIANTS else None
 
 
 @pytest.fixture
@@ -96,15 +92,13 @@ def test_cassette_covers_all_variants_and_companies(
 ) -> None:
     counts = _hit_counts_by_variant(cassette_queries)
     for variant in _VARIANTS:
-        hits, total = counts[variant]
+        _, total = counts[variant]
         assert total == _EXPECTED_COMPANY_COUNT, (
             f"variant {variant} covers {total}/{_EXPECTED_COMPANY_COUNT} companies"
         )
-        # No-op reference so basedpyright doesn't flag `hits` as unused.
-        _ = hits
 
 
-def test_winning_variant_clears_gate(
+def test_plan_chosen_variant_clears_gate(
     cassette_queries: list[Mapping[str, object]],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -116,9 +110,10 @@ def test_winning_variant_clears_gate(
             hits, total = counts[variant]
             logger.info("variant=%s hit_rate=%d/%d", variant, hits, total)
 
-    winner_hits, winner_total = counts[_WINNER]
-    assert winner_total == _EXPECTED_COMPANY_COUNT
-    assert winner_hits >= _MIN_HITS_REQUIRED, (
-        f"winning variant {_WINNER!r} only got {winner_hits}/{winner_total} usable hits; "
+    chosen_hits, chosen_total = counts[_PLAN_CHOSEN_VARIANT]
+    assert chosen_total == _EXPECTED_COMPANY_COUNT
+    assert chosen_hits >= _MIN_HITS_REQUIRED, (
+        f"plan's chosen variant {_PLAN_CHOSEN_VARIANT!r} only got "
+        f"{chosen_hits}/{chosen_total} usable hits; "
         f"gate requires >= {_MIN_HITS_REQUIRED}/{_EXPECTED_COMPANY_COUNT}"
     )
