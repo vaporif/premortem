@@ -12,7 +12,7 @@ from __future__ import annotations
 import functools
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated, Literal, cast
 
 import anyio
 import typer
@@ -152,7 +152,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
         ),
     ] = None,
     tavily_news_search_depth: Annotated[
-        str | None,
+        Literal["basic", "advanced"] | None,
         typer.Option(
             "--tavily-news-search-depth",
             help=(
@@ -272,7 +272,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     tavily_news_start_year: int | None,
     tavily_news_end_year: int | None,
     tavily_news_max_emit: int | None,
-    tavily_news_search_depth: str | None,
+    tavily_news_search_depth: Literal["basic", "advanced"] | None,
     only_source: str | None,
     post_mortems_root: Path,
 ) -> None:

@@ -540,12 +540,12 @@ git commit -m "cleanup: drop _SourceSpec single-field wrap"
 **Pros:** Typos fail immediately with a clear message instead of producing silently wrong runs.
 **Cons:** `typer.Choice` and `Literal`-typed options behave slightly differently in Typer's help rendering; pick one that matches the project's existing CLI style. Grep for `Literal[` in `cli/` to check prior art.
 
-- [ ] **Step 1: Check existing patterns**
+- [x] **Step 1: Check existing patterns**
 
 Run: `git grep -n 'Literal\[' slopmortem/cli/`
 Use whichever pattern the rest of the CLI uses (Typer supports `Literal["a", "b"]` natively in 0.12+).
 
-- [ ] **Step 2: Tighten the type**
+- [x] **Step 2: Tighten the type**
 
 In `slopmortem/cli/_ingest_cmd.py:155-164`, change:
 
@@ -581,7 +581,7 @@ Add `from typing import Literal` to imports if not already there.
 
 If Typer's version in this project doesn't support `Literal` for options (it should — check `uv tree | grep typer`), fall back to `typer.Option(... click_type=click.Choice(["basic","advanced"]))` and update the type to `str | None`.
 
-- [ ] **Step 3: Verify with a deliberate typo**
+- [x] **Step 3: Verify with a deliberate typo**
 
 Run: `uv run slopmortem ingest --tavily-news-search-depth baisic --help-only 2>&1 || true`
 
@@ -589,12 +589,12 @@ Run: `uv run slopmortem ingest --tavily-news-search-depth baisic --help-only 2>&
 
 Expected: Typer rejects the value before the command body runs.
 
-- [ ] **Step 4: Full verify**
+- [x] **Step 4: Full verify**
 
 Run: `just test && just typecheck && just lint`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add slopmortem/cli/_ingest_cmd.py
