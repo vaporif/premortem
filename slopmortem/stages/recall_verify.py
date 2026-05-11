@@ -468,7 +468,7 @@ async def _search_for_evidence(
             continue
         if fallback is None:
             fallback = hit
-        if primary is None and _has_death_keyword(hit.title + " " + hit.snippet):
+        if _has_death_keyword(f"{hit.title} {hit.snippet}"):
             primary = hit
             break
     chosen = primary or fallback
