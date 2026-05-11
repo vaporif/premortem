@@ -4,17 +4,18 @@
 None are verified yet, and a fraction will be hallucinated. This module gates
 each through:
 
-L0 — Search head. One Tavily search per suggestion, shaped by ``status`` and
-     ``failure_year``. Drops when no hit's title or snippet mentions the
-     company name (the article would 404 anyway; saves an L2 round-trip).
-     The selected URL becomes ``discovered_url`` and threads through L2-L5.
+L0 — Search head. Up to two Tavily searches per suggestion (status-shaped
+     pass 1; status-blind pass 2 only when pass 1 found no death-keyword hit)
+     and ranks the pooled hits into up to ``_MAX_CANDIDATE_URLS`` candidates.
+     Drops when nothing mentions the company name. The ranked list becomes
+     ``discovered_urls`` and threads through L2-L5.
 L1 — Pydantic schema, enforced at ``RecallSuggestion`` parse time. No-op here.
-L2 — Liveness on the discovered URL. HEAD→GET fallthrough: HEAD is cheap,
-     but paywalled/anti-bot hosts routinely 401/403/405 on HEAD while serving
-     GET. The GET status is authoritative. The homepage URL is provenance,
-     not corroboration. On L2 4xx OR L3 body-too-short, the Tavily
-     ``/extract`` fallback fires once. Anchor-missing rejections don't retry:
-     extract won't change which words are in the body.
+L2 — Liveness on each candidate URL until one passes. HEAD→GET fallthrough:
+     HEAD is cheap, but paywalled/anti-bot hosts routinely 401/403/405 on HEAD
+     while serving GET. The GET status is authoritative. The homepage URL is
+     provenance, not corroboration. On L2 4xx OR L3 body-too-short, the Tavily
+     ``/extract`` fallback fires once per URL. Anchor-missing rejections don't
+     retry: extract won't change which words are in the body.
 L3 — Body extraction on the GET response. Drops if the body lacks both the
      company name AND a death/distress keyword (case-insensitive).
 L4 — Wayback enrichment, advisory only. Skipped when ``homepage_url`` is
@@ -487,9 +488,9 @@ def _is_self_published(url: str, name: str) -> bool:
     Heuristic: the leading distinctive token of ``name`` appears in the URL
     host or path. Catches ``github.com/<name>``, ``learn.<name>.*``,
     ``docs.<name>.*``, ``<name>.com``, dApp-directory listings like
-    ``alchemy.com/dapps/<name>``. ``_select_hit`` uses this to demote
-    project-controlled pages in the fallback rank without rejecting them —
-    a primary hit (death keyword in title) still wins regardless.
+    ``alchemy.com/dapps/<name>``. ``_rank_candidate_urls`` uses this to demote
+    project-controlled pages in the fallback rank without rejecting them: a
+    primary hit (death keyword in title) still wins regardless.
 
     Returns ``False`` for leading tokens shorter than
     ``_MIN_DISTINCTIVE_TOKEN_LEN`` so generic prefixes don't trip the check.
@@ -549,69 +550,81 @@ def _build_status_shaped_query(suggestion: RecallSuggestion) -> str:
     return f"{name_quoted} ({or_clause}) {year}"
 
 
-def _select_hit(hits: list[TavilyHit], name: str) -> TavilyHit | None:
-    """Pick the best name-matching hit, biased toward third-party obituaries.
+# Cap on the number of distinct URLs the L0 head returns per suggestion.
+# Verifier walks the list in priority order; each URL costs an L2 HEAD+GET
+# and possibly a Tavily /extract call, so unbounded growth would bloat the
+# per-suggestion budget. 5 covers the common case (1-2 obituary candidates
+# plus self-published fallback) without paying for long tails.
+_MAX_CANDIDATE_URLS: Final = 5
 
-    Ranking, best-first:
-        1. Primary — any hit whose title+snippet carries a death keyword,
-           regardless of host. Real obituaries can live on the project's
-           own blog when the team writes one.
-        2. External fallback — first name-matching hit on a host the
-           project doesn't control.
-        3. Self-published fallback — first name-matching hit on the
-           project's own GitHub/docs/homepage. Worst signal, kept as
-           last resort.
+
+def _rank_candidate_urls(hits: list[TavilyHit], name: str, max_urls: int) -> list[str]:
+    """Return up to ``max_urls`` URLs from ``hits``, ordered best-first.
+
+    Each URL appears at most once. Priority:
+        1. Primary — title+snippet carries a death keyword (real obituary,
+           regardless of host).
+        2. External fallback — name-matching hit on a host the project
+           doesn't control.
+        3. Self-published fallback — name-matching hit on a host the
+           project does control. Worst signal, kept as last resort.
+
+    Hits that don't mention ``name`` in title/snippet are skipped entirely.
     """
-    primary: TavilyHit | None = None
-    fallback_external: TavilyHit | None = None
-    fallback_self: TavilyHit | None = None
+    primary: list[str] = []
+    fallback_external: list[str] = []
+    fallback_self: list[str] = []
+    seen: set[str] = set()
     for hit in hits:
+        if hit.url in seen:
+            continue
         if not _hit_mentions(hit, name):
             continue
+        seen.add(hit.url)
         if _has_death_keyword(f"{hit.title} {hit.snippet}"):
-            primary = hit
-            break
-        if _is_self_published(hit.url, name):
-            if fallback_self is None:
-                fallback_self = hit
-        elif fallback_external is None:
-            fallback_external = hit
-    return primary or fallback_external or fallback_self
+            primary.append(hit.url)
+        elif _is_self_published(hit.url, name):
+            fallback_self.append(hit.url)
+        else:
+            fallback_external.append(hit.url)
+    return (primary + fallback_external + fallback_self)[:max_urls]
 
 
-# Outcome of one Tavily pass. ``transport_error`` and ``no_name_match`` map
-# 1:1 to ``RECALL_REJECTED_NO_EVIDENCE`` reasons; ``no_hits`` collapses into
-# ``no_name_match`` at the consolidated drop event so the dashboard sees one
-# final reason per suggestion. The caller (``_search_for_evidence``) owns the
-# emit — pass 1 outcomes never emit on their own so a pass-1 transport_error
-# followed by pass-2 recovery emits nothing.
-type _PassOutcome = Literal["ok", "no_hits", "no_name_match", "transport_error"]
+# Outcome of one Tavily pass. ``_search_for_evidence`` looks at the last
+# pass's outcome to label the consolidated ``RECALL_REJECTED_NO_EVIDENCE``
+# event: ``transport_error`` if Tavily was unreachable, ``no_name_match``
+# otherwise (covers both ``no_hits`` and hits-without-name-match — the
+# dashboard sees one final reason per dropped suggestion).
+type _PassOutcome = Literal["ok", "no_hits", "transport_error"]
 
 
-async def _try_query(
+async def _gather_hits(
     suggestion: RecallSuggestion,
     query: str,
     *,
     tavily_search: TavilySearchFn,
     limit: int,
-) -> tuple[TavilyHit | None, _PassOutcome]:
-    """Run one Tavily search + selection. Returns ``(hit_or_None, outcome)``.
+) -> tuple[list[TavilyHit], _PassOutcome]:
+    """Run one Tavily search; return all hits + transport outcome.
 
-    Outcome is informational; the caller decides retry/drop/emit. No span
-    events fire here, so a suggestion recovered by pass 2 produces zero
-    rejection events even if pass 1 raised a transport error.
+    No selection here: ranking happens in ``_rank_candidate_urls`` after both
+    passes' hits are pooled, so the caller can walk multiple URLs at L2/L3
+    when the first one fails.
     """
     try:
         hits = await tavily_search(query, limit)
     except (httpx.HTTPError, SSRFBlockedError) as exc:
         logger.info("recall_verify: L0 Tavily transport failure for %r: %r", suggestion.name, exc)
-        return None, "transport_error"
-    if not hits:
-        return None, "no_hits"
-    chosen = _select_hit(hits, suggestion.name)
-    if chosen is None:
-        return None, "no_name_match"
-    return chosen, "ok"
+        return [], "transport_error"
+    return hits, ("ok" if hits else "no_hits")
+
+
+def _has_primary_hit(hits: list[TavilyHit], name: str) -> bool:
+    """True when ``hits`` contains a name-matching hit with a death keyword in title/snippet."""
+    return any(
+        _hit_mentions(hit, name) and _has_death_keyword(f"{hit.title} {hit.snippet}")
+        for hit in hits
+    )
 
 
 async def _search_for_evidence(
@@ -619,60 +632,78 @@ async def _search_for_evidence(
     *,
     tavily_search: TavilySearchFn,
     limit: int,
-) -> str | None:
-    """L0: ask Tavily for a citation URL via two passes; return None to drop.
+) -> list[str]:
+    """L0: gather an ordered list of candidate URLs to probe at L2/L3.
 
-    Short-circuits when ``suggestion.evidence_url`` is set — Opus already
-    picked one via its own ``tavily_search`` loop; L2-L5 still validate.
-
-    Pass 1: status-shaped query (precise — biases toward death-keyword articles).
-    Pass 2: status-blind query (broad — let L5 judge alive/dead from body).
+    Returns up to ``_MAX_CANDIDATE_URLS`` URLs, best-first, drawn from:
+      - ``suggestion.evidence_url`` if Opus supplied one (placed first),
+      - hits from the status-shaped query (pass 1),
+      - hits from the status-blind query (pass 2 — only runs when pass 1
+        produced no primary death-keyword hit, preserving the original
+        cost-saving short-circuit).
 
     Two passes because Opus over-labels live companies as
     ``bruised``/``struggling`` and the precise query then can't surface them.
     L5 is the alive/dead arbiter; pass 2 routes more candidates to it.
 
-    One ``RECALL_REJECTED_NO_EVIDENCE`` event per dropped suggestion. A pass-1
-    transport error recovered by pass 2 emits nothing. ``transport_error``
-    wins over ``no_name_match`` when pass 2 also failed by transport (signal:
-    Tavily was unreachable, not that nothing exists).
+    Empty list = drop. ``RECALL_REJECTED_NO_EVIDENCE`` fires once per drop.
+    ``transport_error`` wins over ``no_name_match`` when pass 2 also failed
+    by transport (signal: Tavily was unreachable, not that nothing exists).
+    Returning a non-empty list lets the caller try multiple URLs at L2/L3 so
+    a single 403/anti-bot host doesn't kill a suggestion that has a usable
+    second-best citation.
     """
+    urls: list[str] = []
     if suggestion.evidence_url is not None:
-        # Opus already did a tavily_search and picked this URL. Trust the pick;
-        # L2-L5 still validate. Saves one Tavily call per pre-discovered suggestion.
+        urls.append(suggestion.evidence_url)
         _emit_event(SpanEvent.RECALL_L0_PROVIDED_BY_RECALL_LLM)
         logger.info(
             "recall_verify: L0 short-circuit (LLM-provided URL) for %r: %s",
             suggestion.name,
             suggestion.evidence_url,
         )
-        return suggestion.evidence_url
+
     primary_query = _build_status_shaped_query(suggestion)
-    chosen, _outcome1 = await _try_query(
+    hits1, outcome1 = await _gather_hits(
         suggestion, primary_query, tavily_search=tavily_search, limit=limit
     )
-    if chosen is not None:
-        return chosen.url
-    fallback_query = f'"{suggestion.name}" {suggestion.category} {suggestion.failure_year}'
-    chosen, outcome2 = await _try_query(
-        suggestion, fallback_query, tavily_search=tavily_search, limit=limit
-    )
-    if chosen is not None:
-        logger.info(
-            "recall_verify: L0 name-only fallback recovered %r via %s",
-            suggestion.name,
-            chosen.url,
+
+    pass2_ran = False
+    outcome2: _PassOutcome = "ok"
+    if _has_primary_hit(hits1, suggestion.name):
+        pooled = hits1
+    else:
+        fallback_query = f'"{suggestion.name}" {suggestion.category} {suggestion.failure_year}'
+        hits2, outcome2 = await _gather_hits(
+            suggestion, fallback_query, tavily_search=tavily_search, limit=limit
         )
+        pass2_ran = True
+        pooled = hits1 + hits2
+
+    ranked = _rank_candidate_urls(pooled, suggestion.name, _MAX_CANDIDATE_URLS)
+    for url in ranked:
+        if url not in urls:
+            urls.append(url)
+
+    if not urls:
+        worst_outcome = outcome2 if pass2_ran else outcome1
+        reason = "transport_error" if worst_outcome == "transport_error" else "no_name_match"
+        logger.info("recall_verify: L0 dropped %r — %s (both passes)", suggestion.name, reason)
+        _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": reason})
+        return urls
+
+    if pass2_ran and suggestion.evidence_url is None:
+        # Trace signal: how often pass-2 saves a suggestion that pass-1 missed.
+        # Skipped on the evidence_url path because RECALL_L0_PROVIDED_BY_RECALL_LLM
+        # already fired for it.
         _emit_event(SpanEvent.RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED)
-        return chosen.url
-    # Both passes failed. ``transport_error`` if pass 2's failure was transport
-    # (Tavily down), otherwise ``no_name_match`` (the consolidated drop reason
-    # for both 0-hits and hits-without-name-match — pass-1 outcome doesn't
-    # change the picture once pass 2 confirms nothing found).
-    reason = "transport_error" if outcome2 == "transport_error" else "no_name_match"
-    logger.info("recall_verify: L0 dropped %r — %s (both passes)", suggestion.name, reason)
-    _emit_event(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, attributes={"reason": reason})
-    return None
+        logger.info(
+            "recall_verify: L0 pass-2 fallback recovered %d candidate URL(s) for %r: %s",
+            len(ranked),
+            suggestion.name,
+            ranked,
+        )
+    return urls
 
 
 async def _run_l4_wayback(
@@ -794,27 +825,39 @@ async def _l2_l3_fetch_body(
 async def verify_suggestion(  # noqa: PLR0913 - verifier signature carries L0-L5 deps + the deathness bundle
     suggestion: RecallSuggestion,
     *,
-    discovered_url: str,
+    discovered_urls: list[str],
     wayback: Enricher,
     llm: LLMClient,
     extract: ExtractFn,
     deathness: DeathnessConfig,
 ) -> tuple[RawEntry, VerificationTier, _AdmitVerdict] | None:
-    """Run L1-L5 against one suggestion. Returns ``None`` if any gate drops.
+    """Run L2-L5 against one suggestion across one or more candidate URLs.
 
-    ``discovered_url`` is the L0 Tavily output that L2/L3 probe. ``extract``
-    fires once on direct-GET 4xx or body-too-short. ``RawEntry.url`` falls
-    back to ``discovered_url`` when ``homepage_url`` is None so the persisted
-    point always has provenance.
+    Walks ``discovered_urls`` in priority order, attempting L2/L3 on each
+    until one returns a usable body — a single 403 / anti-bot host doesn't
+    drop the suggestion when a workable second-best URL exists. L4/L5 run
+    once on the first L3-passing body, so L5 LLM cost stays bounded at one
+    call per suggestion regardless of list length.
+
+    ``extract`` fires once per URL on direct-GET 4xx or body-too-short.
+    ``RawEntry.url`` falls back to the chosen evidence URL when
+    ``homepage_url`` is None so the persisted point always has provenance.
+
+    Returns ``None`` when every URL fails L2/L3 or when L5 rules the company
+    alive / low-confidence.
     """
     homepage = suggestion.homepage_url
-    evidence = discovered_url
-    seed_url = homepage if homepage is not None else discovered_url
-    evidence_body = await _l2_l3_fetch_body(
-        name=suggestion.name, evidence=evidence, extract=extract
-    )
-    if evidence_body is None:
+    evidence: str | None = None
+    evidence_body: str | None = None
+    for candidate in discovered_urls:
+        body = await _l2_l3_fetch_body(name=suggestion.name, evidence=candidate, extract=extract)
+        if body is not None:
+            evidence = candidate
+            evidence_body = body
+            break
+    if evidence is None or evidence_body is None:
         return None
+    seed_url = homepage if homepage is not None else evidence
     # markdown_text=None AND raw_html=None matter — WaybackEnricher.enrich
     # short-circuits if either body is already populated, so the seed has to
     # arrive empty for L4 to do its enrichment pass.
@@ -894,11 +937,11 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; recall fan-out
             discovered = await _search_for_evidence(
                 s, tavily_search=tavily_search, limit=tavily_recall_max_results
             )
-            if discovered is None:
+            if not discovered:
                 return None
             verified = await verify_suggestion(
                 s,
-                discovered_url=discovered,
+                discovered_urls=discovered,
                 wayback=wayback,
                 llm=llm,
                 extract=extract,

@@ -108,7 +108,7 @@ async def test_drops_on_zero_hits_both_passes(monkeypatch: pytest.MonkeyPatch) -
     sug = _suggestion()
     fake = FakeTavilySearch(default=[])
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out is None
+    assert out == []
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "no_name_match"})]
     assert len(fake.calls) == 2
 
@@ -136,7 +136,7 @@ async def test_drops_when_no_hit_mentions_name(monkeypatch: pytest.MonkeyPatch) 
     ]
     fake = FakeTavilySearch(default=hits)
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out is None
+    assert out == []
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "no_name_match"})]
     assert len(fake.calls) == 2
 
@@ -166,7 +166,7 @@ async def test_returns_primary_hit_with_name_and_death_keyword(
     ]
     fake = FakeTavilySearch(default=hits)
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out == "https://news.example.com/b"
+    assert out[0] == "https://news.example.com/b"
     assert events == []
     # Pass 1 found a primary hit — pass 2 must not run.
     assert len(fake.calls) == 1
@@ -190,13 +190,18 @@ async def test_drops_on_both_passes_transport_error(monkeypatch: pytest.MonkeyPa
     sug = _suggestion()
     fake = _RaisingTavilySearch(httpx.ConnectError("boom"))
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out is None
+    assert out == []
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "transport_error"})]
     assert len(fake.calls) == 2
 
 
 async def test_returns_fallback_hit_with_name_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No hit has a death keyword; first name-matching hit wins as fallback (pass 1)."""
+    """No hit has a death keyword; fallback name-only hit lands AFTER pass 2 also fires.
+
+    Short-circuit triggers on a primary (death-keyword) hit. Pass 1 here returns
+    name-matching hits without a death keyword, so pass 2 runs to look for a
+    better candidate. With nothing better in pass 2, the original first hit wins.
+    """
     events = _capture_events(monkeypatch)
     sug = _suggestion()
     hits = [
@@ -210,18 +215,12 @@ async def test_returns_fallback_hit_with_name_only(monkeypatch: pytest.MonkeyPat
             url="https://news.example.com/second",
             snippet="A broad overview of recent fundraising rounds in security.",
         ),
-        TavilyHit(
-            title="Unrelated industry report",
-            url="https://news.example.com/third",
-            snippet="DeFi metrics for the quarter, including TVL and active addresses.",
-        ),
     ]
     fake = FakeTavilySearch(default=hits)
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out == "https://news.example.com/first"
-    assert events == []
-    # Pass 1 found a name-matching hit (even without a death keyword) → pass 2 not needed.
-    assert len(fake.calls) == 1
+    assert out[0] == "https://news.example.com/first"
+    assert (SpanEvent.RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED, {}) in events
+    assert len(fake.calls) == 2
 
 
 async def test_fallback_prefers_third_party_over_self_published(
@@ -248,7 +247,7 @@ async def test_fallback_prefers_third_party_over_self_published(
     ]
     fake = FakeTavilySearch(default=hits)
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out == "https://news.example.com/recap"
+    assert out[0] == "https://news.example.com/recap"
 
 
 async def test_fallback_uses_self_published_when_no_third_party_hit(
@@ -272,7 +271,7 @@ async def test_fallback_uses_self_published_when_no_third_party_hit(
     fake = FakeTavilySearch(default=hits)
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
     # First-encountered self-published hit wins when no external one exists.
-    assert out == "https://github.com/hexagate"
+    assert out[0] == "https://github.com/hexagate"
 
 
 # ---------------------------------------------------------------------------
@@ -302,7 +301,7 @@ async def test_l0_falls_back_to_status_blind_query_when_status_shaped_returns_no
         }
     )
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out == fallback_hit.url
+    assert out[0] == fallback_hit.url
     assert events == [(SpanEvent.RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED, {})]
     assert len(fake.calls) == 2
     assert fake.calls[0][0] == _status_shaped_query(sug)
@@ -334,7 +333,7 @@ async def test_l0_returns_pass1_result_when_status_shaped_finds_hit(
         }
     )
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out == primary_hit.url
+    assert out[0] == primary_hit.url
     assert events == []
     assert len(fake.calls) == 1
 
@@ -359,7 +358,7 @@ async def test_l0_drops_when_both_passes_return_no_name_match(
         }
     )
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out is None
+    assert out == []
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "no_name_match"})]
     assert len(fake.calls) == 2
 
@@ -389,7 +388,7 @@ async def test_l0_fallback_on_pass1_transport_error(monkeypatch: pytest.MonkeyPa
         raise AssertionError(msg)
 
     out = await _search_for_evidence(sug, tavily_search=fake_search, limit=5)
-    assert out == fallback_hit.url
+    assert out[0] == fallback_hit.url
     assert events == [(SpanEvent.RECALL_L0_NAME_ONLY_FALLBACK_RECOVERED, {})]
     assert calls == [pass1_query, pass2_query]
 
@@ -413,18 +412,18 @@ async def test_l0_drops_when_pass2_transport_error_after_pass1_no_hits(
         raise AssertionError(msg)
 
     out = await _search_for_evidence(sug, tavily_search=fake_search, limit=5)
-    assert out is None
+    assert out == []
     assert events == [(SpanEvent.RECALL_REJECTED_NO_EVIDENCE, {"reason": "transport_error"})]
 
 
-async def test_l0_short_circuits_when_suggestion_carries_evidence_url(
+async def test_l0_places_evidence_url_first_then_gathers_backups(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Opus pre-discovered the URL; verifier returns it without calling Tavily.
+    """When Opus supplies ``evidence_url``, it ranks first; Tavily still runs for backups.
 
-    L0 short-circuit saves the round-trip when the recall LLM's own
-    ``tavily_search`` loop already picked a citation. L2-L5 still validate
-    downstream — only the L0 search head is skipped.
+    L2/L3 walking is the resilience layer — if Opus's pick fails (anti-bot host,
+    deleted page), the verifier needs alternatives. Tavily's backups land after
+    the LLM-provided URL in the candidate list.
     """
     events = _capture_events(monkeypatch)
     pre_discovered = "https://news.example.com/hexagate-shutdown"
@@ -437,8 +436,16 @@ async def test_l0_short_circuits_when_suggestion_carries_evidence_url(
         failure_year=2024,
         one_liner="Hexagate shut down in 2024.",
     )
-    fake = FakeTavilySearch(default=[])  # would return [] but must never be called
+    backup_hit = TavilyHit(
+        title="Hexagate shuts down operations",
+        url="https://news.example.com/hexagate-retro",
+        snippet="Hexagate, a Web3 security firm, announced its shutdown last week.",
+    )
+    fake = FakeTavilySearch(default=[backup_hit])
     out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
-    assert out == pre_discovered
-    assert fake.calls == []
-    assert events == [(SpanEvent.RECALL_L0_PROVIDED_BY_RECALL_LLM, {})]
+    assert out[0] == pre_discovered
+    assert backup_hit.url in out
+    # Tavily ran pass 1; pass 2 short-circuited because pass 1 had a primary (death-keyword) hit.
+    assert len(fake.calls) == 1
+    # The LLM-provided event still fires.
+    assert (SpanEvent.RECALL_L0_PROVIDED_BY_RECALL_LLM, {}) in events

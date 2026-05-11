@@ -220,7 +220,7 @@ async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -242,7 +242,7 @@ async def test_l2_rejects_ssrf_evidence(monkeypatch: pytest.MonkeyPatch) -> None
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -263,7 +263,7 @@ async def test_l2_rejects_httpx_error_evidence(monkeypatch: pytest.MonkeyPatch) 
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -288,7 +288,7 @@ async def test_l3_rejects_evidence_missing_name(monkeypatch: pytest.MonkeyPatch)
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -314,7 +314,7 @@ async def test_l3_rejects_evidence_missing_death_keyword(monkeypatch: pytest.Mon
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -335,7 +335,7 @@ async def test_l3_rejects_evidence_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -359,7 +359,7 @@ async def test_l3_accepts_name_and_keyword_case_insensitive(
     wb = _FakeWayback(enriched_text=None)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -396,7 +396,7 @@ async def test_l4_wayback_present_with_name_sets_anchored_tier(
     wb = _FakeWayback(enriched_text=wayback_body)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -429,7 +429,7 @@ async def test_l4_wayback_absent_keeps_evidence_only_tier(
     wb = _FakeWayback(enriched_text=None)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -460,7 +460,7 @@ async def test_l4_wayback_present_but_no_name_keeps_evidence_only(
     wb = _FakeWayback(enriched_text=squatter_body)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -489,7 +489,7 @@ async def test_l4_wayback_raises_does_not_drop(monkeypatch: pytest.MonkeyPatch) 
     wb = _FakeWayback(raises=httpx.ReadTimeout("ia is down"))
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -528,7 +528,7 @@ async def test_l4_wayback_short_circuits_when_homepage_is_none(
     wb = _FakeWayback(enriched_text="should not be read")
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -671,7 +671,7 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
     wb = _FakeWayback()
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
@@ -719,7 +719,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
     llm = _FakeLLM(default=_DEATHNESS_PASS)
     first = await verify_suggestion(
         sug,
-        discovered_url=first_url,
+        discovered_urls=[first_url],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -727,7 +727,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
     )
     second = await verify_suggestion(
         sug,
-        discovered_url=other_url,
+        discovered_urls=[other_url],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -735,7 +735,7 @@ async def test_recall_source_id_collapses_on_same_homepage(
     )
     third = await verify_suggestion(
         diff_vendor,
-        discovered_url=diff_vendor_url,
+        discovered_urls=[diff_vendor_url],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -778,7 +778,7 @@ async def test_l5_drops_when_alive(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -801,7 +801,7 @@ async def test_l5_drops_when_low_confidence(monkeypatch: pytest.MonkeyPatch) -> 
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -823,7 +823,7 @@ async def test_l5_passes_at_high_confidence(monkeypatch: pytest.MonkeyPatch) -> 
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -846,7 +846,7 @@ async def test_l5_drops_on_parse_failure(monkeypatch: pytest.MonkeyPatch) -> Non
     llm = _FakeLLM(responses=["this is not json"])
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -864,7 +864,7 @@ async def test_l5_drops_on_transport_failure(monkeypatch: pytest.MonkeyPatch) ->
     llm = _FakeLLM(responses=[httpx.ConnectError("boom")])
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,

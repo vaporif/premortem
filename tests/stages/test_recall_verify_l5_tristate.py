@@ -202,7 +202,7 @@ async def test_l5_tristate_thresholds(
     llm = _FakeLLM(responses=[payload])
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -245,7 +245,7 @@ async def test_l5_news_body_and_persisted_combined_when_anchored(
     wb = _FakeWayback(enriched_text=wayback_marketing)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -285,7 +285,7 @@ async def test_persisted_body_omits_wayback_section_when_not_anchored(
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(enriched_text=None),
         llm=llm,
         extract=_NEVER_EXTRACT,

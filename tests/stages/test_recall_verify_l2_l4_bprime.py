@@ -203,7 +203,7 @@ async def test_homepage_head_does_not_gate_when_wayback_anchors(
     wb = _AnchoringWayback(text=wayback_body)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_admits_llm(),
         extract=_NEVER_EXTRACT,
@@ -232,7 +232,7 @@ async def test_wayback_empty_admits_at_evidence_only_tier(
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_PassThroughWayback(),
         llm=_admits_llm(),
         extract=_NEVER_EXTRACT,
@@ -263,7 +263,7 @@ async def test_wayback_transient_failure_does_not_drop(
     wb = _RaisingWayback(httpx.ReadTimeout("ia is down"))
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=wb,
         llm=_admits_llm(),
         extract=_NEVER_EXTRACT,
@@ -292,7 +292,7 @@ async def test_evidence_head_405_falls_through_to_get(
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_PassThroughWayback(),
         llm=_admits_llm(),
         extract=_NEVER_EXTRACT,
@@ -312,7 +312,7 @@ async def test_evidence_get_404_drops(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_PassThroughWayback(),
         llm=_blocker_llm(),
         extract=_NEVER_EXTRACT,

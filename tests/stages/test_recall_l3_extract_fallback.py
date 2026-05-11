@@ -180,7 +180,7 @@ async def test_l3_extract_fallback_recovers_on_l2_get_4xx(
     extract = FakeTavilyExtract(default=extracted_body)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=extract,
@@ -216,7 +216,7 @@ async def test_l3_extract_fallback_recovers_on_body_too_short(
     extract = FakeTavilyExtract(default=extracted_body)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=extract,
@@ -248,7 +248,7 @@ async def test_l3_extract_fallback_drops_when_extract_also_empty(
     extract = FakeTavilyExtract(default="")
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_FakeLLM(),  # blocker: L5 must not run
         extract=extract,
@@ -275,7 +275,7 @@ async def test_l3_extract_fallback_drops_when_extract_raises(
     extract = FakeTavilyExtract(default=httpx.ConnectError("boom"))
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_FakeLLM(),
         extract=extract,
@@ -308,7 +308,7 @@ async def test_l3_no_extract_fallback_on_name_missing(
     extract = FakeTavilyExtract(default="should not be called")
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_FakeLLM(),
         extract=extract,

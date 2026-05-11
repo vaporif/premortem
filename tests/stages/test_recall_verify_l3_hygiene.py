@@ -156,7 +156,7 @@ async def test_l3_drops_when_body_under_500_chars(monkeypatch: pytest.MonkeyPatc
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_call_blocker(),
         extract=_NEVER_EXTRACT,
@@ -176,7 +176,7 @@ async def test_l3_rejects_when_name_only_in_sidebar(monkeypatch: pytest.MonkeyPa
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_call_blocker(),
         extract=_NEVER_EXTRACT,
@@ -202,7 +202,7 @@ async def test_l3_does_not_match_substring_inside_word(monkeypatch: pytest.Monke
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_call_blocker(),
         extract=_NEVER_EXTRACT,
@@ -229,7 +229,7 @@ async def test_l3_admits_shuttered_keyword(monkeypatch: pytest.MonkeyPatch) -> N
     llm = _FakeLLM(default=_DEATHNESS_PASS)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -257,7 +257,7 @@ async def test_l3_admits_chapter_eleven(monkeypatch: pytest.MonkeyPatch) -> None
     llm = _FakeLLM(default=_DEATHNESS_PASS)
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=llm,
         extract=_NEVER_EXTRACT,
@@ -288,7 +288,7 @@ async def test_l3_anchors_on_crypto_native_keyword(monkeypatch: pytest.MonkeyPat
     )
     out = await verify_suggestion(
         sug,
-        discovered_url=discovered,
+        discovered_urls=[discovered],
         wayback=_FakeWayback(),
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         extract=_NEVER_EXTRACT,
