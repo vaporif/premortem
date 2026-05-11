@@ -6,12 +6,22 @@ has DIED, is STRUGGLING (still operating but visibly impaired), or is ALIVE
 Output JSON matching the schema. Use:
 - "dead" only when the body explicitly states the company shut down,
   liquidated, dissolved, filed Chapter 7, or otherwise ceased to exist as
-  an operating entity. Acquisitions count as "dead" ONLY when the body
-  describes a fire-sale, distress sale, asset-only purchase after
-  insolvency, or acquisition price materially below total funding raised.
+  an operating entity. For crypto / on-chain protocols, "dead" also
+  applies when the body documents any of: TVL or daily volume collapsed
+  to zero / near-zero with no recovery, governance dormant for 12+ months,
+  treasury depleted with no replenishment, smart contracts paused or
+  migrated with no active product, official site/socials abandoned, or
+  GitHub with no commits for 18+ months. Acquisitions count as "dead"
+  ONLY when the body describes a fire-sale, distress sale, asset-only
+  purchase after insolvency, or acquisition price materially below total
+  funding raised.
 - "struggling" when the body describes layoffs, restructuring, missed
   payroll, downsizing, or other ongoing distress — but the company has
-  not ceased operations.
+  not ceased operations. For crypto / on-chain protocols, "struggling"
+  includes: TVL down >80% from peak without recovery, regulatory
+  enforcement action or settlement, hard pivot away from the original
+  product, founders or core contributors departing while the project
+  technically continues, repeated relaunches that fail to regain traction.
 - "alive" when the body does not establish either of the above. Healthy
   M&A (strategic acquisition at or above funding raised, talent acqui-hire
   with no distress signal, portfolio expansion) is "alive" — the company
@@ -30,6 +40,13 @@ Disambiguation examples:
   → "dead" (fire-sale after insolvency).
 - "Acme cut 40% of staff and is restructuring around a smaller core
   product" → "struggling" (distress, still operating).
+- "AcmeDAO's TVL collapsed from $300M in 2021 to under $200K in 2023,
+  governance proposals have not passed in 18 months, and the core team
+  moved to a new project" → "dead" (crypto-native abandonment despite
+  contracts still being on-chain).
+- "Acme Protocol settled with the CFTC for $1.2M and shut down its
+  US-facing options product, pivoting to a different primitive" →
+  "struggling" (regulatory hit + hard pivot, project continues).
 
 Return JSON only, no prose outside it.
 {%- endblock %}

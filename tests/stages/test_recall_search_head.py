@@ -9,7 +9,12 @@ import httpx
 from slopmortem.corpus.tavily import TavilyHit
 from slopmortem.models import RecallSuggestion
 from slopmortem.stages import recall_verify as _rv
-from slopmortem.stages.recall_verify import _search_for_evidence
+from slopmortem.stages.recall_verify import (
+    _build_status_shaped_query as _status_shaped_query,
+)
+from slopmortem.stages.recall_verify import (
+    _search_for_evidence,
+)
 from slopmortem.tracing import SpanEvent
 
 if TYPE_CHECKING:
@@ -219,16 +224,60 @@ async def test_returns_fallback_hit_with_name_only(monkeypatch: pytest.MonkeyPat
     assert len(fake.calls) == 1
 
 
+async def test_fallback_prefers_third_party_over_self_published(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """External hits beat project-controlled pages in the fallback rank.
+
+    Neither hit carries a death keyword, so the primary path doesn't fire. The
+    external-host hit ranks ahead of the github.com/<name> hit.
+    """
+    _ = _capture_events(monkeypatch)
+    sug = _suggestion()
+    hits = [
+        TavilyHit(
+            title="Hexagate codebase",
+            url="https://github.com/hexagate",
+            snippet="The Hexagate organization on GitHub.",
+        ),
+        TavilyHit(
+            title="Hexagate covered in industry recap",
+            url="https://news.example.com/recap",
+            snippet="Hexagate, a Web3 security firm, made the year-end roundup.",
+        ),
+    ]
+    fake = FakeTavilySearch(default=hits)
+    out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
+    assert out == "https://news.example.com/recap"
+
+
+async def test_fallback_uses_self_published_when_no_third_party_hit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If every name-matching hit is project-controlled, the self-published fallback still lands."""
+    _ = _capture_events(monkeypatch)
+    sug = _suggestion()
+    hits = [
+        TavilyHit(
+            title="Hexagate codebase",
+            url="https://github.com/hexagate",
+            snippet="The Hexagate organization on GitHub.",
+        ),
+        TavilyHit(
+            title="Hexagate docs",
+            url="https://docs.hexagate.io/",
+            snippet="Hexagate developer documentation.",
+        ),
+    ]
+    fake = FakeTavilySearch(default=hits)
+    out = await _search_for_evidence(sug, tavily_search=fake, limit=5)
+    # First-encountered self-published hit wins when no external one exists.
+    assert out == "https://github.com/hexagate"
+
+
 # ---------------------------------------------------------------------------
 # Two-pass L0 shape (Fix 2): pass-1 status-shaped → pass-2 status-blind
 # ---------------------------------------------------------------------------
-
-
-def _status_shaped_query(sug: RecallSuggestion) -> str:
-    """Mirror ``_build_status_shaped_query`` so tests can key ``response_map`` on it."""
-    if sug.status in ("dead", "absorbed"):
-        return f'"{sug.name}" shutdown or closed or bankrupt or "Chapter 11" {sug.failure_year}'
-    return f'"{sug.name}" layoffs or restructuring or struggling {sug.failure_year}'
 
 
 def _status_blind_query(sug: RecallSuggestion) -> str:

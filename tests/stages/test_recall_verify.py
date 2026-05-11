@@ -18,6 +18,7 @@ from slopmortem.stages.recall_verify import (
     _DEATH_KEYWORDS,
     DeathnessConfig,
     VerificationTier,
+    _build_status_shaped_query,
     verify_and_persist_all,
     verify_suggestion,
 )
@@ -585,10 +586,7 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
     # FakeTavilySearch keys each suggestion to one hit whose URL matches the
     # L2/L3 fakes above, so the L0 head feeds the right URL into L2.
     tavily = FakeTavilySearch(default=[])
-    tavily.response_map = {
-        f'"{s.name}" shutdown or closed or bankrupt or "Chapter 11" {s.failure_year}': [_hit_for(s)]
-        for s in sugs
-    }
+    tavily.response_map = {_build_status_shaped_query(s): [_hit_for(s)] for s in sugs}
     wb = _FakeWayback(enriched_text=None)
     persisted: list[tuple[RawEntry, VerificationTier, Literal["dead", "struggling"]]] = []
 

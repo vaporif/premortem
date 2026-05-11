@@ -1,60 +1,86 @@
-# Death/distress vocabulary the L3 anchor check (slopmortem/stages/recall_verify.py)
-# looks for. Word-boundary regex match, case-insensitive. Multi-word entries
-# match across HTML whitespace runs.
+# Death/distress vocabulary the L3 anchor check AND the L0 Tavily query
+# both consume. Single source of truth — edit here and both surfaces
+# pick it up automatically.
 #
-# Grouping is for human readability only; the loader flattens to one tuple.
-# Add or remove signals here — no code change needed.
+# Each group declares ``applies_to``: which ``RecallSuggestion.status``
+# values pull this group's ``words`` into the L0 Tavily query.
+# The L3 anchor regex flattens every group regardless of status — any
+# evidence body that names a keyword from any group anchors a candidate.
+#
+# Word-boundary regex match, case-insensitive. Multi-word entries match
+# across HTML whitespace runs in the L3 regex and become quoted phrases
+# in the L0 query.
 
 terminal:
-  # Company is gone.
-  - shutdown
-  - shut down
-  - shuttered
-  - closed
-  - ceased
-  - defunct
-  - dissolved
-  - bankrupt
-  - bankruptcy
-  - Chapter 11
-  - Chapter 7
-  - liquidation
-  - wound down
-  - wind-down
-  - wind down
-  - going out of business
-  - out of business
-  - obituary
-  - delisted
-  - cease operations
-  - acquired
-  - acquisition
+  # Company is gone (corporate vocabulary + crypto-protocol shutdown forms).
+  applies_to: [dead, absorbed]
+  words:
+    - shutdown
+    - shut down
+    - shuttered
+    - closed
+    - ceased
+    - defunct
+    - dissolved
+    - bankrupt
+    - bankruptcy
+    - Chapter 11
+    - Chapter 7
+    - liquidation
+    - wound down
+    - wind-down
+    - wind down
+    - going out of business
+    - out of business
+    - obituary
+    - delisted
+    - cease operations
+    - acquired
+    - acquisition
+    - sunset
+    - sunsetted
+    - deprecated
+    - discontinued
+    - mothballed
+    - no longer maintained
 
 distress:
   # Still operating but visibly hurting.
-  - layoffs
-  - layoff
-  - restructuring
-  - struggling
-  - missed payroll
-  - downsizing
-  - troubled
+  applies_to: [struggling, bruised]
+  words:
+    - layoffs
+    - layoff
+    - restructuring
+    - struggling
+    - missed payroll
+    - downsizing
+    - troubled
+    - down round
+    - pivot
+    - pivoted
 
 crypto_native:
-  # Web3 projects die via exploits, drained funds, token collapse — not
+  # Web3 projects die via exploits, drained funds, TVL collapse — not
   # Chapter 11 filings. Catches death events traditional startup vocabulary
-  # misses. The L3 anchor check still requires the company name in the same
-  # body, so generic "hackathon" or "growth hack" content can't false-admit.
-  - hacked
-  - exploit
-  - exploited
-  - drained
-  - rug pull
-  - rugged
-  - depeg
-  - depegged
-  - token collapse
-  - protocol died
-  - dead in the water
-  - abandoned
-  - team disbanded
+  # misses. ``applies_to`` is the full set so crypto failures surface
+  # whether they're labelled ``dead`` or ``struggling``.
+  applies_to: [dead, absorbed, struggling, bruised]
+  words:
+    - hacked
+    - exploit
+    - exploited
+    - drained
+    - rug pull
+    - rugged
+    - depeg
+    - depegged
+    - token collapse
+    - TVL collapse
+    - TVL collapsed
+    - TVL drained
+    - treasury depleted
+    - governance dormant
+    - protocol died
+    - dead in the water
+    - abandoned
+    - team disbanded

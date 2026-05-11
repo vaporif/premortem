@@ -11,15 +11,32 @@ shells like decrypt.co).
 
 from __future__ import annotations
 
-from typing import Final, cast
+import logging
+from typing import TYPE_CHECKING, Final, cast
 
+import anyio
 from pydantic import BaseModel
 
 from slopmortem.http import safe_post
 
+if TYPE_CHECKING:
+    import httpx
+
 TAVILY_SEARCH_URL: Final[str] = "https://api.tavily.com/search"
 TAVILY_EXTRACT_URL: Final[str] = "https://api.tavily.com/extract"
 TAVILY_SNIPPET_CHARS: Final[int] = 500
+
+# Tavily applies per-second rate limits and signals them with 432 ("limit
+# reached"); 429 and 5xx surface the same shape. ``recall_verify`` fans out
+# 3 suggestions x 2 search passes concurrently, which trips the cap. Without
+# retry, a single 432 permanently drops a candidate the verifier would
+# otherwise admit. Exponential backoff (1s, 2s, 4s) absorbs the burst
+# without serializing the whole stage.
+_RETRY_STATUSES: Final[frozenset[int]] = frozenset({429, 432, 503, 504})
+_MAX_RETRIES: Final[int] = 3
+_BASE_BACKOFF_S: Final[float] = 1.0
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "TAVILY_EXTRACT_URL",
@@ -30,6 +47,28 @@ __all__ = [
     "tavily_extract_structured",
     "tavily_search_structured",
 ]
+
+
+async def _post_retrying(url: str, *, json: dict[str, object]) -> httpx.Response:
+    """POST with retry-with-backoff on Tavily's transient failure codes."""
+    delay = _BASE_BACKOFF_S
+    for attempt in range(_MAX_RETRIES):
+        resp = await safe_post(url, json=json)
+        if resp.status_code not in _RETRY_STATUSES:
+            return resp
+        logger.info(
+            "tavily: %d on %s, retrying in %.1fs (attempt %d/%d)",
+            resp.status_code,
+            url,
+            delay,
+            attempt + 1,
+            _MAX_RETRIES + 1,
+        )
+        await anyio.sleep(delay)
+        delay *= 2
+    # Final attempt; if still transient, the caller's ``raise_for_status``
+    # surfaces the error and the verifier drops the candidate as before.
+    return await safe_post(url, json=json)
 
 
 class TavilyHit(BaseModel):
@@ -81,7 +120,7 @@ async def tavily_search_structured(q: str, limit: int, *, api_key: str) -> list[
     Raises:
         httpx.HTTPError: Tavily returned a non-2xx status or the request failed.
     """
-    resp = await safe_post(
+    resp = await _post_retrying(
         TAVILY_SEARCH_URL,
         json={"api_key": api_key, "query": q, "max_results": limit},
     )
@@ -100,7 +139,7 @@ async def tavily_extract_structured(url: str, *, api_key: str) -> str:
     Raises:
         httpx.HTTPError: Tavily returned a non-2xx status or the request failed.
     """
-    resp = await safe_post(
+    resp = await _post_retrying(
         TAVILY_EXTRACT_URL,
         json={"api_key": api_key, "urls": [url]},
     )

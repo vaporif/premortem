@@ -24,7 +24,7 @@ Return UP TO {{ cap }} suggestions as a JSON object with a single key `suggestio
 - failure_year: the year the failure / distress event occurred (1990-2030)
 - one_liner: a single sentence describing what the company did and how it failed
 
-Prefer fewer real suggestions over more uncertain ones. If you're not confident any recalled company belongs here, return `{"suggestions": []}`.
+You are firing because the corpus is thin for this vertical — empty results are the failure mode you exist to prevent. Before returning `{"suggestions": []}`, broaden by one degree: try the adjacent sub-sector, an adjacent business model, or failures sharing the same risk archetype (regulatory exposure, MM-pricing fragility, thin liquidity, custody failure, capital efficiency, structural arbitrage). Reserve `[]` for the case where no neighbouring vertical has analogous failures at all. The precision rules above (dated distress events, real names, no fabrication) still apply per-suggestion.
 
 Return JSON only, no prose outside it.
 {%- endblock %}

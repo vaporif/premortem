@@ -133,14 +133,40 @@ async def test_published_date_optional(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_propagates_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Non-2xx status surfaces as ``HTTPStatusError`` — same contract as the formatted surface."""
-    fake_resp = _resp(429, {"detail": "rate limited"})
-    monkeypatch.setattr(
-        "slopmortem.corpus.tavily.safe_post",
-        AsyncMock(return_value=fake_resp),
-    )
+    """Non-retriable non-2xx status (auth, etc.) surfaces as ``HTTPStatusError`` immediately."""
+    fake_resp = _resp(401, {"detail": "unauthorized"})
+    mock_post = AsyncMock(return_value=fake_resp)
+    monkeypatch.setattr("slopmortem.corpus.tavily.safe_post", mock_post)
     with pytest.raises(httpx.HTTPStatusError):
         await tavily_search_structured("x", limit=1, api_key="tv-test-key")
+    # 401 is not in ``_RETRY_STATUSES`` — the helper short-circuits on the first call.
+    assert mock_post.call_count == 1
+
+
+async def test_retries_transient_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rate-limit codes (429/432) retry with backoff; a later 2xx admits the call."""
+    rate_limited = _resp(432, {"detail": "limit reached"})
+    success = _resp(200, {"results": [{"title": "t", "url": "https://x", "content": "c"}]})
+    mock_post = AsyncMock(side_effect=[rate_limited, rate_limited, success])
+    monkeypatch.setattr("slopmortem.corpus.tavily.safe_post", mock_post)
+    monkeypatch.setattr("slopmortem.corpus.tavily.anyio.sleep", AsyncMock())
+
+    hits = await tavily_search_structured("x", limit=1, api_key="tv-test-key")
+    assert len(hits) == 1
+    assert mock_post.call_count == 3
+
+
+async def test_retries_exhausted_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Once all retries are spent on the same transient code, the error propagates."""
+    rate_limited = _resp(432, {"detail": "limit reached"})
+    mock_post = AsyncMock(return_value=rate_limited)
+    monkeypatch.setattr("slopmortem.corpus.tavily.safe_post", mock_post)
+    monkeypatch.setattr("slopmortem.corpus.tavily.anyio.sleep", AsyncMock())
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await tavily_search_structured("x", limit=1, api_key="tv-test-key")
+    # _MAX_RETRIES=3 retries + 1 final attempt = 4 calls.
+    assert mock_post.call_count == 4
 
 
 async def test_posts_documented_body(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -194,14 +220,26 @@ async def test_extract_returns_empty_when_no_results(monkeypatch: pytest.MonkeyP
 
 
 async def test_extract_propagates_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """429 from Tavily surfaces as ``HTTPStatusError`` so the verifier can drop cleanly."""
-    fake_resp = _extract_resp(429, {"detail": "rate limited"})
-    monkeypatch.setattr(
-        "slopmortem.corpus.tavily.safe_post",
-        AsyncMock(return_value=fake_resp),
-    )
+    """Non-retriable non-2xx from /extract surfaces as ``HTTPStatusError`` immediately."""
+    fake_resp = _extract_resp(401, {"detail": "unauthorized"})
+    mock_post = AsyncMock(return_value=fake_resp)
+    monkeypatch.setattr("slopmortem.corpus.tavily.safe_post", mock_post)
     with pytest.raises(httpx.HTTPStatusError):
         await tavily_extract_structured("https://example.com/a", api_key="tv-test-key")
+    assert mock_post.call_count == 1
+
+
+async def test_extract_retries_transient(monkeypatch: pytest.MonkeyPatch) -> None:
+    """/extract retries on 432 just like /search."""
+    rate_limited = _extract_resp(432, {"detail": "limit reached"})
+    success = _extract_resp(200, {"results": [{"url": "https://x", "raw_content": "body"}]})
+    mock_post = AsyncMock(side_effect=[rate_limited, success])
+    monkeypatch.setattr("slopmortem.corpus.tavily.safe_post", mock_post)
+    monkeypatch.setattr("slopmortem.corpus.tavily.anyio.sleep", AsyncMock())
+
+    body = await tavily_extract_structured("https://example.com/a", api_key="tv-test-key")
+    assert body == "body"
+    assert mock_post.call_count == 2
 
 
 async def test_extract_posts_documented_body(monkeypatch: pytest.MonkeyPatch) -> None:

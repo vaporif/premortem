@@ -46,7 +46,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Literal, assert_never, cast
+from typing import TYPE_CHECKING, Final, Literal, cast
+from urllib.parse import urlparse
 
 import anyio
 import httpx
@@ -115,10 +116,41 @@ _DEATH_KEYWORDS_PATH: Final = Path(__file__).parent / "death_keywords.yml"
 
 
 @cache
+def _load_death_groups() -> dict[str, dict[str, object]]:
+    """Parse ``death_keywords.yml`` into the ``{group: {applies_to, words}}`` shape."""
+    return cast("dict[str, dict[str, object]]", yaml.safe_load(_DEATH_KEYWORDS_PATH.read_text()))
+
+
+@cache
 def _load_death_keywords() -> tuple[str, ...]:
-    """Load death/distress keywords from the YAML sibling, flatten across groups."""
-    raw = cast("dict[str, list[str]]", yaml.safe_load(_DEATH_KEYWORDS_PATH.read_text()))
-    return tuple(kw for group in raw.values() for kw in group)
+    """Flat list of every keyword across every group — backs the L3 anchor regex."""
+    out: list[str] = []
+    for group in _load_death_groups().values():
+        words = group.get("words")
+        if not isinstance(words, list):
+            continue
+        out.extend(str(w) for w in cast("list[object]", words))
+    return tuple(out)
+
+
+@cache
+def _l0_query_terms(status: str) -> tuple[str, ...]:
+    """Subset of keywords pulled into the L0 Tavily query for ``status``.
+
+    Reads ``applies_to`` on each YAML group: a group contributes its
+    ``words`` when the suggestion's status is named there. Single source of
+    truth shared with ``_DEATH_KEYWORDS`` — edit the YAML, both surfaces
+    pick it up.
+    """
+    out: list[str] = []
+    for group in _load_death_groups().values():
+        applies_to = group.get("applies_to")
+        words = group.get("words")
+        if not isinstance(applies_to, list) or not isinstance(words, list):
+            continue
+        if status in cast("list[object]", applies_to):
+            out.extend(str(w) for w in cast("list[object]", words))
+    return tuple(out)
 
 
 _DEATH_KEYWORDS: Final[tuple[str, ...]] = _load_death_keywords()
@@ -442,40 +474,109 @@ def _has_death_keyword(text: str) -> bool:
     return _DEATH_REGEX.search(text) is not None
 
 
+# Length threshold below which a leading name token is too generic to use as
+# a self-published-host discriminator. ``Opyn`` (4) qualifies; ``The`` (3),
+# ``DAO`` (3), ``AI`` (2) do not. Empirically picked to keep the false-match
+# rate near zero across the project-name shapes Opus emits.
+_MIN_DISTINCTIVE_TOKEN_LEN: Final = 4
+
+
+def _is_self_published(url: str, name: str) -> bool:
+    """True when ``url`` is a page the project itself controls.
+
+    Heuristic: the leading distinctive token of ``name`` appears in the URL
+    host or path. Catches ``github.com/<name>``, ``learn.<name>.*``,
+    ``docs.<name>.*``, ``<name>.com``, dApp-directory listings like
+    ``alchemy.com/dapps/<name>``. ``_select_hit`` uses this to demote
+    project-controlled pages in the fallback rank without rejecting them —
+    a primary hit (death keyword in title) still wins regardless.
+
+    Returns ``False`` for leading tokens shorter than
+    ``_MIN_DISTINCTIVE_TOKEN_LEN`` so generic prefixes don't trip the check.
+    """
+    tokens = name.split()
+    if not tokens:
+        return False
+    leading = tokens[0].lower()
+    if len(leading) < _MIN_DISTINCTIVE_TOKEN_LEN:
+        return False
+    parsed = urlparse(url)
+    haystack = f"{(parsed.hostname or '').lower()}/{parsed.path.lower()}"
+    return leading in haystack
+
+
+def _quote_for_search(term: str) -> str:
+    """Wrap multi-word terms in quotes so Tavily treats them as phrases."""
+    return f'"{term}"' if " " in term else term
+
+
+# Tavily's /search rejects queries over 400 characters with HTTP 400. The
+# OR-clause must fit alongside ``"name"`` + parens + spaces + year. Reserve
+# a small buffer so a longer suggestion name doesn't tip us over.
+_TAVILY_QUERY_MAX_CHARS: Final = 400
+_TAVILY_QUERY_HEADROOM: Final = 20
+
+
 def _build_status_shaped_query(suggestion: RecallSuggestion) -> str:
     """Pass-1 query: biases Tavily toward articles whose surface text screams death.
+
+    Vocabulary is read from ``death_keywords.yml`` (groups whose ``applies_to``
+    contains the suggestion's status). Single source of truth with the L3
+    anchor regex — adding a term in the YAML lifts it into the L0 search
+    automatically. Terms are taken in YAML order until Tavily's 400-char
+    query budget runs out; order high-signal vocabulary first in the YAML.
 
     Precise but misses live companies that Opus over-labeled as
     ``bruised``/``struggling``; pass 2 picks those up.
     """
-    match suggestion.status:
-        case "dead" | "absorbed":
-            return (
-                f'"{suggestion.name}" shutdown or closed or bankrupt or "Chapter 11" '
-                f"{suggestion.failure_year}"
-            )
-        case "struggling" | "bruised":
-            return (
-                f'"{suggestion.name}" layoffs or restructuring or struggling '
-                f"{suggestion.failure_year}"
-            )
-        case _:
-            assert_never(suggestion.status)
+    name_quoted = f'"{suggestion.name}"'
+    year = str(suggestion.failure_year)
+    # name_quoted + " (" + clause + ") " + year ; the parens/spaces total 4 chars.
+    fixed_overhead = len(name_quoted) + len(year) + 4
+    budget = _TAVILY_QUERY_MAX_CHARS - _TAVILY_QUERY_HEADROOM - fixed_overhead
+
+    chosen: list[str] = []
+    used = 0
+    for raw in _l0_query_terms(suggestion.status):
+        candidate = _quote_for_search(raw)
+        added = len(candidate) + (4 if chosen else 0)  # " OR " separator
+        if used + added > budget:
+            continue
+        chosen.append(candidate)
+        used += added
+
+    or_clause = " OR ".join(chosen)
+    return f"{name_quoted} ({or_clause}) {year}"
 
 
 def _select_hit(hits: list[TavilyHit], name: str) -> TavilyHit | None:
-    """Pick the best name-matching hit: primary (name + death keyword) over fallback (name-only)."""
+    """Pick the best name-matching hit, biased toward third-party obituaries.
+
+    Ranking, best-first:
+        1. Primary — any hit whose title+snippet carries a death keyword,
+           regardless of host. Real obituaries can live on the project's
+           own blog when the team writes one.
+        2. External fallback — first name-matching hit on a host the
+           project doesn't control.
+        3. Self-published fallback — first name-matching hit on the
+           project's own GitHub/docs/homepage. Worst signal, kept as
+           last resort.
+    """
     primary: TavilyHit | None = None
-    fallback: TavilyHit | None = None
+    fallback_external: TavilyHit | None = None
+    fallback_self: TavilyHit | None = None
     for hit in hits:
         if not _hit_mentions(hit, name):
             continue
-        if fallback is None:
-            fallback = hit
         if _has_death_keyword(f"{hit.title} {hit.snippet}"):
             primary = hit
             break
-    return primary or fallback
+        if _is_self_published(hit.url, name):
+            if fallback_self is None:
+                fallback_self = hit
+        elif fallback_external is None:
+            fallback_external = hit
+    return primary or fallback_external or fallback_self
 
 
 # Outcome of one Tavily pass. ``transport_error`` and ``no_name_match`` map
