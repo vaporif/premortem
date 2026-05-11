@@ -45,7 +45,7 @@ from typing import TYPE_CHECKING, Final, Literal
 import anyio
 import httpx
 from lmnr import Laminar, observe
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError, model_validator
 
 from slopmortem.concurrency import gather_resilient
 from slopmortem.corpus import extract_clean
@@ -197,11 +197,23 @@ class _DeathnessJudgment(BaseModel):
     ``evidence_quote`` rides along for audit trails — it's not consumed by
     the gate, just preserved for diagnostics if a downstream operator wants
     to inspect why a suggestion was admitted or rejected.
+
+    ``confidence`` carries no field-level ``ge``/``le``: strict
+    ``response_format`` mode (both OpenAI and Anthropic) rejects
+    ``minimum``/``maximum`` on numeric schemas. The [0.0, 1.0] bound is
+    enforced post-parse in ``_validate_confidence`` below.
     """
 
     verdict: Literal["dead", "struggling", "alive"]
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float
     evidence_quote: str
+
+    @model_validator(mode="after")
+    def _validate_confidence(self) -> _DeathnessJudgment:
+        if not 0.0 <= self.confidence <= 1.0:
+            msg = f"confidence {self.confidence} outside [0.0, 1.0]"
+            raise ValueError(msg)
+        return self
 
 
 # Module-private alias: the bare ``Literal`` is what threads through the

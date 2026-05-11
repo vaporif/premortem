@@ -269,30 +269,41 @@ class LlmRerankResult(BaseModel):
 _HTTP_URL_ADAPTER: TypeAdapter[HttpUrl] = TypeAdapter(HttpUrl)
 
 
+_FAILURE_YEAR_MIN = 1990
+_FAILURE_YEAR_MAX = 2030
+
+
 class RecallSuggestion(BaseModel):
     """One LLM-recalled comparable: company name plus the citation that proves failure.
 
-    URL fields are typed ``str`` (not ``HttpUrl``) on purpose: ``HttpUrl`` emits
-    ``format: "uri"`` plus ``minLength``/``maxLength`` in JSON Schema, all of
-    which OpenAI's strict ``response_format`` mode rejects. Parse-equivalent
-    validation runs in ``_validate_urls`` below, so the wire contract stays
-    "well-formed http(s) URL" even though the schema sent upstream is just
-    ``"type": "string"``.
+    Field-level constraints (``HttpUrl`` format, integer ``ge``/``le``) are
+    avoided on purpose: strict ``response_format`` mode on both OpenAI and
+    Anthropic rejects ``format``/``minLength``/``maxLength`` on strings and
+    ``minimum``/``maximum`` on integers. Parse-equivalent validation runs in
+    ``_validate_constraints`` below, so the wire contract stays
+    "well-formed http(s) URL, year in [1990, 2030]" even though the schema
+    sent upstream is just ``"type": "string"`` / ``"type": "integer"``.
     """
 
     name: str
     category: str
     status: Literal["dead", "absorbed", "struggling", "bruised"]
     homepage_url: str
-    failure_year: int = Field(ge=1990, le=2030)
+    failure_year: int
     evidence_url: str
     one_liner: str
 
     @model_validator(mode="after")
-    def _validate_urls(self) -> RecallSuggestion:
+    def _validate_constraints(self) -> RecallSuggestion:
         # Same shape ``HttpUrl`` would have enforced on the field directly.
         _HTTP_URL_ADAPTER.validate_python(self.homepage_url)
         _HTTP_URL_ADAPTER.validate_python(self.evidence_url)
+        if not _FAILURE_YEAR_MIN <= self.failure_year <= _FAILURE_YEAR_MAX:
+            msg = (
+                f"failure_year {self.failure_year} outside "
+                f"[{_FAILURE_YEAR_MIN}, {_FAILURE_YEAR_MAX}]"
+            )
+            raise ValueError(msg)
         return self
 
 

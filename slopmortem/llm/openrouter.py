@@ -69,6 +69,21 @@ async def gather_with_limit[T](
     return await gather_resilient(*(_run(c) for c in coros))
 
 
+def _pin_anthropic_provider(
+    extra_body: dict[str, Any] | None,  # pyright: ignore[reportExplicitAny]
+) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
+    """Return ``extra_body`` with ``provider.order=["Anthropic"]`` set.
+
+    Caller-supplied ``provider`` settings win — only fills the gap when the
+    caller hasn't already constrained routing.
+    """
+    merged: dict[str, Any] = dict(extra_body) if extra_body else {}  # pyright: ignore[reportExplicitAny]
+    if "provider" in merged:
+        return merged
+    merged["provider"] = {"order": ["Anthropic"], "allow_fallbacks": False}
+    return merged
+
+
 class OpenRouterClient:
     """OpenAI-compatible SDK wrapper for OpenRouter; runs the retry and tool-call loops."""
 
@@ -118,10 +133,19 @@ class OpenRouterClient:
         cache_write = 0
         cost = 0.0
 
+        effective_model = model or self._default_model
+        # OpenRouter freely routes ``anthropic/*`` models to AWS Bedrock, whose
+        # Anthropic-compat layer translates ``response_format`` to
+        # ``output_config.format`` and 400s on it. Pin strict-schema requests
+        # for Anthropic models to the direct Anthropic provider so the JSON
+        # schema mode actually reaches a backend that understands it.
+        if response_format is not None and (effective_model or "").startswith("anthropic/"):
+            extra_body = _pin_anthropic_provider(extra_body)
+
         # Only include max_tokens when set so unset callers keep the SDK's
         # "no cap" behavior — sending max_tokens=None upstream is rejected.
         base_kw: dict[str, Any] = {  # pyright: ignore[reportExplicitAny]
-            "model": model or self._default_model,
+            "model": effective_model,
             "response_format": response_format,
             "extra_body": extra_body,
         }
