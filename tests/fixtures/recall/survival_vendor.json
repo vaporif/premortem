@@ -9,9 +9,9 @@
     "",
     "Wayback snapshot: https://web.archive.org/web/20151001000000/https://getpebble.com/",
     "  (captured pre-shutdown homepage describing the smartwatch product line)",
-    "Evidence URL:     https://en.wikipedia.org/wiki/Pebble_(watch)",
-    "  (Wikipedia article documenting the December 2016 insolvency filing,",
-    "   Fitbit asset sale, and post-shutdown Rebble community continuation)",
+    "Citation URL is discovered at L0 by the Tavily search head, not pinned",
+    "in this fixture — the Wikipedia article on Pebble (https://en.wikipedia.org/wiki/Pebble_(watch))",
+    "is the canonical death citation in the survival_news_body.html companion.",
     "",
     "Companion fixtures captured on 2026-05-10 from the URLs above:",
     "  survival_wayback_body.txt  - extract_clean output of the Wayback homepage (~1.2KB)",
@@ -23,7 +23,6 @@
   ],
   "name": "Pebble",
   "homepage_url": "https://www.getpebble.com/",
-  "evidence_url": "https://en.wikipedia.org/wiki/Pebble_(watch)",
   "status": "dead",
   "failure_year": 2016
 }

@@ -84,8 +84,21 @@ def _atomic_swap(*, tmp_dir: Path, real_dir: Path) -> None:
 
 @contextmanager
 def _tavily_off(config: Config) -> Generator[Config]:
-    """Yield a ``Config`` copy with ``enable_tavily_synthesis=False``."""
-    yield config.model_copy(update={"enable_tavily_synthesis": False})
+    """Yield a ``Config`` with both Tavily features off.
+
+    Recording doesn't wire ``RecallDeps``, so the recall branch never fires
+    here; flipping ``enable_tavily_recall_search`` keeps the existing baseline
+    by ensuring the L0 search head can't reach live Tavily even if a future
+    edit threads recall through the recording path. Re-record with a
+    ``RecordingTavilySearch`` wrapper when eval rows are designed to exercise
+    the recall branch.
+    """
+    yield config.model_copy(
+        update={
+            "enable_tavily_synthesis": False,
+            "enable_tavily_recall_search": False,
+        }
+    )
 
 
 async def record_cassettes_for_inputs(  # noqa: PLR0913, PLR0915 — entry point exposes each knob; per-row inline closure intentional

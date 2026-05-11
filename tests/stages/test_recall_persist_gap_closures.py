@@ -26,6 +26,7 @@ from slopmortem.budget import Budget
 from slopmortem.config import Config
 from slopmortem.corpus import MergeJournal, extract_clean
 from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
+from slopmortem.corpus.tavily import TavilyHit
 from slopmortem.ingest import FakeSlopClassifier, IngestResult, InMemoryCorpus, NullProgress
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.llm.client import CompletionResult
@@ -114,7 +115,6 @@ def _suggestion() -> RecallSuggestion:
         status="dead",
         homepage_url="https://hexagate.example/",
         failure_year=2024,
-        evidence_url="https://news.example/hexagate-shutdown",
         one_liner="Hexagate shut down.",
     )
 
@@ -330,7 +330,6 @@ def _recall_payload_single() -> str:
                     "status": "dead",
                     "homepage_url": _ALPHA_HOMEPAGE,
                     "failure_year": 2024,
-                    "evidence_url": _ALPHA_EVIDENCE,
                     "one_liner": "Alpha did Web3 audits and shut down in 2024.",
                 },
             ]
@@ -529,6 +528,32 @@ class _NoOpWayback:
         return entry
 
 
+class _FakeTavilySearch:
+    """Fake ``TavilySearchFn`` — returns one canned Alpha hit per call.
+
+    The verifier's L0 head filters hits by company name in title-or-snippet,
+    so a single hit covering the recalled name (``Alpha``) works for every
+    query in this test file.
+    """
+
+    def __init__(self, hits: list[TavilyHit]) -> None:
+        self._hits = hits
+
+    async def __call__(self, q: str, limit: int) -> list[TavilyHit]:
+        del q
+        return self._hits[:limit]
+
+
+def _alpha_tavily_hits() -> list[TavilyHit]:
+    return [
+        TavilyHit(
+            title="Alpha shuts down operations",
+            url=_ALPHA_EVIDENCE,
+            snippet="Alpha announced its shutdown in 2024 after losing key clients.",
+        )
+    ]
+
+
 def _build_canned(  # noqa: PLR0913 - many parameters shape distinct canned-response keys
     *,
     retrieved: list[Candidate],
@@ -641,6 +666,7 @@ async def _make_recall_deps(tmp_path: Path) -> RecallDeps:
         journal=journal,
         slop_classifier=FakeSlopClassifier(default_score=0.0),
         post_mortems_root=tmp_path / "post_mortems",
+        tavily_search=_FakeTavilySearch(hits=_alpha_tavily_hits()),
         wayback=_NoOpWayback(),
     )
 

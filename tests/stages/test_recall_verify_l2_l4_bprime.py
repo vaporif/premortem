@@ -165,9 +165,14 @@ def _suggestion(name: str = "Acme") -> RecallSuggestion:
         status="dead",
         homepage_url=f"https://{slug}.test/",
         failure_year=2023,
-        evidence_url=f"https://news.example/{slug}",
         one_liner=f"{name} shut down.",
     )
+
+
+def _discovered(name: str = "Acme") -> str:
+    """Stand-in for the L0 Tavily-discovered article URL — keyed off the name."""
+    slug = name.lower().replace(" ", "-")
+    return f"https://news.example/{slug}"
 
 
 async def test_homepage_head_does_not_gate_when_wayback_anchors(
@@ -175,18 +180,20 @@ async def test_homepage_head_does_not_gate_when_wayback_anchors(
 ) -> None:
     """Homepage HEAD 404 must NOT drop the candidate when Wayback anchors the name."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Acme shut down in 2023 per court filings.")
     wayback_body = "Acme is a security firm specializing in runtime monitoring."
     _patch_http(
         monkeypatch,
         # Note: no entry for the homepage URL — the refactored verifier must
         # not probe it. The fake will raise AssertionError if it tries.
-        head_responses={str(sug.evidence_url): _FakeResp(status=200)},
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     wb = _AnchoringWayback(text=wayback_body)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_admits_llm(),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -208,14 +215,16 @@ async def test_wayback_empty_admits_at_evidence_only_tier(
 ) -> None:
     """Wayback returns the seed unchanged → admit at ``evidence_only`` tier (no drop)."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Acme filed for bankruptcy yesterday.")
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=200)},
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_PassThroughWayback(),
         llm=_admits_llm(),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -238,15 +247,17 @@ async def test_wayback_transient_failure_does_not_drop(
     surfaces exceptions to the caller.
     """
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Acme was wound down per filings.")
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=200)},
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     wb = _RaisingWayback(httpx.ReadTimeout("ia is down"))
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=_admits_llm(),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -268,14 +279,16 @@ async def test_evidence_head_405_falls_through_to_get(
     GET returns a real body. The verifier should admit via the GET fallback.
     """
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_html = _article_html("Acme ceased operations in 2023.")
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=405)},
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=evidence_html)},
+        head_responses={discovered: _FakeResp(status=405)},
+        get_responses={discovered: _FakeResp(status=200, text=evidence_html)},
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_PassThroughWayback(),
         llm=_admits_llm(),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -289,13 +302,15 @@ async def test_evidence_head_405_falls_through_to_get(
 async def test_evidence_get_404_drops(monkeypatch: pytest.MonkeyPatch) -> None:
     """When both HEAD and GET fail, drop. L5 must not run (LLM blocker proves it)."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=404)},
-        get_responses={str(sug.evidence_url): _FakeResp(status=404)},
+        head_responses={discovered: _FakeResp(status=404)},
+        get_responses={discovered: _FakeResp(status=404)},
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_PassThroughWayback(),
         llm=_blocker_llm(),
         model_recall_deathness=_DEATHNESS_MODEL,

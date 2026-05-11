@@ -70,7 +70,6 @@ def _suggestion(
         status="dead",
         homepage_url=homepage,
         failure_year=2024,
-        evidence_url="https://news.example/hexagate-shutdown",
         one_liner=f"{name} shut down.",
     )
 

@@ -143,20 +143,25 @@ def _suggestion(name: str = "Acme") -> RecallSuggestion:
         status="dead",
         homepage_url=f"https://{slug}.test/",
         failure_year=2023,
-        evidence_url=f"https://news.example/{slug}",
         one_liner=f"{name} shut down.",
     )
 
 
-def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *, body: str) -> None:
+def _discovered(name: str = "Acme") -> str:
+    """Stand-in for the L0 Tavily-discovered article URL — keyed off the name."""
+    slug = name.lower().replace(" ", "-")
+    return f"https://news.example/{slug}"
+
+
+def _patch_l1_l4_pass(monkeypatch: pytest.MonkeyPatch, sug: RecallSuggestion, *, body: str) -> str:
+    """Wire HEAD/GET to admit through L1-L4 cleanly. Returns the discovered URL."""
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=_article_html(body))},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=_article_html(body))},
     )
+    return discovered
 
 
 @pytest.mark.parametrize(
@@ -178,13 +183,16 @@ async def test_l5_tristate_thresholds(
 ) -> None:
     """L5 admits only when verdict is dead/struggling AND confidence ≥ verdict-specific floor."""
     sug = _suggestion()
-    _patch_l1_l4_pass(monkeypatch, sug, body="Acme shut down in 2023 after losing funding.")
+    discovered = _patch_l1_l4_pass(
+        monkeypatch, sug, body="Acme shut down in 2023 after losing funding."
+    )
     payload = (
         f'{{"verdict": "{verdict}", "confidence": {confidence}, "evidence_quote": "from the body"}}'
     )
     llm = _FakeLLM(responses=[payload])
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -212,6 +220,7 @@ async def test_l5_news_body_and_persisted_combined_when_anchored(
     must contain BOTH under their section markers.
     """
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_lead = "Acme shut down in 2023 per court filings."
     wayback_marketing = (
         "Acme — secure your stack with our runtime threat detection platform "
@@ -219,10 +228,8 @@ async def test_l5_news_body_and_persisted_combined_when_anchored(
     )
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=200)},
-        get_responses={
-            str(sug.evidence_url): _FakeResp(status=200, text=_article_html(evidence_lead)),
-        },
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=_article_html(evidence_lead))},
     )
     llm = _FakeLLM(
         responses=['{"verdict": "dead", "confidence": 0.9, "evidence_quote": "shut down"}'],
@@ -230,6 +237,7 @@ async def test_l5_news_body_and_persisted_combined_when_anchored(
     wb = _FakeWayback(enriched_text=wayback_marketing)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=wb,
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -259,19 +267,19 @@ async def test_persisted_body_omits_wayback_section_when_not_anchored(
 ) -> None:
     """Wayback didn't anchor → persisted body has only the failure citation section."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     evidence_lead = "Acme filed for bankruptcy yesterday after eighteen months of losses."
     _patch_http(
         monkeypatch,
-        head_responses={str(sug.evidence_url): _FakeResp(status=200)},
-        get_responses={
-            str(sug.evidence_url): _FakeResp(status=200, text=_article_html(evidence_lead)),
-        },
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=_article_html(evidence_lead))},
     )
     llm = _FakeLLM(
         responses=['{"verdict": "dead", "confidence": 0.9, "evidence_quote": "bankruptcy"}'],
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_FakeWayback(enriched_text=None),
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,

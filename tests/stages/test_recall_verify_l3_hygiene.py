@@ -125,24 +125,28 @@ def _suggestion(name: str = "Acme") -> RecallSuggestion:
         status="dead",
         homepage_url=f"https://{slug}.test/",
         failure_year=2023,
-        evidence_url=f"https://news.example/{slug}",
         one_liner=f"{name} shut down.",
     )
+
+
+def _discovered(name: str = "Acme") -> str:
+    """Stand-in for the L0 Tavily-discovered article URL — keyed off the name."""
+    slug = name.lower().replace(" ", "-")
+    return f"https://news.example/{slug}"
 
 
 async def test_l3_drops_when_body_under_500_chars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Paywall stub: extracted body is empty, L3 must reject before L5."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=PAYWALL_HTML)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=PAYWALL_HTML)},
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=_call_blocker(),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -156,16 +160,15 @@ async def test_l3_drops_when_body_under_500_chars(monkeypatch: pytest.MonkeyPatc
 async def test_l3_rejects_when_name_only_in_sidebar(monkeypatch: pytest.MonkeyPatch) -> None:
     """Trafilatura strips the ``<aside>`` so ``Acme`` no longer appears in body."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=SIDEBAR_HTML)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=SIDEBAR_HTML)},
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=_call_blocker(),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -179,6 +182,7 @@ async def test_l3_rejects_when_name_only_in_sidebar(monkeypatch: pytest.MonkeyPa
 async def test_l3_does_not_match_substring_inside_word(monkeypatch: pytest.MonkeyPatch) -> None:
     """``enclosed``/``disclosed`` contain ``closed`` as substring but aren't death keywords."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     lead = (
         "<html><body><main><p>Acme's quarterly disclosed financials enclosed in this "
         "release show steady growth. The team enclosed a multi-year roadmap and disclosed "
@@ -187,14 +191,12 @@ async def test_l3_does_not_match_substring_inside_word(monkeypatch: pytest.Monke
     body = lead + ("Filler content. " * 60) + "</p></main></body></html>"
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=body)},
     )
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=_call_blocker(),
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -208,6 +210,7 @@ async def test_l3_does_not_match_substring_inside_word(monkeypatch: pytest.Monke
 async def test_l3_admits_shuttered_keyword(monkeypatch: pytest.MonkeyPatch) -> None:
     """Expanded vocabulary: ``shuttered`` and ``wind down`` admit through L3."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     lead = (
         "<html><body><main><p>Acme Security shuttered last month after failing to "
         "raise a Series B. The thirty-person company had been struggling for two "
@@ -216,15 +219,13 @@ async def test_l3_admits_shuttered_keyword(monkeypatch: pytest.MonkeyPatch) -> N
     body = lead + ("More detail. " * 80) + "</p></main></body></html>"
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=body)},
     )
     llm = _FakeLLM(default=_DEATHNESS_PASS)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,
@@ -239,6 +240,7 @@ async def test_l3_admits_shuttered_keyword(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_l3_admits_chapter_eleven(monkeypatch: pytest.MonkeyPatch) -> None:
     """Multi-word ``Chapter 11`` matches across the whitespace gap."""
     sug = _suggestion()
+    discovered = _discovered(sug.name)
     lead = (
         "<html><body><main><p>Acme Health filed for Chapter 11 protection in March "
         "after eighteen months of negative cash flow. The 200-person staff received "
@@ -247,15 +249,13 @@ async def test_l3_admits_chapter_eleven(monkeypatch: pytest.MonkeyPatch) -> None
     body = lead + ("Background detail. " * 80) + "</p></main></body></html>"
     _patch_http(
         monkeypatch,
-        head_responses={
-            str(sug.homepage_url): _FakeResp(status=200),
-            str(sug.evidence_url): _FakeResp(status=200),
-        },
-        get_responses={str(sug.evidence_url): _FakeResp(status=200, text=body)},
+        head_responses={discovered: _FakeResp(status=200)},
+        get_responses={discovered: _FakeResp(status=200, text=body)},
     )
     llm = _FakeLLM(default=_DEATHNESS_PASS)
     out = await verify_suggestion(
         sug,
+        discovered_url=discovered,
         wayback=_FakeWayback(),
         llm=llm,
         model_recall_deathness=_DEATHNESS_MODEL,

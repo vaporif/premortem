@@ -144,7 +144,6 @@ def _suggestion_from_fixture(vendor: dict[str, Any]) -> RecallSuggestion:
         status="dead",
         homepage_url=str(vendor["homepage_url"]),
         failure_year=int(vendor["failure_year"]),
-        evidence_url=str(vendor["evidence_url"]),
         one_liner=f"{vendor['name']} filed for insolvency in {vendor['failure_year']}.",
     )
 
@@ -405,10 +404,13 @@ async def test_recall_entry_lands_in_top_k_after_persist(tmp_path: Path) -> None
     news_html = (_FIXTURES / "survival_news_body.html").read_text()
     wayback_md = (_FIXTURES / "survival_wayback_body.txt").read_text()
 
+    # Stand-in for the L0 Tavily-discovered citation URL; the body composition
+    # only cares about the string for the ``Source:`` header.
+    discovered_url = "https://en.wikipedia.org/wiki/Pebble_(watch)"
     body = _combine_recall_body(
         wayback_md=wayback_md,
         news_html=news_html,
-        evidence_url=str(vendor["evidence_url"]),
+        evidence_url=discovered_url,
     )
     suggestion = _suggestion_from_fixture(vendor)
     entry = _entry_for(suggestion, body)
