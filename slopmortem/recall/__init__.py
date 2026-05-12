@@ -62,12 +62,11 @@ async def recall(
     drop fired, or transport failures isolated all candidates. The function
     never raises for per-suggestion failures.
     """
-    # Lazy: importing slopmortem.stages.facet_extract eagerly would pull the
-    # whole stages package into recall's import graph for the rare standalone
-    # facets=None path. Pipeline always passes pre-extracted facets.
-    from slopmortem.stages.facet_extract import extract_facets  # noqa: PLC0415
-
     if facets is None:
+        # Lazy: pull stages.facet_extract only when the caller hasn't supplied
+        # facets. Pipeline always passes pre-extracted facets and skips this.
+        from slopmortem.stages.facet_extract import extract_facets  # noqa: PLC0415
+
         facets = await extract_facets(
             pitch,
             deps.llm,
