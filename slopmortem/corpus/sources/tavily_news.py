@@ -419,10 +419,13 @@ class TavilyNewsSource:
         if len(kept) > self.max_emit:
             logger.info("tavily_news: max_emit=%d reached, stopping", self.max_emit)
         for row in capped:
+            raw_title = row.get("title")
+            title = raw_title.strip() if isinstance(raw_title, str) and raw_title.strip() else None
             yield RawEntry(
                 source=SOURCE_TAVILY_NEWS,
                 source_id=cast("str", row["canonical_url"]),
                 url=cast("str", row["canonical_url"]),
+                title=title,
                 raw_html=None,
                 markdown_text=cast("str", row["raw_content"]),
                 fetched_at=datetime.now(UTC),

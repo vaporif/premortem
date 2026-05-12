@@ -857,14 +857,26 @@ async def verify_suggestion(  # noqa: PLR0913 - verifier signature carries L0-L5
             break
     if evidence is None or evidence_body is None:
         return None
-    seed_url = homepage if homepage is not None else evidence
+    # url is identity, not provenance. When ``homepage_url is None`` the only
+    # URL we have is the citation host (e.g. a news outlet), which is a domain
+    # that hosts content about many unrelated companies. Letting that domain
+    # flow into the resolver via ``entry.url`` makes tier-1 win on the citation
+    # host and collapses unrelated recall suggestions into one canonical_id.
+    # Leaving url=None forces the resolver to tier-2 keyed on suggestion.name.
+    # The evidence URL is still preserved in the persisted body (see
+    # ``_combine_recall_body``); only payload.sources loses it for these
+    # entries, which is a cosmetic cost on the rendered report.
     # markdown_text=None AND raw_html=None matter — WaybackEnricher.enrich
     # short-circuits if either body is already populated, so the seed has to
     # arrive empty for L4 to do its enrichment pass.
     seed = RawEntry(
         source=SOURCE_LLM_RECALL,
         source_id=_recall_source_id(suggestion),
-        url=seed_url,
+        url=homepage,
+        # The suggestion's name is trusted (LLM-emitted and L1-validated);
+        # threading it here keeps the resolver from keying tier-2 on the
+        # opaque sha256 source_id.
+        title=suggestion.name,
         markdown_text=None,
         raw_html=None,
         fetched_at=datetime.now(UTC),

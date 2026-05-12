@@ -513,8 +513,13 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
             on_candidate_done=_on_candidate_done,
         )
         successes = [s for s in synth_results if isinstance(s, Synthesis)]
+        # Mirror the pre-synth floor: when recall persisted, the synthesizer's
+        # re-scored similarity is judged against the same lowered bar the
+        # rerank-side filter used. Otherwise the recall branch pays for
+        # synthesis on candidates it already vetted only for the post-synth
+        # drop to re-apply the corpus-normal floor and discard them.
         successes, filtered_post_synth = drop_below_min_similarity(
-            successes, min_similarity=config.min_similarity_score
+            successes, min_similarity=synthesis_threshold
         )
         # Inside the try so a budget-exceeded run falls through to the default
         # empty TopRisks instead of consolidating a partial set.

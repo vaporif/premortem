@@ -17,6 +17,7 @@ from slopmortem.ingest import (
     InMemoryCorpus,
 )
 from slopmortem.ingest._helpers import (
+    _entry_name,
     _entry_summary_text,
     _gather_entries,
     _truncate_to_tokens,
@@ -86,6 +87,80 @@ def test_entry_summary_text_falls_back_to_html_extract():
 def test_entry_summary_text_returns_empty_when_no_content():
     e = _entry(markdown_text=None, raw_html=None)
     assert _entry_summary_text(e, max_tokens=100) == ""
+
+
+def test_entry_name_prefers_title_when_set():
+    e = RawEntry(
+        source="hn_algolia",
+        source_id="21055034",
+        url="https://example.com",
+        title="Kin (by Kik Interactive) shuts down",
+        markdown_text="# Some article heading\n\nbody",
+        fetched_at=datetime(2026, 4, 28, tzinfo=UTC),
+    )
+    assert _entry_name(e) == "Kin (by Kik Interactive) shuts down"
+
+
+def test_entry_name_falls_back_to_first_heading():
+    e = RawEntry(
+        source="tavily_news",
+        source_id="https://example.com/post",
+        url="https://example.com/post",
+        title=None,
+        markdown_text="Some preamble\n\n# Acme Corp shuts down\n\nDetails follow.",
+        fetched_at=datetime(2026, 4, 28, tzinfo=UTC),
+    )
+    assert _entry_name(e) == "Acme Corp shuts down"
+
+
+def test_entry_name_matches_h2_when_no_h1():
+    e = RawEntry(
+        source="tavily_news",
+        source_id="https://example.com/post",
+        url="https://example.com/post",
+        title=None,
+        markdown_text="preamble\n## Foo Co goes bankrupt\nrest",
+        fetched_at=datetime(2026, 4, 28, tzinfo=UTC),
+    )
+    assert _entry_name(e) == "Foo Co goes bankrupt"
+
+
+def test_entry_name_warns_and_falls_back_to_source_id(caplog):
+    e = RawEntry(
+        source="hn_algolia",
+        source_id="21055034",
+        url="https://example.com",
+        title=None,
+        markdown_text="plain body with no markdown headings at all",
+        fetched_at=datetime(2026, 4, 28, tzinfo=UTC),
+    )
+    with caplog.at_level("WARNING", logger="slopmortem.ingest._helpers"):
+        assert _entry_name(e) == "21055034"
+    assert any("no name extractable" in r.message for r in caplog.records)
+
+
+def test_entry_name_treats_whitespace_only_title_as_missing():
+    e = RawEntry(
+        source="hn_algolia",
+        source_id="21055034",
+        url="https://example.com",
+        title="   ",
+        markdown_text=None,
+        fetched_at=datetime(2026, 4, 28, tzinfo=UTC),
+    )
+    assert _entry_name(e) == "21055034"
+
+
+def test_entry_name_strips_title_whitespace():
+    e = RawEntry(
+        source="hn_algolia",
+        source_id="21055034",
+        url="https://example.com",
+        title="  Kin (by Kik Interactive)\t\n",
+        markdown_text=None,
+        fetched_at=datetime(2026, 4, 28, tzinfo=UTC),
+    )
+    assert _entry_name(e) == "Kin (by Kik Interactive)"
 
 
 async def test_inmemory_corpus_rejects_non_point_payload():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import date
 from typing import TYPE_CHECKING, Final, Literal
 
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 __all__ = [
     "_build_payload",
     "_enrich_pipeline",
+    "_entry_name",
     "_entry_summary_text",
     "_gather_entries",
     "_reliability_for",
@@ -94,6 +96,38 @@ def _truncate_to_tokens(text: str, max_tokens: int) -> str:
     if len(tokens) <= max_tokens:
         return text
     return enc.decode(tokens[:max_tokens])
+
+
+_HEADING_RE: Final = re.compile(r"^\s{0,3}#{1,2}\s+(.+?)\s*$", re.MULTILINE)
+
+
+def _entry_name(entry: RawEntry) -> str:
+    """Best-effort company name for entity-resolution tier-2 keying.
+
+    Resolver tier-2 keys on ``{normalized_name}::{sector}``; a wrong name
+    here (e.g. an HN item id like ``"21055034"``) makes two articles about
+    the same company collide *only* if tier-3 dense similarity catches
+    them, which it currently can't (existing-side embedding is the
+    canonical-id string in v1). Order:
+
+    1. ``entry.title`` — sources set it when known.
+    2. First H1/H2 in ``entry.markdown_text``.
+    3. ``entry.source_id`` with a warning — last-resort, breaks dedup.
+    """
+    if entry.title and entry.title.strip():
+        return entry.title.strip()
+    if entry.markdown_text:
+        match = _HEADING_RE.search(entry.markdown_text)
+        if match:
+            heading = match.group(1).strip()
+            if heading:
+                return heading
+    msg = (
+        "ingest: no name extractable for %s:%s; resolver falling back to"
+        " source_id, dedup across sources will likely fail"
+    )
+    logger.warning(msg, entry.source, entry.source_id)
+    return entry.source_id
 
 
 def _entry_summary_text(entry: RawEntry, *, max_tokens: int) -> str:

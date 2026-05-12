@@ -539,8 +539,10 @@ async def test_l4_wayback_short_circuits_when_homepage_is_none(
     assert tier == "evidence_only"
     assert verdict == "dead"
     assert wb.calls == []
-    # Seed RawEntry falls back to the discovered URL when no homepage.
-    assert entry.url == discovered
+    # Seed RawEntry leaves url=None when no homepage: identity is unknown,
+    # don't substitute the citation host. The resolver then tier-2s on
+    # suggestion.name rather than collapsing onto the news outlet's domain.
+    assert entry.url is None
     assert (SpanEvent.RECALL_VERIFIED_EVIDENCE_ONLY, {"wayback_attempted": "false"}) in events
 
 
@@ -683,6 +685,9 @@ async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPa
     assert entry.url == sug.homepage_url
     assert isinstance(entry.fetched_at, datetime)
     assert entry.fetched_at.tzinfo == UTC
+    # Suggestion's name flows into RawEntry.title so the resolver tier-2 key
+    # isn't the opaque sha256 source_id.
+    assert entry.title == sug.name
 
 
 async def test_recall_source_id_collapses_on_same_homepage(

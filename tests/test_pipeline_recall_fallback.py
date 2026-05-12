@@ -519,6 +519,7 @@ def _build_canned(  # noqa: PLR0913 - test fixture: every parameter shapes a can
     second_pass: list[Candidate] | None = None,
     second_pass_top_n: list[Candidate] | None = None,
     rerank_score: float = 7.0,
+    synth_score: float = 7.0,
 ) -> Mapping[tuple[str, str, str], FakeResponse | CompletionResult]:
     """Canned-response map covering every non-recall LLM call.
 
@@ -560,7 +561,9 @@ def _build_canned(  # noqa: PLR0913 - test fixture: every parameter shapes a can
     # Synthesize: deterministic ``candidate_id="acme"`` so consolidate sees
     # one canonical lesson set regardless of which candidates land.
     synth_resp = FakeResponse(
-        text=_synthesis_payload("acme"), cost_usd=0.01, cache_creation_tokens=10
+        text=_synthesis_payload("acme", score=synth_score),
+        cost_usd=0.01,
+        cache_creation_tokens=10,
     )
     seen: set[tuple[str, str, str]] = set()
     for cand in top_n:
@@ -1063,6 +1066,67 @@ async def test_pipeline_recall_lowers_synth_floor_when_persisted(
     # adaptive 3.0 floor (it would have been dropped at 4.0).
     assert report.pipeline_meta.recall_used is True
     assert report.pipeline_meta.recall_persisted_count == 1
+    assert len(report.candidates) == 1
+    assert report.candidates[0].name == "acme"
+
+
+async def test_pipeline_recall_lowers_post_synth_floor_when_persisted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Recall persisted >=1 → post-synth filter also uses the lowered floor.
+
+    The synthesizer sometimes re-scores a candidate below the rerank-side
+    similarity (the synthesis stage's own ``drop_below_min_similarity`` call).
+    Without the after-recall threshold being honoured post-synth, the recall
+    branch synthesises a candidate (paying tokens), the synthesiser scores
+    3.5, then the corpus-normal 4.0 floor drops it — undoing the pre-synth
+    rationale and burning the recall budget.
+
+    Spike both rerank AND synth at 3.5: between the recall floor (3.0) and
+    the corpus-normal floor (4.0). Pre-synth filter (3.0) admits it; without
+    the fix post-synth (4.0) drops it. With the fix both filters apply 3.0.
+    """
+    cfg = _build_config(k_retrieve=6, n_synthesize=3)
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    persisted = _candidate("alpha-stub")
+    corpus = _HybridCorpus(base_candidates=[], augment_with=persisted)
+    canned = _build_canned(
+        retrieved=[],
+        top_n=[],
+        ctx=ctx,
+        cfg=cfg,
+        second_pass=[persisted],
+        second_pass_top_n=[persisted],
+        rerank_score=3.5,
+        synth_score=3.5,
+    )
+    inner = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    llm = _RecallRoutingLLM(
+        inner=inner,
+        recall_responses=[FakeResponse(text=_recall_payload(), cost_usd=0.05)],
+    )
+    embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    budget = Budget(cap_usd=2.0)
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
+    _patch_recall_http(monkeypatch)
+    deps = await _make_recall_deps(tmp_path)
+
+    report = await run_query(
+        ctx,
+        llm=llm,
+        embedding_client=embed,
+        corpus=corpus,
+        config=cfg,
+        budget=budget,
+        sparse_encoder=_stub_sparse,
+        recall_deps=deps,
+    )
+
+    assert report.pipeline_meta.recall_used is True
+    assert report.pipeline_meta.recall_persisted_count == 1
+    # The synthesised candidate clears the lowered 3.0 post-synth bar that
+    # mirrors the pre-synth choice; the corpus-normal 4.0 would have dropped it.
+    assert report.pipeline_meta.filtered_post_synth == 0
     assert len(report.candidates) == 1
     assert report.candidates[0].name == "acme"
 

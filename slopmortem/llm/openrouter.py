@@ -111,7 +111,7 @@ class OpenRouterClient:
         budget: Budget,
         model: str | None = None,
         max_retries: int = 3,
-        max_tool_turns: int = 5,
+        max_tool_turns: int = 12,
         initial_backoff: float = 1.0,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:

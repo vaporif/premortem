@@ -66,7 +66,7 @@ tavily_recall_max_results = 5
 # up to this many times during one recall firing to discover comparable
 # startups. Set to 0 to disable tool calls and fall back to
 # training-data-only recall.
-recall_max_tavily_calls = 3
+recall_max_tavily_calls = 10
 
 # Slop classifier threshold during ingest. Above this, docs go to
 # post_mortems/quarantine/ instead of canonical/. Higher = more permissive.

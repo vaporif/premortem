@@ -129,12 +129,12 @@ class Config(BaseSettings):
     # Per-recall Tavily call budget. The recall LLM may invoke ``tavily_search``
     # up to this many times during one recall firing to discover comparable
     # startups before returning its suggestion list. Bounded so a runaway
-    # tool loop can't blow the budget on a single query. Default chosen so a
-    # niche pitch (e.g. on-chain derivatives, exotic verticals) can verify
-    # 4-6 candidates with one citation lookup each — 3 was too tight, leaving
-    # most suggestions with `evidence_url: null` and forcing the L0 search
-    # head to find citations downstream on a separate path.
-    recall_max_tavily_calls: int = Field(default=6, ge=0, le=20)
+    # tool loop can't blow the budget on a single query. Default sized so a
+    # niche pitch (e.g. on-chain derivatives, exotic verticals) can run a
+    # handful of searches AND extract bodies on the strongest hits before
+    # committing — lower values forced the LLM back to training memory,
+    # biasing recall toward famous failures rather than tight analogs.
+    recall_max_tavily_calls: int = Field(default=10, ge=0, le=20)
 
     # Recall L0: when True, the recall verifier discovers a citation URL via
     # Tavily search before the L2 HEAD/GET gate. When False, the recall branch

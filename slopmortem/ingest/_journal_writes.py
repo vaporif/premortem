@@ -33,6 +33,7 @@ from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.ingest._fan_out import _embed_and_upsert
 from slopmortem.ingest._helpers import (
     _build_payload,
+    _entry_name,
     _reliability_for,
     _skip_key,
     _text_id_for,
@@ -88,7 +89,7 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
     (today only ``delete_chunks_for_canonical`` on re-merge); abort before
     any upsert so we don't shadow prior orphans with a fresh layer.
     """
-    name = entry.source_id  # ingest's name extraction is best-effort in v1
+    name = _entry_name(entry)
     sector = fan.facets.sector
     res = await resolve_entity(
         entry,
