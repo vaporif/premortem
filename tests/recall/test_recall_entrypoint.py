@@ -287,6 +287,5 @@ async def test_recall_isolates_per_suggestion_transport_failures() -> None:
         wayback=_FakeWayback(),
     )
     out = await recall("a pitch", facets=_facets(), deps=deps, config=_config())
-    # Both suggestions return nothing: Raiser raises L0, Quiet has no hits.
-    # Critical: the exception did NOT propagate up.
+    # Raiser raises at L0, Quiet has no hits; the HTTPError must not propagate.
     assert out == []

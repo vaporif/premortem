@@ -244,10 +244,8 @@ class _DeathnessJudgment(BaseModel):
         return self
 
 
-# Module-private alias: the bare ``Literal`` is what threads through the
-# persist chain (CandidatePayload, _build_payload, _process_entry, _write_phase,
-# persist_recall_entry, the persist callback) so the leaf alias doesn't leak
-# across import boundaries.
+# Module-private: persist-chain types use the bare ``Literal`` so this alias
+# stays out of CandidatePayload, _build_payload, persist_recall_entry, etc.
 type _AdmitVerdict = Literal["dead", "struggling"]
 
 
