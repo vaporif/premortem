@@ -208,7 +208,7 @@ def test_min_similarity_score_after_recall_validator_rejects_above_normal(tmp_pa
 
 
 def test_recall_max_tavily_calls_default_is_10(tmp_path, monkeypatch):
-    """Default of 10 lets niche pitches search and extract bodies before falling back to training memory."""
+    """Default of 10 lets niche pitches search and extract bodies before falling back to memory."""
     monkeypatch.chdir(tmp_path)
     cfg = Config()
     assert cfg.recall_max_tavily_calls == 10
