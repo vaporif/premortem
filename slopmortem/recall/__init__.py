@@ -77,7 +77,7 @@ async def recall(
     suggestions = await llm_recall(
         pitch=pitch,
         facets=facets,
-        current_top_n=list(prior_hints) if prior_hints is not None else [],
+        current_top_n=prior_hints if prior_hints is not None else [],
         llm=deps.llm,
         model=config.model_recall,
         max_tokens=config.max_tokens_recall,
