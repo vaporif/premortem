@@ -31,7 +31,8 @@ from slopmortem.config import load_config
 from slopmortem.corpus import set_query_corpus
 from slopmortem.deps import build_deps, build_tavily_recall_extract, build_tavily_recall_search
 from slopmortem.models import InputContext
-from slopmortem.pipeline import RecallDeps, cutoff_iso, run_query
+from slopmortem.pipeline import PersistDeps, cutoff_iso, run_query
+from slopmortem.recall import RecallDeps
 from slopmortem.render import render
 from slopmortem.stages import extract_facets, retrieve
 
@@ -153,7 +154,7 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
     if debug_retrieve:
         await _debug_retrieve(ctx, llm=llm, embedder=embedder, corpus=corpus, config=config)
         return
-    recall_deps = await _build_recall_deps(config, llm=llm)
+    recall_deps, persist_deps = await _build_recall_and_persist_deps(config, llm=llm)
 
     progress_ctx = progress_context(RichQueryProgress)
     err_console = Console(stderr=True)
@@ -169,6 +170,7 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
                 progress=bar,
                 sparse_encoder=sparse_encoder,
                 recall_deps=recall_deps,
+                persist_deps=persist_deps,
             )
     except KeyboardInterrupt:
         err_console.rule("[bold yellow]query cancelled (Ctrl-C)", style="yellow")
@@ -197,12 +199,12 @@ async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
         typer.echo(str(out_path))
 
 
-async def _build_recall_deps(
+async def _build_recall_and_persist_deps(
     config: Config,
     *,
     llm: LLMClient,
-) -> RecallDeps | None:
-    """Build ``RecallDeps`` eagerly; return ``None`` when recall is off.
+) -> tuple[RecallDeps | None, PersistDeps | None]:
+    """Build ``(RecallDeps, PersistDeps)`` eagerly; return ``(None, None)`` when recall is off.
 
     Built up front because the coverage-gap predicate can fire on any query.
     ``MergeJournal.init()`` dominates cold start at <50ms. Tavily-off
@@ -211,7 +213,7 @@ async def _build_recall_deps(
     tavily_search = build_tavily_recall_search(config)
     extract = build_tavily_recall_extract(config)
     if tavily_search is None or extract is None:
-        return None
+        return None, None
     # Local imports keep the cold-start cost off the import path; mirrors
     # the ``_ingest_cmd.py`` pattern of deferring heavyweight deps.
     from slopmortem.corpus import MergeJournal  # noqa: PLC0415
@@ -228,13 +230,17 @@ async def _build_recall_deps(
         model=config.model_summarize,
         max_tokens=config.max_tokens_slop_judge,
     )
-    return RecallDeps(
-        journal=journal,
-        slop_classifier=classifier,
-        post_mortems_root=post_mortems_root,
+    recall_deps = RecallDeps(
+        llm=llm,
         tavily_search=tavily_search,
         extract=extract,
     )
+    persist_deps = PersistDeps(
+        journal=journal,
+        slop_classifier=classifier,
+        post_mortems_root=post_mortems_root,
+    )
+    return recall_deps, persist_deps
 
 
 _DEBUG_SUMMARY_MAX = 200

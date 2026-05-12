@@ -1,6 +1,6 @@
 """Verifier for LLM-recalled suggestions: gates L0-L5 before persistence.
 
-``stages.llm_recall`` returns ``RecallSuggestion`` rows the LLM thinks failed.
+``recall._brainstorm`` returns ``RecallSuggestion`` rows the LLM thinks failed.
 None are verified yet, and a fraction will be hallucinated. This module gates
 each through:
 
@@ -58,7 +58,7 @@ from pydantic import BaseModel, ValidationError, model_validator
 
 from slopmortem.concurrency import gather_resilient
 from slopmortem.corpus import extract_clean
-from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
+from slopmortem.corpus.sources import SOURCE_LLM_RECALL
 from slopmortem.http import SSRFBlockedError, safe_get, safe_head
 from slopmortem.llm import (
     OpenRouterCompletionError,
@@ -914,37 +914,51 @@ async def verify_suggestion(  # noqa: PLR0913 - verifier signature carries L0-L5
     return final, tier, verdict
 
 
+@dataclass(frozen=True, slots=True)
+class VerifiedEntry:
+    """One suggestion that passed L0-L5.
+
+    Carries the triple persistence needs: the seed ``RawEntry``, the
+    Wayback tier label, and the L5 admit verdict (``"dead"`` | ``"struggling"``).
+    Persistence lives pipeline-side and reads all three fields.
+    """
+
+    entry: RawEntry
+    tier: VerificationTier
+    verdict: Literal["dead", "struggling"]
+
+
 # Decorator lives at the fan-out level so the trace gets one
 # ``stage.recall_verify`` parent with N child spans, not N siblings with no
-# parent. Suggestions, persist, wayback, and llm handles never go to span
-# attrs: CLAUDE.md forbids prompt/response bodies in tracing, and the
-# evidence body can be sizeable.
+# parent. Suggestions, wayback, and llm handles never go to span attrs:
+# CLAUDE.md forbids prompt/response bodies in tracing, and the evidence
+# body can be sizeable.
 @observe(
     name="stage.recall_verify",
-    ignore_inputs=["suggestions", "persist", "wayback", "llm", "tavily_search", "extract"],
+    ignore_inputs=["suggestions", "wayback", "llm", "tavily_search", "extract"],
     ignore_output=True,
 )
-async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; recall fan-out takes every dep at this seam
+async def verify_all(  # noqa: PLR0913 - leaf helper; recall fan-out takes every dep at this seam
     suggestions: list[RecallSuggestion],
     *,
     wayback: Enricher,
-    persist: Callable[[RawEntry, VerificationTier, Literal["dead", "struggling"]], Awaitable[None]],
     llm: LLMClient,
     tavily_search: TavilySearchFn,
     extract: ExtractFn,
     tavily_recall_max_results: int,
     deathness: DeathnessConfig,
     concurrency: int = _DEFAULT_CONCURRENCY,
-) -> list[RawEntry]:
-    """Verify each suggestion under a capacity limiter; persist accepted entries.
+) -> list[VerifiedEntry]:
+    """Verify each suggestion under a capacity limiter; return accepted entries.
 
     ``gather_resilient`` isolates per-suggestion failures so a transient
-    outage on one citation host doesn't poison the batch. Returned list
-    contains only entries that passed L0-L5 AND persisted cleanly.
+    outage on one citation host doesn't poison the batch. ``_search_for_evidence``
+    runs inside the same ``_one`` closure so a single 403 host doesn't kill
+    siblings. Returned list contains only suggestions that passed L0-L5.
     """
     limiter = anyio.CapacityLimiter(concurrency)
 
-    async def _one(s: RecallSuggestion) -> RawEntry | None:
+    async def _one(s: RecallSuggestion) -> VerifiedEntry | None:
         async with limiter:
             discovered = await _search_for_evidence(
                 s, tavily_search=tavily_search, limit=tavily_recall_max_results
@@ -962,8 +976,7 @@ async def verify_and_persist_all(  # noqa: PLR0913 - leaf helper; recall fan-out
         if verified is None:
             return None
         entry, tier, verdict = verified
-        await persist(entry, tier, verdict)
-        return entry
+        return VerifiedEntry(entry=entry, tier=tier, verdict=verdict)
 
     results = await gather_resilient(*(_one(s) for s in suggestions))
-    return [r for r in results if isinstance(r, RawEntry)]
+    return [r for r in results if isinstance(r, VerifiedEntry)]

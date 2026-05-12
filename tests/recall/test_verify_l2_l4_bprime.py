@@ -16,11 +16,11 @@ import httpx
 
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
-from slopmortem.stages.recall_verify import (
+from slopmortem.recall._verify import (
     DeathnessConfig,
     verify_suggestion,
 )
-from tests.stages.test_recall_search_head import FakeTavilyExtract
+from tests.recall.test_search_head import FakeTavilyExtract
 
 if TYPE_CHECKING:
     import pytest
@@ -163,8 +163,8 @@ def _patch_http(
             raise item
         return item
 
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_head", fake_head)
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_get", fake_get)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_head", fake_head)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_get", fake_get)
 
 
 def _suggestion(name: str = "Acme") -> RecallSuggestion:

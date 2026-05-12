@@ -17,7 +17,7 @@ from slopmortem.models import (
     ScoredCandidate,
     SimilarityScores,
 )
-from slopmortem.stages.llm_recall import compute_coverage_gap
+from slopmortem.stages.coverage_gap import compute_coverage_gap
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "coverage_gate"
 

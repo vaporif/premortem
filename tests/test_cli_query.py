@@ -91,30 +91,37 @@ def _patch_query_seams(
 
     ``captured`` collects the ``Config`` ``run_query`` was called with so
     the test can assert on the recall flag. ``stub_recall_deps=False`` keeps
-    the real ``_build_recall_deps`` so a test can verify the real journal
-    /classifier construction path runs (used by the always-on contract test).
+    the real ``_build_recall_and_persist_deps`` so a test can verify the real
+    journal/classifier construction path runs (used by the always-on contract test).
     """
 
     async def _fake_run_query(input_ctx: InputContext, **kwargs: Any) -> Report:
         captured["config"] = kwargs["config"]
         captured["recall_deps"] = kwargs.get("recall_deps")
+        captured["persist_deps"] = kwargs.get("persist_deps")
         report = _fixture_report()
         return report.model_copy(update={"input": input_ctx})
 
-    async def _stub_build_recall_deps(*_args: object, **_kwargs: object) -> object:
-        # Return a sentinel so the CLI passes a non-None deps object; tests
-        # that care about identity assert against this value.
-        return _RECALL_DEPS_STUB
+    async def _stub_build_recall_and_persist_deps(
+        *_args: object, **_kwargs: object
+    ) -> tuple[object, object]:
+        # Return sentinels so the CLI passes non-None deps objects; tests
+        # that care about identity assert against these values.
+        return _RECALL_DEPS_STUB, _PERSIST_DEPS_STUB
 
     monkeypatch.setattr("slopmortem.cli._query_cmd.build_deps", _build_fake_deps)
     monkeypatch.setattr("slopmortem.cli._query_cmd.set_query_corpus", _noop_set_corpus)
     monkeypatch.setattr("slopmortem.cli._query_cmd.run_query", _fake_run_query)
     if stub_recall_deps:
-        monkeypatch.setattr("slopmortem.cli._query_cmd._build_recall_deps", _stub_build_recall_deps)
+        monkeypatch.setattr(
+            "slopmortem.cli._query_cmd._build_recall_and_persist_deps",
+            _stub_build_recall_and_persist_deps,
+        )
     monkeypatch.chdir(tmp_path)
 
 
 _RECALL_DEPS_STUB = object()
+_PERSIST_DEPS_STUB = object()
 
 
 def test_force_llm_recall_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

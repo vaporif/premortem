@@ -31,16 +31,18 @@ from slopmortem.ingest import FakeSlopClassifier, IngestResult, InMemoryCorpus, 
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import Candidate, CandidatePayload, Facets, InputContext, RawEntry
-from slopmortem.pipeline import RecallDeps, run_query
+from slopmortem.pipeline import PersistDeps, run_query
+from slopmortem.recall import RecallDeps
+from slopmortem.recall._verify import _recall_source_id
 from slopmortem.stages import synthesize_prompt_kwargs
 from slopmortem.stages.recall_persist import persist_recall_entry
-from slopmortem.stages.recall_verify import _recall_source_id
-from tests.stages.test_recall_search_head import FakeTavilyExtract, FakeTavilySearch
+from tests.recall.test_search_head import FakeTavilyExtract, FakeTavilySearch
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
+    from slopmortem.llm import LLMClient
     from slopmortem.models import RecallSuggestion
 
 
@@ -520,8 +522,8 @@ def _patch_recall_http(monkeypatch: pytest.MonkeyPatch) -> None:
             raise AssertionError(msg)
         return get_map[url]
 
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_head", fake_head)
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_get", fake_get)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_head", fake_head)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_get", fake_get)
 
 
 class _NoOpWayback:
@@ -644,16 +646,22 @@ def _build_canned(  # noqa: PLR0913 - many parameters shape distinct canned-resp
     return canned
 
 
-async def _make_recall_deps(tmp_path: Path) -> RecallDeps:
-    journal = MergeJournal(tmp_path / "j.sqlite")
-    await journal.init()
+def _make_recall_deps(llm: LLMClient) -> RecallDeps:
     return RecallDeps(
-        journal=journal,
-        slop_classifier=FakeSlopClassifier(default_score=0.0),
-        post_mortems_root=tmp_path / "post_mortems",
+        llm=llm,
         tavily_search=FakeTavilySearch(default=_alpha_tavily_hits()),
         extract=FakeTavilyExtract(),
         wayback=_NoOpWayback(),
+    )
+
+
+async def _make_persist_deps(tmp_path: Path) -> PersistDeps:
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    return PersistDeps(
+        journal=journal,
+        slop_classifier=FakeSlopClassifier(default_score=0.0),
+        post_mortems_root=tmp_path / "post_mortems",
     )
 
 
@@ -715,7 +723,8 @@ async def test_post_recall_gap_score_emits_after_rerank(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     await run_query(
         ctx,
@@ -726,6 +735,7 @@ async def test_post_recall_gap_score_emits_after_rerank(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     after_events = [e for e in events if e["name"] == "recall.gap_score_after"]

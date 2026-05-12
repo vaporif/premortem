@@ -17,11 +17,13 @@ from slopmortem.ingest import FakeSlopClassifier, IngestResult, InMemoryCorpus, 
 from slopmortem.ingest._helpers import _build_payload
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.models import Facets, RawEntry, RecallSuggestion
+from slopmortem.recall._verify import _recall_source_id
 from slopmortem.stages.recall_persist import persist_recall_entry
-from slopmortem.stages.recall_verify import VerificationTier, _recall_source_id
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from slopmortem.recall import VerificationTier
 
 
 _HAIKU = "anthropic/claude-haiku-4.5"

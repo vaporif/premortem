@@ -1,9 +1,8 @@
-"""LLM-recall fallback: coverage-gap predicate, plus the recall stage call."""
+"""LLM brainstorm half of the recall subsystem: asks Opus for comparable failures."""
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import httpx
@@ -15,7 +14,7 @@ from slopmortem.models import RecallSuggestion, RecallSuggestionList
 
 if TYPE_CHECKING:
     from slopmortem.llm import LLMClient
-    from slopmortem.models import Candidate, Facets, ScoredCandidate, ToolSpec
+    from slopmortem.models import Facets, ToolSpec
 
 
 class PriorCandidateHint(BaseModel):
@@ -30,58 +29,6 @@ class PriorCandidateHint(BaseModel):
 
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class CoverageGapResult:
-    """Coverage-gap counts plus the fire/don't-fire decision.
-
-    ``qualifying``/``required`` are emitted on every query so eval can sweep
-    predicate thresholds against historical traces.
-    """
-
-    qualifying: int
-    required: int
-
-    @property
-    def gap(self) -> bool:
-        return self.qualifying < self.required
-
-
-def compute_coverage_gap(
-    *,
-    retrieved: list[Candidate],
-    ranked: list[ScoredCandidate],
-    pitch_sector: str,
-    min_similarity_score: float,
-    n_synthesize: int,
-) -> CoverageGapResult:
-    """Score the retrieve+rerank result against the LLM-recall predicate.
-
-    Counts candidates that are both high-quality (mean perspective ≥
-    ``min_similarity_score``) and in-sector (own sector or ``"other"``).
-    Fewer than ``n_synthesize`` qualifying → gap.
-
-    ``pitch_sector == "other"`` short-circuits the in-sector check: sector
-    is uninformative there, so quality alone gates the count.
-    """
-    by_id: dict[str, Candidate] = {c.canonical_id: c for c in retrieved}
-    pitch_sector_unknown = pitch_sector == "other"
-    qualifying = 0
-    for sc in ranked:
-        if sc.perspective_scores.mean() < min_similarity_score:
-            continue
-        if pitch_sector_unknown:
-            qualifying += 1
-            continue
-        cand = by_id.get(sc.candidate_id)
-        if cand is None:
-            # Rerank should never emit ids absent from retrieve, but if it
-            # does we treat it as a miss rather than crashing the gate.
-            continue
-        if cand.payload.facets.sector in (pitch_sector, "other"):
-            qualifying += 1
-    return CoverageGapResult(qualifying=qualifying, required=n_synthesize)
 
 
 # Drop user pitch, candidate payloads, and rerank rationales from span attrs:
