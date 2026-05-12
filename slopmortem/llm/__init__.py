@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from slopmortem.llm._pitch_filler_tools import (
+    PitchFillerSearchArgs as PitchFillerSearchArgs,
+)
+from slopmortem.llm._pitch_filler_tools import (
+    build_pitch_filler_tavily_tool as build_pitch_filler_tavily_tool,
+)
 from slopmortem.llm.cassettes import (
     NoCannedEmbeddingError as NoCannedEmbeddingError,
 )
@@ -51,6 +57,9 @@ from slopmortem.llm.openrouter import (
     OpenRouterClient as OpenRouterClient,
 )
 from slopmortem.llm.openrouter import (
+    OpenRouterCompletionError as OpenRouterCompletionError,
+)
+from slopmortem.llm.openrouter import (
     gather_with_limit as gather_with_limit,
 )
 from slopmortem.llm.openrouter import (
@@ -64,6 +73,9 @@ from slopmortem.llm.prompts import (
 )
 from slopmortem.llm.prompts import (
     render_prompt as render_prompt,
+)
+from slopmortem.llm.tools import (
+    recall_tools as recall_tools,
 )
 from slopmortem.llm.tools import (
     synthesis_tools as synthesis_tools,
@@ -90,12 +102,16 @@ __all__ = [
     "NoCannedResponseError",
     "OpenAIEmbeddingClient",
     "OpenRouterClient",
+    "OpenRouterCompletionError",
+    "PitchFillerSearchArgs",
+    "build_pitch_filler_tavily_tool",
     "embed_cassette_key",
     "gather_with_limit",
     "is_transient_http",
     "llm_cassette_key",
     "make_embedder",
     "prompt_template_sha",
+    "recall_tools",
     "render_blocks",
     "render_prompt",
     "synthesis_tools",

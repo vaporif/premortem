@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from slopmortem.corpus._tools_impl import _get_post_mortem, _search_corpus, _set_corpus
+from slopmortem.corpus._tools_impl import _get_post_mortem, _search_corpus, set_query_corpus
 
 if TYPE_CHECKING:
     from slopmortem.models import Candidate, Facets
@@ -27,7 +27,7 @@ class _FakeCorpus:
     """Minimal Corpus stand-in; Task 9 only reads ``get_post_mortem`` / ``search_corpus``.
 
     A no-op ``query`` exists to satisfy the structural `Corpus`
-    protocol for ``_set_corpus``'s signature.
+    protocol for ``set_query_corpus``'s signature.
     """
 
     def __init__(
@@ -49,8 +49,19 @@ class _FakeCorpus:
         cutoff_iso: str | None,
         strict_deaths: bool,
         k_retrieve: int,
+        strict_sector_filter: bool = False,
+        strict_sector_filter_excludes_other: bool = False,
     ) -> list[Candidate]:
-        _ = (dense, sparse, facets, cutoff_iso, strict_deaths, k_retrieve)
+        _ = (
+            dense,
+            sparse,
+            facets,
+            cutoff_iso,
+            strict_deaths,
+            k_retrieve,
+            strict_sector_filter,
+            strict_sector_filter_excludes_other,
+        )
         return []
 
     async def get_post_mortem(self, canonical_id: str) -> str:
@@ -80,7 +91,7 @@ def fixture_corpus():
             }
         ],
     )
-    _set_corpus(corpus)
+    set_query_corpus(corpus)
     try:
         yield corpus
     finally:
@@ -102,7 +113,7 @@ async def test_search_corpus_returns_hits(fixture_corpus):
 
 # Per-synthesis Tavily budget gate (spec line 1005).
 from slopmortem.config import Config  # noqa: E402
-from slopmortem.llm import synthesis_tools  # noqa: E402
+from slopmortem.llm import recall_tools, synthesis_tools  # noqa: E402
 
 
 @pytest.fixture
@@ -115,7 +126,8 @@ async def test_tavily_calls_under_cap_pass_through(monkeypatch, tavily_key):
 
     calls: list[tuple[str, int]] = []
 
-    async def fake_real(q: str, limit: int = 5) -> str:
+    async def fake_real(q: str, limit: int = 5, *, api_key: str) -> str:
+        del api_key
         calls.append((q, limit))
         return f"hit:{q}"
 
@@ -136,7 +148,8 @@ async def test_third_tavily_call_returns_budget_message(monkeypatch, tavily_key)
     cfg = Config(enable_tavily_synthesis=True, tavily_calls_per_synthesis=2)
     real_calls: list[str] = []
 
-    async def fake_real(q: str, limit: int = 5) -> str:
+    async def fake_real(q: str, limit: int = 5, *, api_key: str) -> str:
+        del limit, api_key
         real_calls.append(q)
         return "ok"
 
@@ -155,10 +168,12 @@ async def test_tavily_search_and_extract_share_budget(monkeypatch, tavily_key):
     """The cap covers tavily_search and tavily_extract combined, not each independently."""
     cfg = Config(enable_tavily_synthesis=True, tavily_calls_per_synthesis=2)
 
-    async def fake_search(q: str, limit: int = 5) -> str:
+    async def fake_search(q: str, limit: int = 5, *, api_key: str) -> str:
+        del q, limit, api_key
         return "search-hit"
 
-    async def fake_extract(url: str) -> str:
+    async def fake_extract(url: str, *, api_key: str) -> str:
+        del url, api_key
         return "extract-hit"
 
     monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_search)
@@ -176,7 +191,8 @@ async def test_tavily_search_and_extract_share_budget(monkeypatch, tavily_key):
 async def test_each_synthesis_gets_a_fresh_budget(monkeypatch, tavily_key):
     cfg = Config(enable_tavily_synthesis=True, tavily_calls_per_synthesis=1)
 
-    async def fake_search(q: str, limit: int = 5) -> str:
+    async def fake_search(q: str, limit: int = 5, *, api_key: str) -> str:
+        del q, limit, api_key
         return "ok"
 
     monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_search)
@@ -203,3 +219,93 @@ def test_tavily_disabled_means_no_tavily_tools_in_factory():
     names = {t.name for t in tools}
     assert "tavily_search" not in names
     assert "tavily_extract" not in names
+
+
+# ----- recall_tools (Opus tavily_search during candidate discovery) ----------
+
+
+def test_recall_tools_returns_empty_when_disabled(monkeypatch):
+    # enable_tavily_recall_search=False overrides everything else — the recall
+    # branch falls back to training-data-only suggestions.
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    cfg = Config(enable_tavily_recall_search=False)
+    assert recall_tools(cfg) == []
+
+
+def test_recall_tools_returns_empty_when_cap_is_zero(tavily_key):
+    # recall_max_tavily_calls=0 short-circuits the tool list even when the
+    # outer enable flag is on.
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=0)
+    assert recall_tools(cfg) == []
+
+
+def test_recall_tools_returns_both_search_and_extract(tavily_key):
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
+    tools = recall_tools(cfg)
+    # Both surfaces are exposed: search for discovery, extract for high-stakes
+    # picks where the snippet alone isn't enough to commit.
+    assert {t.name for t in tools} == {"tavily_search", "tavily_extract"}
+
+
+async def test_recall_tools_bounded_search_caps_at_budget(monkeypatch, tavily_key):
+    """Sixth call returns the budget-exceeded string instead of hitting Tavily."""
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
+    real_calls: list[str] = []
+
+    async def fake_real(q: str, limit: int = 5, *, api_key: str) -> str:
+        del limit, api_key
+        real_calls.append(q)
+        return f"hit:{q}"
+
+    monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_real)
+    tools = recall_tools(cfg)
+    search = next(t for t in tools if t.name == "tavily_search")
+
+    for i in range(5):
+        out = await search.fn(q=f"q{i}", limit=5)
+        assert "hit:" in out
+    out6 = await search.fn(q="q5", limit=5)
+    assert "budget exceeded" in out6
+    # Real implementation was hit exactly cap times — the sixth call short-
+    # circuited before reaching Tavily.
+    assert real_calls == ["q0", "q1", "q2", "q3", "q4"]
+
+
+async def test_recall_tools_shared_budget_caps_combined_calls(monkeypatch, tavily_key):
+    """The recall cap spans tavily_search + tavily_extract — not each independently."""
+    del tavily_key
+    cfg = Config(enable_tavily_recall_search=True, recall_max_tavily_calls=5)
+    search_calls: list[str] = []
+    extract_calls: list[str] = []
+
+    async def fake_search(q: str, limit: int = 5, *, api_key: str) -> str:
+        del limit, api_key
+        search_calls.append(q)
+        return f"hit:{q}"
+
+    async def fake_extract(url: str, *, api_key: str) -> str:
+        del api_key
+        extract_calls.append(url)
+        return "body"
+
+    monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_search_async", fake_search)
+    monkeypatch.setattr("slopmortem.corpus._tools_impl.tavily_extract_async", fake_extract)
+    tools = recall_tools(cfg)
+    search = next(t for t in tools if t.name == "tavily_search")
+    extract = next(t for t in tools if t.name == "tavily_extract")
+
+    # 3 searches + 2 extracts = 5 (at the cap); the 6th call (whichever shape)
+    # must refuse.
+    for i in range(3):
+        out = await search.fn(q=f"q{i}", limit=5)
+        assert "hit:" in out
+    for i in range(2):
+        out = await extract.fn(url=f"https://example.com/{i}")
+        assert out == "body"
+    out6 = await extract.fn(url="https://example.com/over")
+    assert "budget exceeded" in out6
+    assert len(search_calls) == 3
+    assert len(extract_calls) == 2

@@ -21,6 +21,8 @@ class Corpus(Protocol):
         cutoff_iso: str | None,
         strict_deaths: bool,
         k_retrieve: int,
+        strict_sector_filter: bool = False,
+        strict_sector_filter_excludes_other: bool = False,
     ) -> list[Candidate]: ...
 
     async def get_post_mortem(self, canonical_id: str) -> str: ...

@@ -160,8 +160,12 @@ def test_tavily_enabled_without_key_rejected(tmp_path, monkeypatch):
 def test_tavily_disabled_does_not_require_key(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    cfg = Config()
+    # All three Tavily call sites must be off — recall L0 defaults on per the
+    # search-then-verify contract, so it has to be explicitly disabled to make
+    # the no-key Config legal.
+    cfg = Config(enable_tavily_recall_search=False)
     assert cfg.enable_tavily_synthesis is False
+    assert cfg.enable_tavily_recall_search is False
     assert cfg.tavily_api_key.get_secret_value() == ""
 
 
@@ -179,3 +183,45 @@ def test_fastembed_provider_does_not_require_openai_key(tmp_path, monkeypatch):
     cfg = Config()
     assert cfg.embedding_provider == "fastembed"
     assert cfg.openai_api_key.get_secret_value() == ""
+
+
+def test_title_pre_filter_config_defaults() -> None:
+    c = Config()
+    assert c.enable_title_pre_filter is False
+    assert c.model_title_pre_filter == "anthropic/claude-haiku-4.5"
+    assert c.max_tokens_title_pre_filter == 16
+
+
+def test_min_similarity_score_after_recall_default(tmp_path, monkeypatch):
+    """Recall-branch synthesis floor defaults to 3.0 (below the 4.0 corpus-normal)."""
+    monkeypatch.chdir(tmp_path)
+    cfg = Config()
+    assert cfg.min_similarity_score_after_recall == 3.0
+    assert cfg.min_similarity_score_after_recall <= cfg.min_similarity_score
+
+
+def test_min_similarity_score_after_recall_validator_rejects_above_normal(tmp_path, monkeypatch):
+    """Setting the recall floor above the corpus-normal floor is rejected at load."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError, match="min_similarity_score_after_recall"):
+        Config(min_similarity_score=4.0, min_similarity_score_after_recall=5.0)
+
+
+def test_recall_max_tavily_calls_default_is_10(tmp_path, monkeypatch):
+    """Default of 10 lets niche pitches search and extract bodies before falling back to memory."""
+    monkeypatch.chdir(tmp_path)
+    cfg = Config()
+    assert cfg.recall_max_tavily_calls == 10
+
+
+def test_recall_max_tavily_calls_rejects_above_cap(tmp_path, monkeypatch):
+    """Cap of 20 keeps a runaway tool loop from blowing the whole budget."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError, match="recall_max_tavily_calls"):
+        Config(recall_max_tavily_calls=21)
+
+
+def test_recall_max_tavily_calls_rejects_negative(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError, match="recall_max_tavily_calls"):
+        Config(recall_max_tavily_calls=-1)

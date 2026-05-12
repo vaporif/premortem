@@ -1,0 +1,56 @@
+{
+  "pitch_sector": "crypto_web3",
+  "retrieved": [
+    {
+      "canonical_id": "only",
+      "score": 0.8,
+      "payload": {
+        "name": "only",
+        "summary": "only summary",
+        "body": "only body",
+        "facets": {
+          "sector": "crypto_web3",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:only",
+        "text_id": "only"
+      }
+    }
+  ],
+  "ranked": [
+    {
+      "candidate_id": "only",
+      "perspective_scores": {
+        "business_model": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 5.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 5.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    }
+  ],
+  "expected_gate": false,
+  "n_synthesize": 1
+}

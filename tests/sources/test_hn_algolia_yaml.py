@@ -134,8 +134,12 @@ async def test_emits_one_entry_per_phrase_match(
     assert e.source == "hn_algolia"
     assert e.source_id == "1"
     assert e.url == "https://rethinkdb.com/blog/sunset"
-    assert e.markdown_text is not None
-    assert "RethinkDB" in e.markdown_text
+    # Title is plumbed through so the LLM pitch filler can search with it.
+    assert e.title == "RethinkDB is shutting down"
+    # Source emits URL-only stubs; the body is filled by the enricher chain
+    # (TavilyEnricher / WaybackEnricher) at ingest time.
+    assert e.markdown_text is None
+    assert e.raw_html is None
 
 
 async def test_dedups_objectid_across_phrases(
@@ -451,4 +455,6 @@ async def test_round_trip(tmp_path: Path) -> None:
     src = HNAlgoliaSource(queries_yaml_path=yaml_path)
     entries = [e async for e in src.fetch()]
     # Mattermark obituary (Dec 22 2017) lives in this year-window.
-    assert any("Mattermark" in (e.markdown_text or "") for e in entries)
+    # Match on URL since the source emits URL-only stubs (body is filled later
+    # by the enricher chain).
+    assert any("mattermark" in (e.url or "").lower() for e in entries)

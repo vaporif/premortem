@@ -164,9 +164,9 @@ async def test_emits_dedup_sorted_capped(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(
         "slopmortem.corpus.sources.tavily_news.throttle_for", AsyncMock(return_value=None)
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     src = TavilyNewsSource(
+        api_key="tv-test-key",
         queries=["q1"],
         start_year=2024,
         end_year=2024,
@@ -200,9 +200,9 @@ async def test_per_call_failure_isolated(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(
         "slopmortem.corpus.sources.tavily_news.throttle_for", AsyncMock(return_value=None)
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     src = TavilyNewsSource(
+        api_key="tv-test-key",
         queries=["q1"],
         start_year=2024,
         end_year=2024,
@@ -225,34 +225,17 @@ async def test_max_emit_caps_yield(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "slopmortem.corpus.sources.tavily_news.throttle_for", AsyncMock(return_value=None)
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     src = TavilyNewsSource(
-        queries=["q1"], start_year=2024, end_year=2024, min_score=0.3, max_emit=3
+        api_key="tv-test-key",
+        queries=["q1"],
+        start_year=2024,
+        end_year=2024,
+        min_score=0.3,
+        max_emit=3,
     )
     entries = [e async for e in src.fetch()]
     assert len(entries) == 3
-
-
-async def test_fetch_no_api_key_yields_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Defence in depth: even if the CLI gate is bypassed, the source warns and yields nothing."""
-    called = False
-
-    async def fake_post(url: str, *, json: dict[str, object], **_: object) -> httpx.Response:
-        nonlocal called
-        called = True
-        return _ok_resp({"results": []})
-
-    monkeypatch.setattr("slopmortem.corpus.sources.tavily_news.safe_post", fake_post)
-    monkeypatch.setattr(
-        "slopmortem.corpus.sources.tavily_news.throttle_for", AsyncMock(return_value=None)
-    )
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-
-    src = TavilyNewsSource(queries=["q1"], start_year=2024, end_year=2024)
-    entries = [e async for e in src.fetch()]
-    assert entries == []
-    assert called is False
 
 
 async def test_yaml_defaults_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -267,9 +250,8 @@ async def test_yaml_defaults_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "slopmortem.corpus.sources.tavily_news.throttle_for", AsyncMock(return_value=None)
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    src = TavilyNewsSource()
+    src = TavilyNewsSource(api_key="tv-test-key")
     _ = [e async for e in src.fetch()]
     # YAML default has 10 queries; year_range.start=2024, end defaults to current.
     # Therefore at least 10 queries x 1 year x 4 quarters = 40 calls.
@@ -283,6 +265,7 @@ async def test_round_trip() -> None:
     if not CASSETTE_FILE.exists() and not os.environ.get("RECORD"):
         pytest.skip(f"no cassette at {CASSETTE_FILE}; rerun with RECORD=1 to record")
     src = TavilyNewsSource(
+        api_key=os.environ.get("TAVILY_API_KEY", "tv-test-key"),
         queries=["startup shuts down"],
         start_year=2024,
         end_year=2024,

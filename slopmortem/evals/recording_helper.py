@@ -84,8 +84,19 @@ def _atomic_swap(*, tmp_dir: Path, real_dir: Path) -> None:
 
 @contextmanager
 def _tavily_off(config: Config) -> Generator[Config]:
-    """Yield a ``Config`` copy with ``enable_tavily_synthesis=False``."""
-    yield config.model_copy(update={"enable_tavily_synthesis": False})
+    """Yield a ``Config`` with both Tavily features off.
+
+    ``enable_tavily_recall_search`` is defensive: recording doesn't wire
+    ``RecallDeps`` today, but flipping it stops a future edit from quietly
+    threading recall through to live Tavily. Re-record with a
+    ``RecordingTavilySearch`` wrapper when an eval row exercises recall.
+    """
+    yield config.model_copy(
+        update={
+            "enable_tavily_synthesis": False,
+            "enable_tavily_recall_search": False,
+        }
+    )
 
 
 async def record_cassettes_for_inputs(  # noqa: PLR0913, PLR0915 — entry point exposes each knob; per-row inline closure intentional
@@ -99,9 +110,9 @@ async def record_cassettes_for_inputs(  # noqa: PLR0913, PLR0915 — entry point
     progress: RecordProgress | None = None,
     max_concurrent_rows: int = _DEFAULT_MAX_CONCURRENT_ROWS,
 ) -> RecordResult:
-    """Record cassettes for every input in ``inputs`` under ``output_dir/<scope>/``.
+    """Record cassettes for every input under ``output_dir/<scope>/``.
 
-    Rows run under ``CapacityLimiter(max_concurrent_rows)`` — default keeps
+    Rows run under ``CapacityLimiter(max_concurrent_rows)``; the default keeps
     in-flight Sonnet calls under typical OpenRouter per-key limits. Failed
     rows clean their tmp dirs; the first failure re-raises after siblings
     settle. Tavily is forced off.
@@ -261,6 +272,7 @@ class _ByModelLLM:
         response_format: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         extra_body: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult:
         if model is None or model not in self._by_model:
             msg = f"no recording wrapper for model={model!r}"
@@ -274,6 +286,7 @@ class _ByModelLLM:
             response_format=response_format,
             extra_body=extra_body,
             max_tokens=max_tokens,
+            single_tool_call=single_tool_call,
         )
 
 
@@ -281,9 +294,9 @@ class _AggregateProgressBridge:
     """Funnel one row's ``QueryPhase`` advances into the shared ROWS bar.
 
     Sink total is pre-summed across rows so percentage tracks subtask
-    completion. ``set_phase_status`` is a no-op under parallel mode
-    (concurrent rows would race the status line). ``top_up`` settles rows
-    that fire fewer SYNTHESIZE advances than budgeted.
+    completion. ``set_phase_status`` is a no-op (concurrent rows would race
+    the status line). ``top_up`` settles rows that fire fewer SYNTHESIZE
+    advances than budgeted.
     """
 
     def __init__(self, sink: RecordProgress, ticks_per_row: int) -> None:

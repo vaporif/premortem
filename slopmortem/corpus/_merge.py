@@ -3,16 +3,13 @@
 """SQLite-backed merge journal, quarantine table, and alias graph.
 
 All sqlite calls go through ``anyio.to_thread.run_sync``; WAL +
-``busy_timeout=5000``.
-
-Terminal-state writers (``upsert_pending``, ``upsert_resolver_flipped``,
-``upsert_alias_blocked``) each run inside one ``BEGIN; ... COMMIT;`` so a
-crash commits everything or nothing. ``mark_complete`` is the only path from
-``pending`` to ``complete``, and runs after the qdrant and disk writes succeed.
+``busy_timeout=5000``. Terminal-state writers each run in one
+``BEGIN; ... COMMIT;``, so a crash commits everything or nothing.
+``mark_complete`` is the only ``pending`` → ``complete`` path and runs
+after qdrant and disk writes succeed.
 
 Quarantine rows live in a separate table keyed on
-``(content_sha256, source, source_id)``; quarantined docs are not in the
-main journal.
+``(content_sha256, source, source_id)`` and don't appear in the main journal.
 """
 
 from __future__ import annotations
@@ -308,6 +305,38 @@ class MergeJournal:
             )
             row = cur.fetchone()
             return None if row is None else str(row["canonical_id"])
+
+    async def is_terminal(self, source: str, source_id: str) -> bool:
+        """True when (source, source_id) has a terminal row.
+
+        Terminal = ``merge_state='complete'`` or any ``quarantine_journal``
+        row. Mid-flight states (``pending``, ``alias_blocked``,
+        ``resolver_flipped``) stay non-terminal so crashed runs, alias-graph
+        edits, and re-resolutions re-run end-to-end.
+        """
+        return await to_thread.run_sync(self._is_terminal_sync, source, source_id)
+
+    def _is_terminal_sync(self, source: str, source_id: str) -> bool:
+        with connect(self._db) as conn:
+            cur = conn.execute(
+                """
+                SELECT 1 FROM merge_journal
+                 WHERE source = ? AND source_id = ? AND merge_state = 'complete'
+                 LIMIT 1
+                """,
+                (source, source_id),
+            )
+            if cur.fetchone() is not None:
+                return True
+            cur = conn.execute(
+                """
+                SELECT 1 FROM quarantine_journal
+                 WHERE source = ? AND source_id = ?
+                 LIMIT 1
+                """,
+                (source, source_id),
+            )
+            return cur.fetchone() is not None
 
     async def fetch_aliases(self, canonical_id: str) -> list[AliasEdge]:
         rows = await to_thread.run_sync(self._fetch_aliases_sync, canonical_id)

@@ -1,11 +1,9 @@
 """Tests for the Tavily synthesis tools (``tavily_search`` / ``tavily_extract``).
 
 The tools wrap Tavily's POST-only ``/search`` and ``/extract`` endpoints
-behind ``safe_post``. They read ``TAVILY_API_KEY`` from the environment at
-call time (not from `Config`), because the tool callables are
-passed bare to OpenRouter's function-calling surface and the existing
-``_set_corpus`` indirection would not extend cleanly to a second
-binding.
+behind ``safe_post``. The API key is passed in by the synthesis-tools builder
+(`slopmortem.llm.tools._build_bounded_tavily_pair`), which captures it from
+``Config.tavily_api_key``.
 """
 
 from __future__ import annotations
@@ -48,9 +46,8 @@ async def test_tavily_search_calls_api_and_formats_results(
     )
     mock_post = AsyncMock(return_value=fake_resp)
     monkeypatch.setattr("slopmortem.corpus._tools_impl.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    out = await tavily_search_async("acme failure", limit=2)
+    out = await tavily_search_async("acme failure", limit=2, api_key="tv-test-key")
 
     # Result is a string the LLM can read: contains URLs and titles, no raw HTML.
     assert "example.com/a" in out
@@ -63,15 +60,6 @@ async def test_tavily_search_calls_api_and_formats_results(
     assert body["api_key"] == "tv-test-key"
 
 
-async def test_tavily_search_raises_on_missing_api_key(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Missing TAVILY_API_KEY surfaces a clear RuntimeError."""
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    with pytest.raises(RuntimeError, match="TAVILY_API_KEY"):
-        await tavily_search_async("x", limit=1)
-
-
 async def test_tavily_search_returns_marker_when_no_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -81,9 +69,8 @@ async def test_tavily_search_returns_marker_when_no_results(
         "slopmortem.corpus._tools_impl.safe_post",
         AsyncMock(return_value=fake_resp),
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    out = await tavily_search_async("nothing matches", limit=5)
+    out = await tavily_search_async("nothing matches", limit=5, api_key="tv-test-key")
     assert "no results" in out.lower()
 
 
@@ -97,9 +84,8 @@ async def test_tavily_extract_calls_api_and_returns_text(
     )
     mock_post = AsyncMock(return_value=fake_resp)
     monkeypatch.setattr("slopmortem.corpus._tools_impl.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
-    out = await tavily_extract_async("https://example.com/x")
+    out = await tavily_extract_async("https://example.com/x", api_key="tv-test-key")
     assert "extracted body" in out
     body = mock_post.call_args.kwargs["json"]
     assert body["urls"] == ["https://example.com/x"]
@@ -114,9 +100,8 @@ async def test_tavily_extract_propagates_http_error(
     monkeypatch.setattr(
         "slopmortem.corpus._tools_impl.safe_post", AsyncMock(return_value=fake_resp)
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
     with pytest.raises(httpx.HTTPStatusError):
-        await tavily_extract_async("https://example.com/x")
+        await tavily_extract_async("https://example.com/x", api_key="tv-test-key")
 
 
 async def test_tavily_extract_returns_empty_on_no_results(
@@ -127,5 +112,4 @@ async def test_tavily_extract_returns_empty_on_no_results(
     monkeypatch.setattr(
         "slopmortem.corpus._tools_impl.safe_post", AsyncMock(return_value=fake_resp)
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
-    assert await tavily_extract_async("https://example.com/x") == ""
+    assert await tavily_extract_async("https://example.com/x", api_key="tv-test-key") == ""

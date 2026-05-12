@@ -31,10 +31,9 @@ async def test_skips_when_raw_html_already_populated(monkeypatch):
     """If raw_html is non-empty, the enricher returns the entry unchanged."""
     mock_post = AsyncMock()
     monkeypatch.setattr("slopmortem.corpus.sources.tavily.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     entry = _entry(raw_html="<html>already there</html>")
-    result = await TavilyEnricher().enrich(entry)
+    result = await TavilyEnricher(api_key="tv-test-key").enrich(entry)
     assert result is entry
     mock_post.assert_not_called()
 
@@ -43,10 +42,9 @@ async def test_skips_when_markdown_text_already_populated(monkeypatch):
     """tavily_news yields markdown_text with raw_html=None — don't re-fetch via /extract."""
     mock_post = AsyncMock()
     monkeypatch.setattr("slopmortem.corpus.sources.tavily.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     entry = _entry(markdown_text="already extracted body text")
-    result = await TavilyEnricher().enrich(entry)
+    result = await TavilyEnricher(api_key="tv-test-key").enrich(entry)
     assert result is entry
     mock_post.assert_not_called()
 
@@ -55,10 +53,9 @@ async def test_skips_when_url_missing(monkeypatch):
     """If url is None, the enricher returns the entry unchanged."""
     mock_post = AsyncMock()
     monkeypatch.setattr("slopmortem.corpus.sources.tavily.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     entry = _entry(url=None, raw_html=None)
-    result = await TavilyEnricher().enrich(entry)
+    result = await TavilyEnricher(api_key="tv-test-key").enrich(entry)
     assert result is entry
     mock_post.assert_not_called()
 
@@ -91,10 +88,9 @@ async def test_populates_raw_html_and_markdown_on_success(monkeypatch):
     )
     mock_post = AsyncMock(return_value=fake_resp)
     monkeypatch.setattr("slopmortem.corpus.sources.tavily.safe_post", mock_post)
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     entry = _entry(raw_html=None)
-    result = await TavilyEnricher().enrich(entry)
+    result = await TavilyEnricher(api_key="tv-test-key").enrich(entry)
     assert result is not entry  # immutable update
     assert result.raw_html == raw_content
     assert result.markdown_text  # extract_clean filled this
@@ -106,21 +102,8 @@ async def test_returns_entry_unchanged_on_http_error(monkeypatch):
     monkeypatch.setattr(
         "slopmortem.corpus.sources.tavily.safe_post", AsyncMock(return_value=fake_resp)
     )
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-test-key")
 
     entry = _entry(raw_html=None)
-    result = await TavilyEnricher().enrich(entry)
+    result = await TavilyEnricher(api_key="tv-test-key").enrich(entry)
     assert result is entry
     assert result.raw_html is None
-
-
-async def test_returns_entry_unchanged_when_api_key_missing(monkeypatch):
-    """Missing ``TAVILY_API_KEY``: enricher logs and returns the entry unchanged (no raise)."""
-    mock_post = AsyncMock()
-    monkeypatch.setattr("slopmortem.corpus.sources.tavily.safe_post", mock_post)
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-
-    entry = _entry(raw_html=None)
-    result = await TavilyEnricher().enrich(entry)
-    assert result is entry
-    mock_post.assert_not_called()

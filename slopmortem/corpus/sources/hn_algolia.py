@@ -1,17 +1,16 @@
 """HN Algolia phrase-driven discovery source.
 
-YAML-driven, multi-phrase, year-window-sliced, chronologically-paginated.
-For each phrase, the source iterates one (epoch_start, epoch_end) window
-per calendar year between ``date_from`` and ``date_to``, and within each
-window paginates ``/search_by_date`` (NOT ``/search`` — relevance ranking
-buries the long tail) up to ``pages_per_window``. Pagination terminates
-on an empty page within a window. Dedup is by HN ``objectID`` across all
-phrases and windows.
+YAML-driven, multi-phrase, year-window-sliced, chronologically paginated.
+For each phrase, the source iterates one (epoch_start, epoch_end) window per
+calendar year between ``date_from`` and ``date_to``, paginating
+``/search_by_date`` (not ``/search``; relevance ranking buries the long tail)
+up to ``pages_per_window``. Empty page within a window ends pagination. Dedup
+is by HN ``objectID`` across all phrases and windows.
 
 Year-window slicing is what makes the long tail reachable: a flat
-chronological pagination from "most recent" only covers ~6 weeks per page,
-so 20 pages = ~Nov 2023 onward — never reaching 2017's Mattermark
-obituary. Per-year windows give every year its own bounded budget.
+chronological pagination from "most recent" covers ~6 weeks per page, so 20
+pages only reach ~Nov 2023 — never 2017's Mattermark obituary. Per-year
+windows give each year its own bounded budget.
 """
 
 from __future__ import annotations
@@ -46,11 +45,10 @@ DEFAULT_LOOKBACK_YEARS: Final = 11  # fallback lookback when date_from is unset
 
 
 def _epoch(date_str: str, *, end_of_day: bool = False) -> int | None:
-    """Parse YYYY-MM-DD to UTC epoch seconds; return None for empty string.
+    """Parse YYYY-MM-DD to UTC epoch seconds; ``None`` for empty string.
 
-    With ``end_of_day=True``, returns 23:59:59 of the date instead of midnight —
-    so an operator setting ``date_to: "2017-12-31"`` includes the full day, not
-    just its midnight boundary.
+    ``end_of_day=True`` returns 23:59:59 of the date so ``date_to: "2017-12-31"``
+    covers the full day, not just its midnight boundary.
     """
     if not date_str:
         return None
@@ -80,11 +78,10 @@ def _year_windows(
 ) -> list[tuple[int, int]]:
     """Yield (epoch_start, epoch_end) per calendar year between bounds (inclusive).
 
-    - If ``date_to_epoch`` is unset, defaults to "now".
-    - If ``date_from_epoch`` is unset, defaults to ``DEFAULT_LOOKBACK_YEARS``
-      before ``date_to``.
-    - Each window is clamped to its calendar year boundary, but the first
-      and last windows are clamped to the actual ``date_from``/``date_to``.
+    Unset ``date_to_epoch`` → now. Unset ``date_from_epoch`` →
+    ``DEFAULT_LOOKBACK_YEARS`` before ``date_to``. First/last windows clamp
+    to the actual ``date_from``/``date_to``; the rest snap to calendar-year
+    boundaries.
     """
     end_dt = (
         datetime.fromtimestamp(date_to_epoch, tz=UTC)
@@ -181,30 +178,23 @@ class HNAlgoliaSource:
     def _hit_to_entry(hit: dict[str, object]) -> RawEntry | None:
         object_id = hit.get("objectID")
         url = hit.get("url")
-        title = hit.get("title") or ""
-        created_at = hit.get("created_at") or ""
-        points = hit.get("points")
-        num_comments = hit.get("num_comments")
+        raw_title = hit.get("title")
         if not isinstance(object_id, str) or not object_id:
             return None
         if not isinstance(url, str) or not url:
-            # Ask-HN / Show-HN self-posts have no external URL; the Tavily
-            # enricher would have nothing to fetch.
+            # Ask-HN / Show-HN self-posts have no external URL; nothing for
+            # the enricher chain to fetch.
             return None
-        title_str = title if isinstance(title, str) else str(title)
-        markdown = (
-            f"# {title_str}\n\n"
-            f"hn_object_id: {object_id}\n"
-            f"created_at: {created_at}\n"
-            f"points: {points}\n"
-            f"num_comments: {num_comments}\n"
-        ).strip()
+        title = raw_title if isinstance(raw_title, str) and raw_title else None
+        # markdown_text=None: TavilyEnricher/WaybackEnricher short-circuit on a
+        # populated body, so a title-stub here blocks them from fetching the article.
         return RawEntry(
             source=SOURCE_HN_ALGOLIA,
             source_id=object_id,
             url=url,
+            title=title,
             raw_html=None,
-            markdown_text=markdown,
+            markdown_text=None,
             fetched_at=datetime.now(UTC),
         )
 

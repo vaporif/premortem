@@ -1,0 +1,21 @@
+{
+  "key": {
+    "model": "anthropic/claude-sonnet-4.6",
+    "prompt_hash": "b160fcc090b977dc",
+    "template_sha": "b2bd67a82def2019"
+  },
+  "request_debug": {
+    "prompt_preview": "You are the final consolidation step in a startup slopmortem pipeline. Earlier stages compared a fresh pitch against several historical startup failures and produced per-failure lessons. Your job: pick and rank the lessons that actually apply to THIS pitch, dedup paraphrases, and explain why each applies.\n\nRules:\n- Only consolidate lessons from the input list. Do NOT invent new risks. If a theme spans multiple lessons, write one canonical summary covering them.\n- Drop lessons that do not apply t",
+    "response_format_present": true,
+    "system_preview": "",
+    "tools_present": []
+  },
+  "response": {
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "cost_usd": 0.010992,
+    "stop_reason": "stop",
+    "text": "{\"top_risks\":[{\"summary\":\"Set explicit LTV/CAC targets before scaling headcount to avoid existential burn.\",\"applies_because\":\"The pitch is a B2C free-to-play title where monetization depends on cosmetics and a battle pass \u2014 scaling team size before validating per-player economics could recreate 38 Studios' fatal burn pattern.\",\"raised_by\":[\"38-studios::gaming\"],\"severity\":\"high\"},{\"summary\":\"Keep the team lean until live revenue signals confirm the monetization model works.\",\"applies_because\":\"A free-to-play 4X strategy game across iOS, Android, and Steam requires significant production investment before any cosmetic or battle pass revenue is realized, mirroring 38 Studios' ~400-person pre-revenue headcount trap.\",\"raised_by\":[\"38-studios::gaming\"],\"severity\":\"high\"},{\"summary\":\"Do not concentrate financial survival on this single unreleased flagship; build cash flow earlier.\",\"applies_because\":\"The pitch describes one unshipped title as the studio's product, exactly the single-product dependency that made 38 Studios existentially fragile before launch.\",\"raised_by\":[\"38-studios::gaming\"],\"severity\":\"high\"},{\"summary\":\"Soft-launch on one platform early to validate player demand before full cross-platform production commitment.\",\"applies_because\":\"The pitch targets iOS, Android, and Steam simultaneously; a staged soft launch would surface demand signals for the 4X strategy genre before full production spend, a step 38 Studios skipped.\",\"raised_by\":[\"38-studios::gaming\"],\"severity\":\"medium\"},{\"summary\":\"Diversify the capital stack with equity rounds rather than relying on a single creditor or grant.\",\"applies_because\":\"An early-stage gaming studio shipping its first title is vulnerable to a single-creditor default scenario like 38 Studios experienced; the pitch implies early-stage funding dependency.\",\"raised_by\":[\"38-studios::gaming\"],\"severity\":\"medium\"}],\"injection_detected\":false}"
+  },
+  "schema_version": "1.0"
+}

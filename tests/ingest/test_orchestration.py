@@ -8,7 +8,7 @@ import json
 import typing
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import pytest
 
@@ -19,6 +19,7 @@ from slopmortem.corpus import MergeJournal
 from slopmortem.ingest import (
     FakeSlopClassifier,
     InMemoryCorpus,
+    NullProgress,
     ingest,
 )
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
@@ -385,6 +386,96 @@ async def test_ingest_quarantines_slop(tmp_path, cfg):
     assert any(p.suffix == ".md" for p in quarantine_dir.iterdir())
 
 
+async def test_recall_slop_threshold_default_uses_global(tmp_path, cfg):
+    """``recall_slop_threshold=None`` keeps llm_recall entries on the global ``slop_threshold``."""
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=cfg.embed_model_id)
+    budget = Budget(cap_usd=cfg.max_cost_usd_per_ingest)
+    classifier = FakeSlopClassifier(default_score=0.6)
+    sources = [_ListSource(entries=[_entry(source="llm_recall", source_id="acme")])]
+
+    assert cfg.recall_slop_threshold is None
+    assert cfg.slop_threshold == pytest.approx(0.7)
+    result = await ingest(
+        sources=sources,
+        enrichers=[],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=classifier,
+        config=cfg,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.processed == 1
+    assert result.quarantined == 0
+
+
+async def test_recall_slop_threshold_override_quarantines_llm_recall(tmp_path):
+    """``recall_slop_threshold=0.5`` quarantines an llm_recall entry scoring 0.6."""
+    config = Config(
+        max_cost_usd_per_ingest=100.0,
+        ingest_concurrency=20,
+        recall_slop_threshold=0.5,
+    )
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=config.embed_model_id)
+    budget = Budget(cap_usd=config.max_cost_usd_per_ingest)
+    classifier = FakeSlopClassifier(default_score=0.6)
+    sources = [_ListSource(entries=[_entry(source="llm_recall", source_id="acme")])]
+
+    result = await ingest(
+        sources=sources,
+        enrichers=[],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=classifier,
+        config=config,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.processed == 0
+    assert result.quarantined == 1
+
+
+async def test_recall_slop_threshold_override_does_not_affect_other_sources(tmp_path):
+    """Override only applies to llm_recall; hn at 0.6 still passes the global 0.7."""
+    config = Config(
+        max_cost_usd_per_ingest=100.0,
+        ingest_concurrency=20,
+        recall_slop_threshold=0.5,
+    )
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    classifier = FakeSlopClassifier(default_score=0.6)
+    result = await ingest(
+        sources=[_ListSource(entries=[_entry(source="hn", source_id="other")])],
+        enrichers=[],
+        journal=journal,
+        corpus=InMemoryCorpus(),
+        llm=FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU),
+        embed_client=FakeEmbeddingClient(model=config.embed_model_id),
+        budget=Budget(cap_usd=config.max_cost_usd_per_ingest),
+        slop_classifier=classifier,
+        config=config,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.processed == 1
+    assert result.quarantined == 0
+
+
 async def test_ingest_payload_sources_url_only_when_url_present(tmp_path, cfg):
     """Payload sources holds the URL; provenance_id holds <source>:<source_id>."""
     journal = MergeJournal(tmp_path / "j.sqlite")
@@ -735,6 +826,66 @@ async def test_ingest_records_at_most_max_recorded_errors_attributes(tmp_path, c
     assert len(failed_events) == n
 
 
+class _RecordingProgress(NullProgress):
+    """``NullProgress`` plus an ``error()`` recorder for assertions."""
+
+    def __init__(self) -> None:
+        self.errors: list[tuple[str, str]] = []
+
+    @override
+    def error(self, phase, message: str) -> None:
+        self.errors.append((str(phase), message))
+
+
+async def test_failed_outcome_records_entry_failure(tmp_path, cfg, monkeypatch):
+    """``ProcessOutcome.FAILED`` from ``_process_entry`` must reach progress + trace.
+
+    Without this, the only signal a delete_chunks failure happened is a silent
+    ``result.failed`` counter; the entry vanishes from the trace and the UI.
+    """
+    from slopmortem.ingest._journal_writes import ProcessOutcome  # noqa: PLC0415
+
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned=_canned_for_run(), default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=cfg.embed_model_id)
+    budget = Budget(cap_usd=cfg.max_cost_usd_per_ingest)
+    classifier = FakeSlopClassifier(default_score=0.0)
+
+    ingest_inner = importlib.import_module("slopmortem.ingest._ingest")
+
+    async def _return_failed(*_args, **_kwargs):
+        return ProcessOutcome.FAILED
+
+    monkeypatch.setattr(ingest_inner, "_process_entry", _return_failed)
+
+    progress = _RecordingProgress()
+    entry = _entry(source="hn_algolia", source_id="123")
+    result = await ingest(
+        sources=[_ListSource(entries=[entry])],
+        enrichers=[],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=classifier,
+        config=cfg,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+        progress=progress,
+    )
+
+    assert result.failed == 1
+    assert result.errors == 1, "FAILED outcome must record an entry-level error"
+    assert SpanEvent.INGEST_ENTRY_FAILED.value in result.span_events
+    assert progress.errors, "progress.error must be called for FAILED outcome"
+    assert any("123" in msg for _phase, msg in progress.errors), (
+        f"progress.error message must include source_id; got {progress.errors!r}"
+    )
+
+
 async def test_ingest_write_phase_reraises_cancelled_error(tmp_path, cfg, monkeypatch):
     """The per-entry isolator catches ``Exception`` but lets ``BaseException`` bubble out."""
     journal = MergeJournal(tmp_path / "j.sqlite")
@@ -769,3 +920,143 @@ async def test_ingest_write_phase_reraises_cancelled_error(tmp_path, cfg, monkey
             post_mortems_root=tmp_path / "post_mortems",
             sparse_encoder=_stub_sparse,
         )
+
+
+async def test_ingest_skips_title_pre_filter_rejected_before_slop_classify(tmp_path, cfg):
+    """Rejected entries short-circuit before the slop classifier and never reach the corpus."""
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    corpus = InMemoryCorpus()
+    llm = FakeLLMClient(canned={}, default_model=_HAIKU)
+    embed = FakeEmbeddingClient(model=cfg.embed_model_id)
+    budget = Budget(cap_usd=cfg.max_cost_usd_per_ingest)
+
+    @dataclass
+    class _RejectAllEnricher:
+        async def enrich(self, entry: RawEntry) -> RawEntry:
+            return entry.model_copy(update={"title_pre_filter_rejected": True})
+
+    @dataclass
+    class _NeverCalledClassifier:
+        async def score(self, text: str) -> float:
+            del text
+            msg = "slop classifier should not be called for title-pre-filter-rejected entries"
+            raise AssertionError(msg)
+
+    n = 3
+    entries = [_entry(source_id=str(i), url=f"https://e{i}.com") for i in range(n)]
+    sources = [_ListSource(entries=entries)]
+
+    result = await ingest(
+        sources=sources,
+        enrichers=[_RejectAllEnricher()],
+        journal=journal,
+        corpus=corpus,
+        llm=llm,
+        embed_client=embed,
+        budget=budget,
+        slop_classifier=_NeverCalledClassifier(),
+        config=cfg,
+        post_mortems_root=tmp_path / "post_mortems",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.seen == n
+    assert result.skipped == n
+    assert result.processed == 0
+    assert result.errors == 0
+    assert corpus.points == []
+    assert SpanEvent.SLOP_QUARANTINED.value not in result.span_events
+
+
+@dataclass
+class _RecordingEnricher:
+    """Captures source_ids of entries that reached the enricher chain."""
+
+    calls: list[str]
+
+    async def enrich(self, entry: RawEntry) -> RawEntry:
+        self.calls.append(entry.source_id)
+        return entry
+
+
+async def _seed_complete(journal: MergeJournal, *, source: str, source_id: str) -> None:
+    await journal.upsert_pending(canonical_id="acme.com", source=source, source_id=source_id)
+    await journal.mark_complete(
+        canonical_id="acme.com",
+        source=source,
+        source_id=source_id,
+        skip_key="prior",
+        merged_at="2026-05-07T00:00:00Z",
+    )
+
+
+async def test_already_processed_entry_skipped_before_enrichers_run(tmp_path):
+    """Pre-enrich gate: a complete-in-journal entry must not invoke any enricher.
+
+    ``source="hn"`` (not in ``_PRE_VETTED_SOURCES``) so the classifier_calls
+    assertion is meaningful — without the gate, ``classify_one`` would invoke
+    ``slop_classifier.score`` for non-pre-vetted entries.
+    """
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    await _seed_complete(journal, source="hn", source_id="acme")
+
+    classifier_calls: list[str] = []
+
+    class _RecordingClassifier:
+        async def score(self, text: str) -> float:
+            classifier_calls.append(text[:16])
+            return 0.0
+
+    enricher_calls: list[str] = []
+    config = Config()
+    result = await ingest(
+        sources=[_ListSource(entries=[_entry(source="hn", source_id="acme")])],
+        enrichers=[_RecordingEnricher(calls=enricher_calls)],
+        journal=journal,
+        corpus=InMemoryCorpus(),
+        llm=FakeLLMClient(canned={}, default_model=_HAIKU),
+        embed_client=FakeEmbeddingClient(model=config.embed_model_id),
+        budget=Budget(cap_usd=1.0),
+        slop_classifier=_RecordingClassifier(),
+        config=config,
+        post_mortems_root=tmp_path / "pm",
+        sparse_encoder=_stub_sparse,
+    )
+    assert result.skipped == 1
+    assert result.processed == 0
+    assert enricher_calls == [], "pre-enrich gate must short-circuit BEFORE the enricher runs"
+    assert classifier_calls == [], "pre-enrich gate must short-circuit BEFORE the classifier runs"
+
+
+async def test_force_bypasses_already_processed_skip(tmp_path):
+    """--force re-runs an already-complete entry through the enricher chain.
+
+    ``FakeSlopClassifier(default_score=0.9)`` quarantines the entry post-enrich
+    (0.9 > default ``slop_threshold=0.7``), so ``keepers`` stays empty and
+    ``ingest`` returns before any LLM-backed stage runs.
+    """
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    await _seed_complete(journal, source="hn", source_id="acme")
+
+    enricher_calls: list[str] = []
+    config = Config()
+    result = await ingest(
+        sources=[_ListSource(entries=[_entry(source="hn", source_id="acme")])],
+        enrichers=[_RecordingEnricher(calls=enricher_calls)],
+        journal=journal,
+        corpus=InMemoryCorpus(),
+        llm=FakeLLMClient(canned={}, default_model=_HAIKU),
+        embed_client=FakeEmbeddingClient(model=config.embed_model_id),
+        budget=Budget(cap_usd=1.0),
+        slop_classifier=FakeSlopClassifier(default_score=0.9),
+        config=config,
+        post_mortems_root=tmp_path / "pm",
+        force=True,
+        sparse_encoder=_stub_sparse,
+    )
+    assert enricher_calls == ["acme"], "--force must bypass the pre-enrich skip"
+    assert result.quarantined == 1, (
+        "non-curated source with score=0.9 should quarantine post-enrich"
+    )

@@ -253,6 +253,8 @@ class _FakeCorpus:
         cutoff_iso: str | None,
         strict_deaths: bool,
         k_retrieve: int,
+        strict_sector_filter: bool = False,
+        strict_sector_filter_excludes_other: bool = False,
     ) -> list[Candidate]:
         self.queries.append(
             {
@@ -262,6 +264,8 @@ class _FakeCorpus:
                 "cutoff_iso": cutoff_iso,
                 "strict_deaths": strict_deaths,
                 "k_retrieve": k_retrieve,
+                "strict_sector_filter": strict_sector_filter,
+                "strict_sector_filter_excludes_other": strict_sector_filter_excludes_other,
             }
         )
         return list(self.candidates[:k_retrieve])
@@ -511,6 +515,7 @@ async def test_run_query_marks_budget_exceeded_on_llm_overspend(
             response_format: dict[str, Any] | None = None,
             extra_body: dict[str, Any] | None = None,
             max_tokens: int | None = None,
+            single_tool_call: bool = False,
         ) -> CompletionResult:
             result = await self.inner.complete(
                 prompt,
@@ -521,6 +526,7 @@ async def test_run_query_marks_budget_exceeded_on_llm_overspend(
                 response_format=response_format,
                 extra_body=extra_body,
                 max_tokens=max_tokens,
+                single_tool_call=single_tool_call,
             )
             if result.cost_usd > 0.0:
                 await self.budget.settle("test:llm", result.cost_usd)
@@ -619,6 +625,7 @@ async def test_ctrl_c_cancels_in_flight(monkeypatch: pytest.MonkeyPatch) -> None
             response_format: dict[str, Any] | None = None,
             extra_body: dict[str, Any] | None = None,
             max_tokens: int | None = None,
+            single_tool_call: bool = False,
         ) -> CompletionResult:
             await asyncio.sleep(0.5)
             return await self.inner.complete(
@@ -630,6 +637,7 @@ async def test_ctrl_c_cancels_in_flight(monkeypatch: pytest.MonkeyPatch) -> None
                 response_format=response_format,
                 extra_body=extra_body,
                 max_tokens=max_tokens,
+                single_tool_call=single_tool_call,
             )
 
     slow_llm = _SlowFakeLLMClient(inner=FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL))
@@ -914,3 +922,42 @@ async def test_pipeline_logs_drops_at_info(
         )
 
     assert any("min_similarity dropped" in r.message for r in caplog.records)
+
+
+async def test_strict_sector_filter_flows_from_config_to_corpus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Config flags `strict_sector_filter` and `_excludes_other` reach `Corpus.query`."""
+    candidates = [_candidate(f"cand-{i}") for i in range(6)]
+    cfg = _build_config(k_retrieve=6, n_synthesize=3).model_copy(
+        update={
+            "strict_sector_filter": True,
+            "strict_sector_filter_excludes_other": True,
+        }
+    )
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    canned = _build_canned(
+        retrieved=candidates[: cfg.K_retrieve],
+        top_n=candidates[: cfg.N_synthesize],
+        ctx=ctx,
+    )
+    fake_llm = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    fake_embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    fake_corpus = _FakeCorpus(candidates=candidates)
+    budget = Budget(cap_usd=2.0)
+
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _no_op_sparse_encoder)
+
+    _ = await run_query(
+        ctx,
+        llm=fake_llm,
+        embedding_client=fake_embed,
+        corpus=fake_corpus,
+        config=cfg,
+        budget=budget,
+    )
+
+    assert len(fake_corpus.queries) == 1
+    q = fake_corpus.queries[0]
+    assert q["strict_sector_filter"] is True
+    assert q["strict_sector_filter_excludes_other"] is True

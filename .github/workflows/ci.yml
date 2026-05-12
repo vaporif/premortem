@@ -7,6 +7,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.13"
+  ENABLE_TAVILY_RECALL_SEARCH: "false"
 
 jobs:
   lint:

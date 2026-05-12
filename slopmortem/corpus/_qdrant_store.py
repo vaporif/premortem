@@ -18,6 +18,7 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     FilterSelector,
+    MatchAny,
     MatchValue,
     Modifier,
     SparseIndexParams,
@@ -28,6 +29,7 @@ from qdrant_client.models import (
 from slopmortem.corpus._alias_graph import collapse_alias_components
 from slopmortem.corpus._disk import read_canonical
 from slopmortem.corpus._paths import safe_path
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.models import Candidate, CandidatePayload
 
 logger = logging.getLogger(__name__)
@@ -95,20 +97,23 @@ class QdrantCorpus:
         post_mortems_root: Path,
         facet_boost: float = 0.01,
         rrf_k: int = 60,
+        recall_score_factor: float = 1.0,
         fetch_aliases: Callable[[str], Awaitable[list[AliasEdge]]] | None = None,
     ) -> None:
         # ``facet_boost=0.01`` lifts ~0.04 max for a 4-facet match against an
         # RRF ceiling of ~0.033. ``rrf_k=60`` matches Qdrant's server default.
-        # ``fetch_aliases=None`` no-ops the alias-graph dedup pass for tests
-        # that don't seed an aliases table.
+        # ``recall_score_factor=1.0`` keeps tests on the pre-change formula;
+        # ``build_deps`` wires the config value in production. ``fetch_aliases=None``
+        # no-ops the alias-graph dedup pass for tests that don't seed an aliases table.
         self._client = client
         self._collection = collection
         self._root = post_mortems_root
         self._facet_boost = facet_boost
         self._rrf_k = rrf_k
+        self._recall_score_factor = recall_score_factor
         self._fetch_aliases = fetch_aliases
 
-    async def query(  # noqa: PLR0913 — Protocol method signature is the public contract
+    async def query(  # noqa: PLR0913, C901 — Protocol method signature; one branch per orchestration knob
         self,
         *,
         dense: list[float],
@@ -117,15 +122,16 @@ class QdrantCorpus:
         cutoff_iso: str | None,
         strict_deaths: bool,
         k_retrieve: int,
+        strict_sector_filter: bool = False,
+        strict_sector_filter_excludes_other: bool = False,
     ) -> list[Candidate]:
         """Hybrid retrieve top-K candidates with FormulaQuery facet boost.
 
-        Inner ``Prefetch`` does dense+sparse RRF fusion; outer ``FormulaQuery``
-        adds a per-facet boost on top of ``$score`` (``"other"`` values skip).
-        Over-fetches chunks at ``k_retrieve * 4`` so the in-Python parent
-        collapse + alias-component dedup have room before truncating.
-        ``strict_deaths=True`` narrows the recency filter to "known failure_date
-        >= cutoff_iso" (branch A only).
+        Inner ``Prefetch`` does dense+sparse RRF; outer ``FormulaQuery`` adds
+        a per-facet boost on top of ``$score`` (``"other"`` values skip).
+        Over-fetches at ``k_retrieve * 4`` to leave room for parent-collapse
+        and alias-component dedup. ``strict_deaths=True`` narrows to branch A
+        (known ``failure_date >= cutoff_iso``).
         """
         from qdrant_client.models import (  # noqa: PLC0415 — keep top-level imports lean
             FieldCondition,
@@ -171,11 +177,31 @@ class QdrantCorpus:
         formula_terms: list[Any] = ["$score"]  # pyright: ignore[reportExplicitAny]
         if boost_must:
             formula_terms.append(MultExpression(mult=[self._facet_boost, Filter(must=boost_must)]))
+        # Soft demote on llm_recall: the term resolves to ``$score x (factor-1)``
+        # when source matches and to 0 otherwise, so the outer Sum yields
+        # ``$score x factor`` for recall rows and ``$score`` for everything else.
+        # Legacy qdrant rows written before ``source`` landed on CandidatePayload
+        # carry no ``source`` key, so the FieldCondition is false and they keep
+        # their original score.
+        if self._recall_score_factor < 1.0:
+            formula_terms.append(
+                MultExpression(
+                    mult=[
+                        "$score",
+                        self._recall_score_factor - 1.0,
+                        FieldCondition(key="source", match=MatchValue(value=SOURCE_LLM_RECALL)),
+                    ]
+                )
+            )
         formula = FormulaQuery(formula=SumExpression(sum=formula_terms))
 
-        query_filter = _build_recency_filter(
-            cutoff_iso=cutoff_iso,
-            strict_deaths=strict_deaths,
+        query_filter = _and_filters(
+            _build_recency_filter(cutoff_iso=cutoff_iso, strict_deaths=strict_deaths),
+            _build_sector_filter(
+                sector=facets.sector,
+                strict=strict_sector_filter,
+                exclude_other=strict_sector_filter_excludes_other,
+            ),
         )
 
         # TODO(prod): chunk over-fetch may under-fill long post-mortems (#25).
@@ -224,7 +250,7 @@ class QdrantCorpus:
             try:
                 cp = _payload_dict_to_candidate_payload(payload)
             except Exception as exc:  # noqa: BLE001 — per-doc isolation; we log and continue
-                logger.warning("qdrant_query: dropped malformed payload for %r: %s", cid, exc)
+                logger.warning("qdrant_query: dropped malformed payload for %r: %r", cid, exc)
                 continue
             candidates.append(Candidate(canonical_id=cid, score=score, payload=cp))
 
@@ -339,6 +365,38 @@ def canonical_path_for(post_mortems_root: Path, canonical_id: str) -> Path:
     return safe_path(post_mortems_root, kind="canonical", text_id=text_id)
 
 
+def _and_filters(*filters: Filter | None) -> Filter | None:
+    """AND-combine optional ``Filter``s.
+
+    Wraps in ``Filter(must=[…])`` rather than merging ``must`` lists:
+    ``_build_recency_filter`` can return ``Filter(should=[…])`` (must=None),
+    and clause-merging would silently drop those ``should`` branches.
+    """
+    present = [f for f in filters if f is not None]
+    if not present:
+        return None
+    if len(present) == 1:
+        return present[0]
+    return Filter(must=list(present))
+
+
+def _build_sector_filter(*, sector: str, strict: bool, exclude_other: bool) -> Filter | None:
+    """Hard payload filter on ``facets.sector``; ``None`` = no narrowing.
+
+    Always ``None`` when ``sector == "other"``: that bucket is uninformative,
+    so filtering on it either matches noise or empties the result. Only flip
+    ``exclude_other`` after auditing and reclassifying ``"other"``.
+    """
+    if not strict or sector == "other":
+        return None
+
+    if exclude_other:
+        cond = FieldCondition(key="facets.sector", match=MatchValue(value=sector))
+    else:
+        cond = FieldCondition(key="facets.sector", match=MatchAny(any=[sector, "other"]))
+    return Filter(must=[cond])
+
+
 def _build_recency_filter(*, cutoff_iso: str | None, strict_deaths: bool) -> Any:  # pyright: ignore[reportExplicitAny]
     # Branches A/B/C use derived ``failure_date_unknown`` /
     # ``founding_date_unknown`` boolean payloads instead of IsNullCondition
@@ -383,9 +441,9 @@ def _build_recency_filter(*, cutoff_iso: str | None, strict_deaths: bool) -> Any
 
 
 def _payload_dict_to_candidate_payload(payload: dict[str, Any]) -> CandidatePayload:  # pyright: ignore[reportExplicitAny]
-    """Drop Qdrant-only keys so ``extra="forbid"`` won't trip if the model later turns strict.
+    """Drop Qdrant-only keys (``canonical_id``, ``chunk_idx``).
 
-    Strips ``canonical_id`` and ``chunk_idx``.
+    Pre-strips so a future ``extra="forbid"`` on the model won't trip.
     """
     cleaned = {k: v for k, v in payload.items() if k not in ("canonical_id", "chunk_idx")}
     return CandidatePayload.model_validate(cleaned)

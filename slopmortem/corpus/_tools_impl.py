@@ -1,17 +1,21 @@
 """Tool implementations exposed to the LLM via OpenRouter function-calling.
 
-Corpus tools delegate to a module-level ``Corpus`` bound via ``_set_corpus``
-so the functions stay plain ``async def`` and match the ``ToolSpec``
-signature contract (no closures, no bound methods).
+Corpus tools read a module-level ``Corpus`` bound via ``set_query_corpus`` so
+the functions stay plain ``async def`` and match ``ToolSpec`` (no closures,
+no bound methods).
 """
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from slopmortem.corpus.tavily import (
+    TAVILY_EXTRACT_URL,
+    TAVILY_SEARCH_URL,
+    parse_tavily_response,
+)
 from slopmortem.http import safe_post
 from slopmortem.models import (
     BusinessModelLit,
@@ -25,10 +29,6 @@ from slopmortem.models import (
 if TYPE_CHECKING:
     from slopmortem.corpus._store import Corpus
 
-_TAVILY_SEARCH_URL = "https://api.tavily.com/search"
-TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
-_TAVILY_SNIPPET_CHARS = 500
-
 __all__ = [
     "GetPostMortemArgs",
     "SearchCorpusArgs",
@@ -36,7 +36,6 @@ __all__ = [
     "SearchHit",
     "TavilyExtractArgs",
     "TavilySearchArgs",
-    "_set_corpus",
     "get_post_mortem",
     "search_corpus",
     "set_query_corpus",
@@ -53,9 +52,9 @@ class GetPostMortemArgs(BaseModel):
 class SearchFacets(BaseModel):
     """Closed-enum filters for ``search_corpus``; all optional.
 
-    Values come from ``taxonomy.yml`` via ``*Lit``, so the JSON schema carries
-    a per-field ``enum`` and grammar-constrained sampling enforces validity
-    at decode time.
+    Values come from ``taxonomy.yml`` via ``*Lit``, so the JSON schema gets a
+    per-field ``enum`` and grammar-constrained sampling enforces validity at
+    decode time.
     """
 
     sector: SectorLit | None = None
@@ -90,14 +89,10 @@ class TavilyExtractArgs(BaseModel):
 _corpus: Corpus | None = None
 
 
-def _set_corpus(c: Corpus) -> None:
+def set_query_corpus(c: Corpus) -> None:
+    """Wire the module-level corpus reference that the LLM tool callables read."""
     global _corpus  # noqa: PLW0603 — the module-level binding is the public init surface
     _corpus = c
-
-
-def set_query_corpus(c: Corpus) -> None:
-    """Public re-export of ``_set_corpus`` so callers don't reach past the ``corpus`` façade."""
-    _set_corpus(c)
 
 
 async def _get_post_mortem(canonical_id: str, max_chars: int = 8000) -> str:
@@ -134,40 +129,30 @@ async def _search_corpus(
     return hits
 
 
-def _tavily_api_key() -> str:
-    """Read at call time — tool callables are passed bare to OpenRouter and can't carry config."""
-    key = os.environ.get("TAVILY_API_KEY", "")
-    if not key:
-        msg = "TAVILY_API_KEY not set; --tavily-synthesis path is unavailable"
-        raise RuntimeError(msg)
-    return key
+async def tavily_search_async(q: str, limit: int = 5, *, api_key: str) -> str:
+    r"""Search Tavily; return ``- title — url\n  snippet`` lines or ``"(no results)"``.
 
-
-async def tavily_search_async(q: str, limit: int = 5) -> str:
-    r"""Search Tavily; return ``- title — url\n  snippet`` lines or ``"(no results)"``."""
+    Shares ``parse_tavily_response`` with ``tavily_search_structured`` to keep
+    snippet truncation in lockstep. The line shape is load-bearing for
+    cassette matching on the synthesis tool-call loop.
+    """
     resp = await safe_post(
-        _TAVILY_SEARCH_URL,
-        json={"api_key": _tavily_api_key(), "query": q, "max_results": limit},
+        TAVILY_SEARCH_URL,
+        json={"api_key": api_key, "query": q, "max_results": limit},
     )
     resp.raise_for_status()
-    payload = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
-    raw_hits: list[dict[str, object]] = (
-        payload.get("results", [])[:limit] if payload else []  # pyright: ignore[reportAny]
-    )
-    lines: list[str] = []
-    for hit in raw_hits:
-        title = str(hit.get("title", "(no title)"))
-        url = str(hit.get("url", ""))
-        snippet = str(hit.get("content") or "")[:_TAVILY_SNIPPET_CHARS]
-        lines.append(f"- {title} — {url}\n  {snippet}")
-    return "\n".join(lines) if lines else "(no results)"
+    payload: object = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design
+    hits = parse_tavily_response(payload, limit)
+    if not hits:
+        return "(no results)"
+    return "\n".join(f"- {h.title} — {h.url}\n  {h.snippet}" for h in hits)
 
 
-async def tavily_extract_async(url: str) -> str:
+async def tavily_extract_async(url: str, *, api_key: str) -> str:
     """Return ``""`` when no results."""
     resp = await safe_post(
         TAVILY_EXTRACT_URL,
-        json={"api_key": _tavily_api_key(), "urls": [url]},
+        json={"api_key": api_key, "urls": [url]},
     )
     resp.raise_for_status()
     payload = resp.json()  # pyright: ignore[reportAny]  # httpx Response.json() is Any by design

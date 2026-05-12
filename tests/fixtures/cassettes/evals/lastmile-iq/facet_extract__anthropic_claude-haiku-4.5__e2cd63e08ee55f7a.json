@@ -1,0 +1,21 @@
+{
+  "key": {
+    "model": "anthropic/claude-haiku-4.5",
+    "prompt_hash": "e2cd63e08ee55f7a",
+    "template_sha": "0a05e16b1fed1ad4"
+  },
+  "request_debug": {
+    "prompt_preview": "You classify startup pitches into a fixed taxonomy. The output is consumed by a retrieval pipeline that boosts results matching these facets, so accuracy on the closed enums matters more than nuance.\n\nClosed enums (pick exactly one value per facet; use `other` only when none of the listed values fit):\n- sector: fintech, crypto_web3, healthtech, edtech, climate_energy, biotech, devtools, infra_devops, ai_ml_platform, data_analytics, security, hardware, robotics, logistics_supply_chain, mobility_t",
+    "response_format_present": true,
+    "system_preview": "",
+    "tools_present": []
+  },
+  "response": {
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "cost_usd": 0.002332,
+    "stop_reason": "stop",
+    "text": "{\"sector\": \"logistics_supply_chain\", \"business_model\": \"b2b_saas\", \"customer_type\": \"smb\", \"geography\": \"us\", \"monetization\": \"subscription_recurring\", \"sub_sector\": \"route optimization and dispatch\", \"product_type\": \"SaaS platform\", \"price_point\": \"per-driver subscription with usage overages\", \"founding_year\": null, \"failure_year\": null}"
+  },
+  "schema_version": "1.0"
+}

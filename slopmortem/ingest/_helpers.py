@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import date
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 from slopmortem.corpus import extract_clean
 from slopmortem.corpus.sources._names import (
     SOURCE_CRUNCHBASE_CSV,
     SOURCE_CURATED,
     SOURCE_HN_ALGOLIA,
+    SOURCE_LLM_RECALL,
     SOURCE_TAVILY_NEWS,
 )
 from slopmortem.ingest._ports import IngestPhase, NullProgress
@@ -28,6 +30,7 @@ if TYPE_CHECKING:
 __all__ = [
     "_build_payload",
     "_enrich_pipeline",
+    "_entry_name",
     "_entry_summary_text",
     "_gather_entries",
     "_reliability_for",
@@ -39,11 +42,15 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 # merge_text orders sections by this. Curated > HN > Crunchbase > everything else.
+# llm_recall sits below Tavily news because the verifier guarantees one
+# corroborating citation but the body itself can be either an article or a
+# Wayback snapshot — both weaker primary sources than a curated obit.
 _RELIABILITY_RANK: Final[dict[str, int]] = {
     SOURCE_CURATED: 0,
     SOURCE_HN_ALGOLIA: 1,
     SOURCE_CRUNCHBASE_CSV: 2,
     SOURCE_TAVILY_NEWS: 4,
+    SOURCE_LLM_RECALL: 6,
 }
 
 
@@ -89,6 +96,38 @@ def _truncate_to_tokens(text: str, max_tokens: int) -> str:
     if len(tokens) <= max_tokens:
         return text
     return enc.decode(tokens[:max_tokens])
+
+
+_HEADING_RE: Final = re.compile(r"^\s{0,3}#{1,2}\s+(.+?)\s*$", re.MULTILINE)
+
+
+def _entry_name(entry: RawEntry) -> str:
+    """Best-effort company name for entity-resolution tier-2 keying.
+
+    Resolver tier-2 keys on ``{normalized_name}::{sector}``; a wrong name
+    here (e.g. an HN item id like ``"21055034"``) makes two articles about
+    the same company collide *only* if tier-3 dense similarity catches
+    them, which it currently can't (existing-side embedding is the
+    canonical-id string in v1). Order:
+
+    1. ``entry.title`` — sources set it when known.
+    2. First H1/H2 in ``entry.markdown_text``.
+    3. ``entry.source_id`` with a warning — last-resort, breaks dedup.
+    """
+    if entry.title and entry.title.strip():
+        return entry.title.strip()
+    if entry.markdown_text:
+        match = _HEADING_RE.search(entry.markdown_text)
+        if match:
+            heading = match.group(1).strip()
+            if heading:
+                return heading
+    msg = (
+        "ingest: no name extractable for %s:%s; resolver falling back to"
+        " source_id, dedup across sources will likely fail"
+    )
+    logger.warning(msg, entry.source, entry.source_id)
+    return entry.source_id
 
 
 def _entry_summary_text(entry: RawEntry, *, max_tokens: int) -> str:
@@ -139,7 +178,7 @@ async def _gather_entries(
                     break
         except Exception as exc:  # noqa: BLE001 - never abort the run on a per-source failure.
             logger.warning(
-                "ingest: source %r failed: %s",
+                "ingest: source %r failed: %r",
                 type(src).__name__,
                 exc,
             )
@@ -158,10 +197,19 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
     provenance_id: str,
     text_id: str,
     name: str,
-    provenance: str,
+    entry_source: str,
+    synthesized: bool = False,
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> CandidatePayload:
     founding_year = facets.founding_year
     failure_year = facets.failure_year
+    if synthesized:
+        provenance_value: Literal["curated_real", "scraped", "synthesized"] = "synthesized"
+    elif entry_source == SOURCE_CURATED:
+        provenance_value = "curated_real"
+    else:
+        provenance_value = "scraped"
     return CandidatePayload(
         name=name,
         summary=summary,
@@ -171,9 +219,12 @@ def _build_payload(  # noqa: PLR0913 - payload assembly takes every store-time f
         failure_date=None if failure_year is None else date(failure_year, 1, 1),
         founding_date_unknown=founding_year is None,
         failure_date_unknown=failure_year is None,
-        provenance="curated_real" if provenance == SOURCE_CURATED else "scraped",
+        provenance=provenance_value,
         slop_score=slop_score,
         sources=sources_seen,
         provenance_id=provenance_id,
         text_id=text_id,
+        verification_tier=verification_tier,
+        deathness_verdict=deathness_verdict,
+        source=entry_source,
     )

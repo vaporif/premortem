@@ -33,8 +33,8 @@ _HTTP_TOO_MANY_REQUESTS = 429
 class MidStreamError(Exception):
     """SSE chunk arrived at HTTP 200 with finish_reason='error'.
 
-    Carries the raw error payload so the retry layer can decide whether
-    ``error.code`` is transient (e.g. ``overloaded_error``) or fatal.
+    Carries the raw error payload so the retry layer can classify
+    ``error.code`` (e.g. ``overloaded_error``) as transient or fatal.
     """
 
     def __init__(self, error: object) -> None:
@@ -48,6 +48,24 @@ class MidStreamError(Exception):
         return str(getattr(self.error, "code", ""))
 
 
+class OpenRouterCompletionError(Exception):
+    """Completion loop reached a non-recoverable terminal state.
+
+    Reasons: ``hard_stop`` (finish_reason=length|content_filter),
+    ``null_tool_calls`` (tool_calls finish reason with empty list),
+    ``tool_loop_exceeded`` (turn budget exhausted),
+    ``allowlist_violation`` (model called an unregistered tool),
+    ``retry_exhausted`` (defensive; retry loop fell through).
+
+    Callers catch this alongside ``httpx.HTTPError`` to degrade gracefully
+    while letting ``BudgetExceededError`` propagate.
+    """
+
+    def __init__(self, msg: str, *, reason: str) -> None:
+        super().__init__(msg)
+        self.reason = reason
+
+
 _TRANSIENT_MIDSTREAM_CODES = frozenset({"overloaded_error"})
 
 
@@ -55,9 +73,9 @@ async def gather_with_limit[T](
     coros: Iterable[Coroutine[Any, Any, T]],  # pyright: ignore[reportExplicitAny]
     limit: int,
 ) -> list[T | Exception]:
-    """Run *coros* concurrently with at most *limit* in flight.
+    """Run ``coros`` concurrently with at most ``limit`` in flight.
 
-    Wraps ``gather_resilient`` behind a ``CapacityLimiter`` so callers can cap
+    ``gather_resilient`` behind a ``CapacityLimiter`` so callers can cap
     parallel OpenRouter calls at ``config.ingest_concurrency``.
     """
     limiter = anyio.CapacityLimiter(limit)
@@ -67,6 +85,20 @@ async def gather_with_limit[T](
             return await coro
 
     return await gather_resilient(*(_run(c) for c in coros))
+
+
+def _pin_anthropic_provider(
+    extra_body: dict[str, Any] | None,  # pyright: ignore[reportExplicitAny]
+) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
+    """Return ``extra_body`` with ``provider.order=["Anthropic"]`` set.
+
+    Caller-supplied ``provider`` wins; this only fills the gap.
+    """
+    merged: dict[str, Any] = dict(extra_body) if extra_body else {}  # pyright: ignore[reportExplicitAny]
+    if "provider" in merged:
+        return merged
+    merged["provider"] = {"order": ["Anthropic"], "allow_fallbacks": False}
+    return merged
 
 
 class OpenRouterClient:
@@ -79,7 +111,7 @@ class OpenRouterClient:
         budget: Budget,
         model: str | None = None,
         max_retries: int = 3,
-        max_tool_turns: int = 5,
+        max_tool_turns: int = 12,
         initial_backoff: float = 1.0,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
@@ -91,7 +123,7 @@ class OpenRouterClient:
         self._initial_backoff = initial_backoff
         self._sleep: Callable[[float], Awaitable[None]] = sleep or anyio.sleep
 
-    async def complete(  # noqa: C901, PLR0913 - mirrors OpenAI chat.create kwargs.
+    async def complete(  # noqa: C901, PLR0912, PLR0913, PLR0915 - mirrors OpenAI chat.create kwargs.
         self,
         prompt: str,
         *,
@@ -102,6 +134,7 @@ class OpenRouterClient:
         response_format: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         extra_body: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult:
         """Run a chat completion, including the tool-call loop and transient-error retries."""
         # Pre-call gate: a runaway loop stops issuing calls once the budget is
@@ -117,10 +150,19 @@ class OpenRouterClient:
         cache_write = 0
         cost = 0.0
 
+        effective_model = model or self._default_model
+        # OpenRouter freely routes ``anthropic/*`` models to AWS Bedrock, whose
+        # Anthropic-compat layer translates ``response_format`` to
+        # ``output_config.format`` and 400s on it. Pin strict-schema requests
+        # for Anthropic models to the direct Anthropic provider so the JSON
+        # schema mode actually reaches a backend that understands it.
+        if response_format is not None and (effective_model or "").startswith("anthropic/"):
+            extra_body = _pin_anthropic_provider(extra_body)
+
         # Only include max_tokens when set so unset callers keep the SDK's
         # "no cap" behavior — sending max_tokens=None upstream is rejected.
         base_kw: dict[str, Any] = {  # pyright: ignore[reportExplicitAny]
-            "model": model or self._default_model,
+            "model": effective_model,
             "response_format": response_format,
             "extra_body": extra_body,
         }
@@ -128,11 +170,17 @@ class OpenRouterClient:
             base_kw["max_tokens"] = max_tokens
 
         try:
-            for _turn in range(self._max_tool_turns):
+            # Under single_tool_call: turn 0 forces the tool call, turn 1
+            # synthesizes with tools disabled. No third turn is reachable.
+            effective_max_turns = 2 if single_tool_call else self._max_tool_turns
+            for turn in range(effective_max_turns):
+                per_turn_kw: dict[str, Any] = base_kw.copy()  # pyright: ignore[reportExplicitAny]
+                if single_tool_call:
+                    per_turn_kw["tool_choice"] = "required" if turn == 0 else "none"
                 resp = await self._call_with_retry(
                     messages=messages,
                     tools=tools_payload,
-                    **base_kw,
+                    **per_turn_kw,
                 )
                 usage = resp.usage
                 if usage is not None:
@@ -155,9 +203,16 @@ class OpenRouterClient:
                     )
 
                 if fr == "tool_calls":
-                    self._assert_tool_allowlist(choice.message.tool_calls, registered)
+                    tcs = choice.message.tool_calls
+                    if not tcs:
+                        # Some providers return finish_reason="tool_calls" with a
+                        # null/empty tool_calls list. Surface as a typed error so
+                        # callers degrade like ``hard stop: length``.
+                        msg = "tool_calls finish reason but no tool_calls in message"
+                        raise OpenRouterCompletionError(msg, reason="null_tool_calls")
+                    self._assert_tool_allowlist(tcs, registered)
                     messages.append(_assistant_with_tools(choice.message))
-                    for tc in choice.message.tool_calls:
+                    for tc in tcs:
                         name = _tc_name(tc)
                         args_raw = _tc_arguments(tc)
                         args = json.loads(args_raw)
@@ -178,7 +233,7 @@ class OpenRouterClient:
 
                 if fr in ("length", "content_filter"):
                     msg = f"hard stop: {fr}"
-                    raise RuntimeError(msg)
+                    raise OpenRouterCompletionError(msg, reason="hard_stop")
 
                 if fr == "error":
                     # _call_with_retry should have consumed the stream and raised
@@ -186,7 +241,7 @@ class OpenRouterClient:
                     raise MidStreamError(getattr(choice, "error", {"code": "unknown"}))
 
             msg = "tool-loop bound exceeded"
-            raise RuntimeError(msg)
+            raise OpenRouterCompletionError(msg, reason="tool_loop_exceeded")
         finally:
             if cost > 0.0:
                 # True cost lands on response.usage.cost — settle without a
@@ -205,7 +260,7 @@ class OpenRouterClient:
 
         Mid-stream ``error.code='overloaded_error'`` is transient. Auth
         (401/403), 402 (no credits), 503 (no provider), and non-overloaded
-        mid-stream errors are fatal — re-raised immediately.
+        mid-stream errors are fatal.
         """
         sdk: Any = self._sdk  # pyright: ignore[reportExplicitAny]
         for attempt in range(self._max_retries + 1):
@@ -225,7 +280,7 @@ class OpenRouterClient:
             else:
                 return resp
         msg = "retry loop exited without resolution"  # pragma: no cover - unreachable
-        raise RuntimeError(msg)
+        raise OpenRouterCompletionError(msg, reason="retry_exhausted")
 
     async def _backoff(self, attempt: int) -> None:
         delay = self._initial_backoff * (2**attempt)
@@ -275,7 +330,7 @@ class OpenRouterClient:
             name = _tc_name(tc)
             if name not in registered:
                 msg = f"{SpanEvent.TOOL_ALLOWLIST_VIOLATION.value}: {name}"
-                raise RuntimeError(msg)
+                raise OpenRouterCompletionError(msg, reason="allowlist_violation")
 
     def _emit(self, _event: SpanEvent) -> None:
         # No-op hook so tests can patch it to observe emissions. Active emit

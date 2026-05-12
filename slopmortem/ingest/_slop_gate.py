@@ -15,17 +15,27 @@ from typing import TYPE_CHECKING, Final
 from anyio import to_thread
 
 from slopmortem.corpus import safe_path
-from slopmortem.corpus.sources._names import SOURCE_CRUNCHBASE_CSV, SOURCE_CURATED
+from slopmortem.corpus.sources._names import (
+    SOURCE_CRUNCHBASE_CSV,
+    SOURCE_CURATED,
+    SOURCE_LLM_RECALL,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from slopmortem.config import Config
     from slopmortem.corpus import MergeJournal
     from slopmortem.ingest._ports import SlopClassifier
     from slopmortem.models import RawEntry
 
-__all__ = ["_PRE_VETTED_SOURCES", "_quarantine", "classify_one"]
+__all__ = [
+    "_PRE_VETTED_SOURCES",
+    "_effective_slop_threshold",
+    "_quarantine",
+    "classify_one",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +48,13 @@ _PRE_VETTED_SOURCES: Final[frozenset[str]] = frozenset({SOURCE_CURATED, SOURCE_C
 
 def _content_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _effective_slop_threshold(entry: RawEntry, config: Config) -> float:
+    """Per-source threshold override for llm_recall; global default otherwise."""
+    if entry.source == SOURCE_LLM_RECALL and config.recall_slop_threshold is not None:
+        return config.recall_slop_threshold
+    return config.slop_threshold
 
 
 async def classify_one(
@@ -58,7 +75,7 @@ async def classify_one(
     try:
         return await slop_classifier.score(body)
     except Exception as exc:  # noqa: BLE001 - defensive: never abort on classifier failure.
-        logger.warning("ingest: slop classifier failed: %s", exc)
+        logger.warning("ingest: slop classifier failed: %r", exc)
         on_error(exc)
         return 0.0
 

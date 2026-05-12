@@ -5,8 +5,8 @@ replay loaders both import from here so record and replay can't disagree on
 disk shape.
 
 Schema version is ``<major>.<minor>``: reader hard-fails on major mismatch,
-accepts any minor at the same major. Minor bumps are purely additive and
-Pydantic ``extra="ignore"`` lets unknown future fields deserialize cleanly.
+accepts any minor at the same major. Minor bumps are additive, and
+``extra="ignore"`` lets unknown future fields deserialize cleanly.
 """
 
 from __future__ import annotations
@@ -294,8 +294,8 @@ def load_llm_cassettes(
 ) -> Mapping[tuple[str, str, str], LlmCassette]:
     """Load every ``<stage>__*.json`` (non-``embed__``) under ``scope_dir``.
 
-    A bad type (e.g. ``cost_usd`` as a string) raises ``CassetteFormatError``
-    with the path here, not a confusing ``TypeError`` later at use site.
+    Bad types raise ``CassetteFormatError`` with the path here, not a
+    confusing ``TypeError`` later at use site.
     """
     out: dict[tuple[str, str, str], LlmCassette] = {}
     if not scope_dir.exists():
@@ -340,7 +340,7 @@ def load_embedding_cassettes(
 ]:
     """Load every ``embed__*.json`` under ``scope_dir``.
 
-    Splits sparse vs dense via response shape.
+    Splits sparse vs dense by response shape.
     """
     dense: dict[tuple[str, str], list[float]] = {}
     sparse: dict[tuple[str, str], tuple[list[int], list[float]]] = {}

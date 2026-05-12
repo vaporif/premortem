@@ -2,9 +2,9 @@
 
 Tiered IDs:
 
-- Tier 1: registrable_domain (via ``tldextract``). Demoted if the domain is
-  on ``platform_domains.yml``, or recycled-domain founding-year delta /
-  parent/subsidiary suffix delta forces demotion.
+- Tier 1: registrable_domain (via ``tldextract``). Demoted on
+  ``platform_domains.yml``, recycled-domain founding-year delta, or
+  parent/subsidiary suffix delta.
 - Tier 2: ``{normalized_name}::{sector}``.
 - Tier 3: dense-embedding cosine similarity against the existing tier-2
   canonical, with a Haiku tiebreaker inside the calibration band
@@ -12,16 +12,16 @@ Tiered IDs:
 
 Atomicity contracts:
 
-- Resolver-flip precheck runs first. If ``(source, source_id)`` was
-  previously bound to a different canonical_id, the journal row lands as
-  ``resolver_flipped`` in its terminal state — no transient ``pending`` row,
-  no ingest of the new canonical (``--reconcile`` owns repair).
+- Resolver-flip precheck runs first. A previously-bound
+  ``(source, source_id)`` lands as ``resolver_flipped`` in its terminal
+  state — no transient ``pending`` row, no ingest of the new canonical
+  (``--reconcile`` owns repair).
 - Alias precheck runs before any ingest write. With an alias hint,
-  `MergeJournal.upsert_alias_blocked` writes the alias edge and the
+  ``MergeJournal.upsert_alias_blocked`` writes the alias edge and the
   journal row in one SQLite transaction; on failure both roll back.
 
 Tier-3 decisions cache in a module-private ``tier3_decisions`` SQLite table
-sharing the merge journal's ``db_path``. The cache key is lex-sorted so
+sharing the merge journal's ``db_path``. Cache key is lex-sorted so
 ``(A, B)`` and ``(B, A)`` collapse to one row.
 """
 
@@ -92,8 +92,8 @@ _TIEBREAKER_PROMPT_NAME = "tier3_tiebreaker"
 class ResolveResult:
     """Outcome of a resolve attempt.
 
-    For ``resolver_flipped``, ``canonical_id`` is the NEW id and intentionally
-    not written here — the repair pass owns the rebind.
+    For ``resolver_flipped``, ``canonical_id`` is the NEW id; the rebind is
+    not written here — the repair pass owns it.
     """
 
     canonical_id: str
@@ -418,8 +418,7 @@ async def _is_parent_subsidiary_suspect(journal: MergeJournal, domain: str, new_
     """Flag a suffix-delta when the bare domain is in the journal and the name has a corp suffix.
 
     No per-row display-name persistence yet, so the heuristic is conservative.
-    ``corporate_hierarchy_overrides.yml`` seeds explicit parent/subsidiary pairs
-    (ships empty in v1).
+    ``corporate_hierarchy_overrides.yml`` seeds explicit parent/subsidiary pairs.
     """
     if domain in _HIERARCHY_OVERRIDES:
         return True
@@ -452,13 +451,13 @@ async def resolve_entity(  # noqa: PLR0913 — keyword-only resolver entry point
 ) -> ResolveResult:
     """Resolve *entry* to a canonical_id.
 
-    - ``alias_hint`` set → alias edge + ``alias_blocked`` journal row written
-      atomically, short-circuits.
+    - ``alias_hint`` set → alias edge + ``alias_blocked`` row written
+      atomically; short-circuits.
     - ``founding_year`` drives the recycled-domain check (delta > 10).
     - ``llm_client`` only required for in-band tier-3 calls.
     - ``force_similarity`` is a test-only escape hatch.
 
-    Sqlite or LLM exceptions propagate after the journal transaction rolls back.
+    SQLite or LLM exceptions propagate after the journal rolls back.
     """
     # tier-3 + founding-year caches share the merge journal's sqlite file. No
     # public accessor on purpose — merge.py is read-only from this side.

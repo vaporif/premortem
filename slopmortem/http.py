@@ -110,3 +110,19 @@ async def safe_post(
     transport = httpx.AsyncHTTPTransport()
     async with httpx.AsyncClient(transport=transport, timeout=timeout) as client:
         return await client.post(url, json=json, headers=merged_headers)
+
+
+async def safe_head(
+    url: str,
+    *,
+    user_agent: str = USER_AGENT,
+    timeout: float = 30.0,  # noqa: ASYNC109 - caller-controlled timeout is part of the public API
+) -> httpx.Response:
+    """SSRF-pinned HEAD for cheap liveness probes.
+
+    Verifier L2 uses this to drop dead URLs before paying for the body GET.
+    """
+    host = _resolve_and_validate(url)
+    transport = httpx.AsyncHTTPTransport()
+    async with httpx.AsyncClient(transport=transport, timeout=timeout) as client:
+        return await client.head(url, headers={"Host": host, "User-Agent": user_agent})

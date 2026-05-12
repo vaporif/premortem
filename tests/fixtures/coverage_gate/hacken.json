@@ -1,0 +1,78 @@
+{
+  "pitch_sector": "crypto_web3",
+  "retrieved": [
+    {
+      "canonical_id": "norse_corp",
+      "score": 0.78,
+      "payload": {
+        "name": "Norse Corp",
+        "summary": "Cyber threat intelligence platform built on a global honeypot sensor network.",
+        "body": "Norse Corp sold real-time attack visualization and enterprise threat feeds before collapsing amid data-quality fraud and leadership misconduct.",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2011-01-01",
+        "failure_date": "2016-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://krebsonsecurity.com/2016/01/sources-security-firm-norse-corp-imploding/"],
+        "provenance_id": "curated:Norse Corp",
+        "text_id": "0123456789abcdef"
+      }
+    },
+    {
+      "canonical_id": "carbon_black",
+      "score": 0.72,
+      "payload": {
+        "name": "Carbon Black",
+        "summary": "Cloud-native endpoint security platform for enterprise threat detection and response.",
+        "body": "Carbon Black sold continuous endpoint monitoring with behavioral analytics; acquired by VMware in 2019, brand retired post-Broadcom merger.",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2002-01-01",
+        "failure_date": null,
+        "founding_date_unknown": false,
+        "failure_date_unknown": true,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://en.wikipedia.org/wiki/Carbon_Black_(company)"],
+        "provenance_id": "curated:Carbon Black",
+        "text_id": "fedcba9876543210"
+      }
+    }
+  ],
+  "ranked": [
+    {
+      "candidate_id": "norse_corp",
+      "perspective_scores": {
+        "business_model": {"score": 4.0, "rationale": "subscription enterprise security with divergent product architectures"},
+        "market": {"score": 5.0, "rationale": "shared real-time threat detection but distinct customer segments"},
+        "gtm": {"score": 4.0, "rationale": "brand-led upsell motion in both"},
+        "stage_scale": {"score": 3.0, "rationale": "Norse far more scaled than Hacken's product-extension stage"}
+      },
+      "rationale": "Subscription enterprise security with overlap on real-time detection but Norse is general-IP and Hacken is on-chain."
+    },
+    {
+      "candidate_id": "carbon_black",
+      "perspective_scores": {
+        "business_model": {"score": 6.0, "rationale": "structural parallel: continuous monitoring -> automated response -> compliance"},
+        "market": {"score": 3.0, "rationale": "traditional enterprise endpoints vs Web3 protocol operators"},
+        "gtm": {"score": 5.0, "rationale": "brand-led, channel-augmented land-and-expand in both"},
+        "stage_scale": {"score": 2.0, "rationale": "publicly listed unicorn vs early product-extension"}
+      },
+      "rationale": "Same continuous-monitoring loop, different telemetry substrate."
+    }
+  ],
+  "expected_gate": true
+}

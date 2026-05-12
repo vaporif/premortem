@@ -17,7 +17,7 @@ from slopmortem.models import (
     Synthesis,
     TopRisks,
 )
-from slopmortem.render import render
+from slopmortem.render import _render_candidate, render
 
 if TYPE_CHECKING:
     from syrupy.assertion import SnapshotAssertion
@@ -193,6 +193,122 @@ def test_render_skips_banner_on_budget_exceeded() -> None:
 def test_render_footer_includes_min_similarity_score() -> None:
     md = render(_report())
     assert "min_similarity_score: 4.0" in md
+
+
+def test_render_footer_includes_recall_flags_when_set() -> None:
+    """``coverage_gap`` / ``recall_used`` / ``recall_persisted_count`` only render when non-default.
+
+    The footer must surface all three when set so eval and ops can attribute
+    extra cost and corpus growth to the recall path; default reports keep
+    the footer terse.
+    """
+    report = _report().model_copy(
+        update={
+            "pipeline_meta": _report().pipeline_meta.model_copy(
+                update={
+                    "coverage_gap": True,
+                    "recall_used": True,
+                    "recall_persisted_count": 2,
+                }
+            )
+        }
+    )
+    md = render(report)
+    assert "- coverage_gap: True" in md
+    assert "- recall_used: True" in md
+    assert "- recall_persisted_count: 2" in md
+
+
+def test_render_footer_omits_recall_flags_when_default() -> None:
+    """Default ``PipelineMeta`` (recall not used) keeps the three lines out of the footer."""
+    md = render(_report())
+    assert "coverage_gap" not in md
+    assert "recall_used" not in md
+    assert "recall_persisted_count" not in md
+
+
+def _synthesis_with_source(source: str | None) -> Synthesis:
+    return Synthesis(
+        candidate_id="recall-co",
+        name="RecallCo",
+        one_liner="LLM-recalled comparable.",
+        failure_date=date(2022, 6, 1),
+        lifespan_months=24,
+        similarity=_scores(5.0),
+        why_similar="They served the same niche.",
+        where_diverged="Different geo footprint.",
+        failure_causes=["regulation"],
+        lessons_for_input=["watch the regulator"],
+        sources=["https://recall.example/post"],
+        source=source,
+    )
+
+
+def test_render_marks_recall_provenance() -> None:
+    """``source == "llm_recall"`` surfaces a provenance tag in the rendered candidate.
+
+    The tag warns the reader that the comparable was named by an LLM and only
+    web-verified — weaker grounding than a crawler-sourced obit.
+    """
+    out = _render_candidate(_synthesis_with_source("llm_recall"))
+    assert "Source: LLM recall (verified against live web)" in out
+
+
+def test_render_omits_recall_tag_for_other_sources() -> None:
+    """Crawler-sourced candidates render without the recall provenance line."""
+    out = _render_candidate(_synthesis_with_source("crunchbase_csv"))
+    assert "Source: LLM recall" not in out
+
+
+def test_render_omits_recall_tag_when_source_missing() -> None:
+    """Legacy syntheses (``source=None``) render without the recall provenance line."""
+    out = _render_candidate(_synthesis_with_source(None))
+    assert "Source: LLM recall" not in out
+
+
+def _synthesis_struggling() -> Synthesis:
+    """Synthesis whose source candidate carries L5 ``deathness_verdict="struggling"``.
+
+    Mirrors ``_synthesis_clean`` (curated obit) so the test only varies the
+    verdict; the renderer's struggling branch is what's under test.
+    """
+    return Synthesis(
+        candidate_id="impaired-co",
+        name="ImpairedCo",
+        one_liner="SMB invoicing vendor mid-restructuring.",
+        failure_date=date(2025, 11, 1),
+        lifespan_months=84,
+        similarity=_scores(6.0),
+        why_similar="Same SMB invoicing motion as the pitch.",
+        where_diverged="Pitch is greenfield; ImpairedCo is mid-pivot.",
+        failure_causes=["active layoffs", "missed Q3 revenue"],
+        lessons_for_input=["watch burn early", "avoid SMB-heavy ARR mix"],
+        sources=["https://news.example/impairedco-layoffs"],
+        deathness_verdict="struggling",
+    )
+
+
+def test_render_struggling_uses_distress_heading() -> None:
+    """Struggling vendors get a forward-looking heading + "Distress observed:" label.
+
+    The default "## Name" + "Failure date:" framing reads as a post-mortem;
+    a still-operating but impaired vendor must not be presented as dead.
+    """
+    out = _render_candidate(_synthesis_struggling())
+    assert "## ImpairedCo — currently struggling" in out
+    assert "Distress observed: 2025-11-01" in out
+    # Lifespan is omitted for struggling vendors — open-ended runway is not
+    # a number worth printing alongside layoff signals.
+    assert "Lifespan:" not in out
+
+
+def test_render_dead_keeps_default_failure_heading() -> None:
+    """Default ``deathness_verdict=None`` (or ``"dead"``) keeps the post-mortem framing."""
+    out = _render_candidate(_synthesis_clean())
+    assert "## Acme" in out
+    assert "currently struggling" not in out
+    assert "Failure date: 2023-01-01" in out
+    assert "Lifespan: 60 months" in out
 
 
 def test_render_is_pure_no_io() -> None:

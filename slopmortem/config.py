@@ -30,10 +30,28 @@ class Config(BaseSettings):
     K_retrieve: int = Field(default=30, ge=1)
     N_synthesize: int = Field(default=5, ge=1)
     min_similarity_score: float = Field(default=4.0, ge=0.0, le=10.0)
+    # Post-recall floor for the pre-synthesis top-N filter. Recall only fires
+    # on thin-corpus pitches, so re-applying ``min_similarity_score`` would
+    # empty the result set; the verifier already vetted these candidates.
+    min_similarity_score_after_recall: float = Field(default=3.0, ge=0.0, le=10.0)
+    strict_sector_filter: bool = False
+    strict_sector_filter_excludes_other: bool = False
     ingest_concurrency: int = Field(default=20, ge=1)
     facet_boost: float = Field(default=0.01, ge=0.0)
     rrf_k: int = Field(default=60, ge=1)
+    # Multiplicative score factor for ``source=="llm_recall"`` payloads in the
+    # retrieval FormulaQuery. 1.0 disables the down-weight; 0.0 zeroes recall
+    # scores. Always on: crawler-sourced rows outrank when present; with only
+    # recall rows the uniform shift doesn't drop them since rerank cares about
+    # relative order.
+    recall_score_factor: float = Field(default=0.9, ge=0.0, le=1.0)
     slop_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    # llm_recall content (Wayback marketing copy, TechCrunch acquisition pieces,
+    # founder farewell blogs) is shaped differently from the HN/Crunchbase
+    # corpus the global threshold was tuned against. Override here when
+    # calibration data shows recall is over- or under-rejecting; ``None`` keeps
+    # the global threshold for every source.
+    recall_slop_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
     max_doc_tokens: int = Field(default=8000, ge=1)
     tier3_calibration_band: tuple[float, float] = (0.65, 0.85)
     max_cost_usd_per_query: float = Field(default=2.00, gt=0.0)
@@ -48,6 +66,33 @@ class Config(BaseSettings):
     model_rerank: str = "anthropic/claude-sonnet-4.6"
     model_synthesize: str = "anthropic/claude-sonnet-4.6"
     model_consolidate: str = "anthropic/claude-sonnet-4.6"
+    model_pitch_filler: str = "anthropic/claude-haiku-4.5"
+    model_title_pre_filter: str = "anthropic/claude-haiku-4.5"
+
+    # Recall fires automatically when the coverage-gap predicate trips
+    # (survivors < N_synthesize after rerank+min_similarity). ``force_llm_recall``
+    # fires recall on every query, bypassing the predicate. Useful for cassette
+    # recording, eval calibration, and probes against thin/new corpora. Spend is
+    # gated by the pipeline-level ``Budget`` shared across every LLM call — there
+    # is no per-stage cap.
+    force_llm_recall: bool = False
+    model_recall: str = "anthropic/claude-opus-4-7"
+    max_tokens_recall: int = Field(default=4096, ge=1)
+    recall_max_suggestions_per_pitch: int = Field(default=8, ge=1, le=20)
+
+    # L5 deathness gate: a verified URL + death keyword can still describe a
+    # layoff at a still-running firm. Haiku reads the body and returns verdict
+    # ∈ {dead, struggling, alive} + confidence; drop on alive, on below-floor
+    # confidence, or on transport/parse failure. ``dead`` uses
+    # ``recall_deathness_min_confidence``; ``struggling`` uses the stricter
+    # ``recall_struggling_min_confidence`` below.
+    model_recall_deathness: str = "anthropic/claude-haiku-4.5"
+    max_tokens_recall_deathness: int = Field(default=128, ge=1)
+    recall_deathness_min_confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+    # Higher than ``recall_deathness_min_confidence``: Haiku is less calibrated
+    # on "struggling" because distress signals (layoffs, restructuring) are
+    # routinely ambiguous in news prose.
+    recall_struggling_min_confidence: float = Field(default=0.85, ge=0.0, le=1.0)
 
     # Per-stage output caps. OpenRouter holds upfront credit for the model's
     # max output, so leaving these unset reserves the full 64K Anthropic
@@ -60,6 +105,8 @@ class Config(BaseSettings):
     max_tokens_consolidate: int = Field(default=2048, ge=1)
     max_tokens_slop_judge: int = Field(default=64, ge=1)
     max_tokens_tiebreaker: int = Field(default=256, ge=1)
+    max_tokens_pitch_filler: int = Field(default=1500, ge=1)
+    max_tokens_title_pre_filter: int = Field(default=16, ge=1)
 
     embedding_provider: Literal["fastembed", "openai"] = "fastembed"
     embed_model_id: str = "nomic-ai/nomic-embed-text-v1.5"
@@ -67,14 +114,36 @@ class Config(BaseSettings):
     retry_max_attempts: int = Field(default=3, ge=0)
     retry_initial_backoff: float = Field(default=1.0, ge=0.0)
 
-    taxonomy_version: str = "v1"
+    taxonomy_version: str = "v2"
     reliability_rank_version: str = "v1"
 
     enable_tavily_synthesis: bool = False
+    enable_pitch_filler: bool = False
+    enable_title_pre_filter: bool = False
+    pitch_filler_max_chars_per_result: int = Field(default=2500, ge=1)
     enable_tracing: bool = False
     strict_deaths: bool = False
 
     tavily_calls_per_synthesis: int = Field(default=2, ge=0)
+
+    # Per-recall Tavily call budget. The recall LLM may invoke ``tavily_search``
+    # up to this many times during one recall firing to discover comparable
+    # startups before returning its suggestion list. Bounded so a runaway
+    # tool loop can't blow the budget on a single query. Default sized so a
+    # niche pitch (e.g. on-chain derivatives, exotic verticals) can run a
+    # handful of searches AND extract bodies on the strongest hits before
+    # committing — lower values forced the LLM back to training memory,
+    # biasing recall toward famous failures rather than tight analogs.
+    recall_max_tavily_calls: int = Field(default=10, ge=0, le=20)
+
+    # Recall L0: when True, the recall verifier discovers a citation URL via
+    # Tavily search before the L2 HEAD/GET gate. When False, the recall branch
+    # is disabled entirely (the L0 step is mandatory under the new contract).
+    # Needs TAVILY_API_KEY.
+    enable_tavily_recall_search: bool = True
+
+    # Per-suggestion Tavily result cutoff for the recall L0 search head.
+    tavily_recall_max_results: int = Field(default=5, ge=1, le=10)
 
     openrouter_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
@@ -105,6 +174,17 @@ class Config(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _check_recall_similarity_threshold(self) -> Config:
+        if self.min_similarity_score_after_recall > self.min_similarity_score:
+            msg = (
+                f"min_similarity_score_after_recall ({self.min_similarity_score_after_recall}) "
+                f"must be <= min_similarity_score ({self.min_similarity_score}); a recall "
+                "threshold above the corpus-normal floor has no useful effect"
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
     def _check_tier3_band(self) -> Config:
         lo, hi = self.tier3_calibration_band
         if not (0.0 <= lo <= hi <= 1.0):
@@ -119,6 +199,18 @@ class Config(BaseSettings):
     def _check_required_api_keys(self) -> Config:
         if self.enable_tavily_synthesis and not self.tavily_api_key.get_secret_value():
             msg = "enable_tavily_synthesis=True requires tavily_api_key"
+            raise ValueError(msg)
+        if self.enable_pitch_filler and not self.tavily_api_key.get_secret_value():
+            msg = (
+                "enable_pitch_filler=True requires tavily_api_key "
+                "(the filler's tavily_search tool needs the Tavily API key)"
+            )
+            raise ValueError(msg)
+        if self.enable_tavily_recall_search and not self.tavily_api_key.get_secret_value():
+            msg = (
+                "enable_tavily_recall_search=True requires tavily_api_key "
+                "(the recall verifier's L0 search head needs the Tavily API key)"
+            )
             raise ValueError(msg)
         if self.embedding_provider == "openai" and not self.openai_api_key.get_secret_value():
             msg = 'embedding_provider="openai" requires openai_api_key'

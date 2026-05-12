@@ -1,0 +1,24 @@
+{
+  "key": {
+    "model": "anthropic/claude-sonnet-4.6",
+    "prompt_hash": "010efad47a2644d2",
+    "template_sha": "08ceee4747b8a7ff"
+  },
+  "request_debug": {
+    "prompt_preview": "You write per-candidate post-mortems for a slopmortem pipeline. Given a fresh pitch and one dead-startup canonical document, produce a single LLMSynthesis JSON object that explains why this dead startup is similar, where the new pitch could diverge, what killed the dead startup, and what the new founder should learn.\n\nRules:\n- Ground every claim in the candidate document or in tool calls. Do not invent facts.\n- A `Trusted facts` block (typed pipeline data \u2014 not user input) appears below the pitc",
+    "response_format_present": true,
+    "system_preview": "",
+    "tools_present": [
+      "get_post_mortem",
+      "search_corpus"
+    ]
+  },
+  "response": {
+    "cache_creation_tokens": 4810,
+    "cache_read_tokens": 0,
+    "cost_usd": 0.0301215,
+    "stop_reason": "stop",
+    "text": "{\"candidate_id\":\"rethinkdb::devtools\",\"name\":\"rethinkdb\",\"one_liner\":\"Free and open-source distributed document database that failed to build a sustainable commercial business around its real-time change-feed technology.\",\"similarity\":{\"business_model\":{\"score\":1,\"rationale\":\"RethinkDB was a free open-source product with no recurring per-seat or usage-based subscription; the new pitch is a per-driver B2B SaaS with usage overages \u2014 fundamentally different monetization structures.\"},\"market\":{\"score\":1,\"rationale\":\"RethinkDB targeted developers building real-time applications globally; the new pitch targets US regional 3PL operators in logistics \u2014 entirely different verticals, buyers, and geographies.\"},\"gtm\":{\"score\":1,\"rationale\":\"RethinkDB relied on open-source community adoption and developer word-of-mouth; the new pitch implies direct B2B sales to logistics operators, a completely different go-to-market motion.\"},\"stage_scale\":{\"score\":3,\"rationale\":\"Both were early-stage, VC-backed (RethinkDB via Y Combinator) companies that struggled to cross from product traction to sustainable revenue before running out of runway \u2014 a broadly shared stage challenge.\"}},\"why_similar\":\"The only meaningful similarity is at the stage/scale level: both companies are early-stage, venture-backed startups that face the core challenge of converting product usage into sustainable recurring revenue before capital runs dry. RethinkDB's story is a cautionary tale about building a technically impressive product without a viable monetization path, a risk any early-stage SaaS startup shares in principle.\",\"where_diverged\":\"Nearly every concrete dimension diverges. (1) Business model: RethinkDB was free/open-source with no subscription; the new pitch is a paid per-driver SaaS with usage overages. (2) Market/sector: RethinkDB was a distributed database for developers (devtools, global); the new pitch is a logistics SaaS for US regional 3PLs (logistics_supply_chain, US). (3) Customer type: developers vs. logistics operations managers/dispatchers. (4) Product type: open-source infrastructure software vs. a vertical SaaS with a route-optimizer and dispatcher cockpit UI. (5) Geography: global developer audience vs. US-focused regional logistics operators.\",\"failure_causes\":[\"inability to monetize an open-source product\",\"no sustainable commercial model around free software\",\"failure to convert developer adoption into paying enterprise customers\",\"open-source licensing undermined pricing power\",\"loss of engineering team to acqui-hire (Stripe) signaling capital exhaustion\",\"market timing mismatch \u2014 real-time database demand did not scale fast enough to support the business\"],\"lessons_for_input\":[\"Never build your core product on a free/open-source model unless you have a clearly validated paid tier from day one \u2014 ensure your per-driver subscription pricing is tested before launch.\",\"Define a payback period for CAC against your per-driver subscription ARPU early; RethinkDB collapsed partly because usage never converted to revenue.\",\"Anchor the product to a specific, measurable operational pain (e.g., dispatcher hours saved, fuel cost reduction) so logistics buyers can justify budget \u2014 pure technical elegance does not sell in operations-heavy verticals.\",\"Secure multi-year contracts with anchor 3PL customers before scaling headcount; RethinkDB ran out of runway without a committed revenue base.\",\"Plan for usage-overage abuse or under-consumption: model both scenarios and set contractual minimums so revenue does not collapse if drivers go underutilized.\"]}"
+  },
+  "schema_version": "1.0"
+}

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-import os
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 import httpx
 
 from slopmortem.corpus._extract import extract_clean
-from slopmortem.corpus._tools_impl import TAVILY_EXTRACT_URL
+from slopmortem.corpus.tavily import TAVILY_EXTRACT_URL
 from slopmortem.http import safe_post
 
 if TYPE_CHECKING:
@@ -36,8 +36,11 @@ def _pick_raw_content(payload: object) -> str | None:
     return raw_content
 
 
+@dataclass
 class TavilyEnricher:
     """[Enricher] Tavily /extract client that recovers article bodies on empty entries."""
+
+    api_key: str
 
     async def enrich(self, entry: RawEntry) -> RawEntry:
         """Best-effort. Returns *entry* unchanged on failure or when the body is already there."""
@@ -47,16 +50,26 @@ class TavilyEnricher:
             return entry
         if not entry.url:
             return entry
-        api_key = os.environ.get("TAVILY_API_KEY", "")
-        if not api_key:
-            logger.warning("tavily enricher: TAVILY_API_KEY not set; skipping")
-            return entry
 
-        raw_content = await self._fetch_raw_content(entry.url, api_key)
+        raw_content = await self._fetch_raw_content(entry.url, self.api_key)
         if not raw_content:
+            logger.info(
+                "tavily enricher: empty/no extract for %s:%s url=%s",
+                entry.source,
+                entry.source_id,
+                entry.url,
+            )
             return entry
 
         markdown_text = extract_clean(raw_content) or None
+        logger.info(
+            "tavily enricher: filled %s:%s body=%d chars (raw=%d) url=%s",
+            entry.source,
+            entry.source_id,
+            len(markdown_text or ""),
+            len(raw_content),
+            entry.url,
+        )
         return entry.model_copy(update={"raw_html": raw_content, "markdown_text": markdown_text})
 
     async def _fetch_raw_content(self, url: str, api_key: str) -> str | None:
@@ -66,7 +79,7 @@ class TavilyEnricher:
                 json={"api_key": api_key, "urls": [url]},
             )
         except (httpx.HTTPError, ValueError) as exc:
-            logger.warning("tavily enricher: fetch failed for %s: %s", url, exc)
+            logger.warning("tavily enricher: fetch failed for %s: %r", url, exc)
             return None
 
         if resp.status_code >= httpx.codes.BAD_REQUEST:

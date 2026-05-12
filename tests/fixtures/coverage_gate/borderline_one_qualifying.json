@@ -1,0 +1,243 @@
+{
+  "pitch_sector": "crypto_web3",
+  "retrieved": [
+    {
+      "canonical_id": "in0",
+      "score": 0.8,
+      "payload": {
+        "name": "in0",
+        "summary": "in0 summary",
+        "body": "in0 body",
+        "facets": {
+          "sector": "crypto_web3",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:in0",
+        "text_id": "in0"
+      }
+    },
+    {
+      "canonical_id": "out0",
+      "score": 0.8,
+      "payload": {
+        "name": "out0",
+        "summary": "out0 summary",
+        "body": "out0 body",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:out0",
+        "text_id": "out0"
+      }
+    },
+    {
+      "canonical_id": "out1",
+      "score": 0.8,
+      "payload": {
+        "name": "out1",
+        "summary": "out1 summary",
+        "body": "out1 body",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:out1",
+        "text_id": "out1"
+      }
+    },
+    {
+      "canonical_id": "out2",
+      "score": 0.8,
+      "payload": {
+        "name": "out2",
+        "summary": "out2 summary",
+        "body": "out2 body",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:out2",
+        "text_id": "out2"
+      }
+    },
+    {
+      "canonical_id": "out3",
+      "score": 0.8,
+      "payload": {
+        "name": "out3",
+        "summary": "out3 summary",
+        "body": "out3 body",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2022-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": [],
+        "provenance_id": "curated:out3",
+        "text_id": "out3"
+      }
+    }
+  ],
+  "ranked": [
+    {
+      "candidate_id": "in0",
+      "perspective_scores": {
+        "business_model": {
+          "score": 4.5,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 4.5,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 4.5,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 4.5,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "out0",
+      "perspective_scores": {
+        "business_model": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 8.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "out1",
+      "perspective_scores": {
+        "business_model": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 8.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "out2",
+      "perspective_scores": {
+        "business_model": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 8.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    },
+    {
+      "candidate_id": "out3",
+      "perspective_scores": {
+        "business_model": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "market": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "gtm": {
+          "score": 8.0,
+          "rationale": "r"
+        },
+        "stage_scale": {
+          "score": 8.0,
+          "rationale": "r"
+        }
+      },
+      "rationale": "r"
+    }
+  ],
+  "expected_gate": true
+}

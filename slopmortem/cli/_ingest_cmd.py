@@ -9,13 +9,9 @@ quarantine row and routes survivors back out of the quarantine tree.
 
 from __future__ import annotations
 
-import contextlib
 import functools
-import os
-import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated, Literal, cast
 
 import anyio
 import typer
@@ -26,7 +22,12 @@ from rich.table import Table
 
 from slopmortem.budget import Budget
 from slopmortem.cli import app
-from slopmortem.cli._common import _maybe_init_tracing
+from slopmortem.cli._common import (
+    _STDERR_CONSOLE,
+    _maybe_init_tracing,
+    _maybe_setup_logging,
+    progress_context,
+)
 from slopmortem.cli_progress import RichPhaseProgress
 from slopmortem.config import load_config
 from slopmortem.corpus import (
@@ -39,9 +40,7 @@ from slopmortem.corpus.sources import (
     CrunchbaseCsvSource,
     CuratedSource,
     HNAlgoliaSource,
-    TavilyEnricher,
     TavilyNewsSource,
-    WaybackEnricher,
 )
 from slopmortem.ingest import INGEST_PHASE_LABELS, IngestPhase, IngestResult, ingest
 from slopmortem.llm import OpenRouterClient, make_embedder
@@ -94,11 +93,30 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             help="Path to a Crunchbase CSV; enables the Crunchbase adapter for this run.",
         ),
     ] = None,
-    enrich_wayback: Annotated[
-        bool, typer.Option("--enrich-wayback", help="Enable the Wayback enricher.")
+    enable_pitch_filler: Annotated[
+        bool,
+        typer.Option(
+            "--enable-pitch-filler/--no-pitch-filler",
+            help=(
+                "Enable the LLM-driven pitch filler that synthesizes bodies for "
+                "URL-only stubs via tavily_search. Auto-enabled when hn_algolia is "
+                "in the source list. The title pre-filter (auto-enabled too) "
+                "drops most non-death titles before this stage runs, so Tavily "
+                "credit burn is roughly proportional to the title-pass rate."
+            ),
+        ),
     ] = False,
-    tavily_enrich: Annotated[
-        bool, typer.Option("--tavily-enrich", help="Enable the Tavily enricher.")
+    enable_title_pre_filter: Annotated[
+        bool,
+        typer.Option(
+            "--enable-title-pre-filter/--no-title-pre-filter",
+            help=(
+                "Enable the cheap title-only Haiku gate that rejects HN entries "
+                "whose titles aren't startup-death narratives. Saves Tavily credits "
+                "by short-circuiting before the pitch filler. Auto-enabled when "
+                "hn_algolia is in the source list."
+            ),
+        ),
     ] = False,
     enable_tavily_news: Annotated[
         bool,
@@ -133,7 +151,7 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
         ),
     ] = None,
     tavily_news_search_depth: Annotated[
-        str | None,
+        Literal["basic", "advanced"] | None,
         typer.Option(
             "--tavily-news-search-depth",
             help=(
@@ -148,7 +166,8 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             "--only-source",
             help=(
                 "Run only the named source, auto-enabling its --enable-* flag if any. "
-                "Accepts source identifiers (curated, hn_algolia, crunchbase_csv, tavily_news)."
+                "Accepts source identifiers (curated, hn_algolia, crunchbase_csv, "
+                "tavily_news)."
             ),
         ),
     ] = None,
@@ -165,8 +184,8 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             "--limit",
             help=(
                 "Process only the first N entries after gathering from all sources. "
-                "Source order is curated -> HN -> Crunchbase. Useful for cheap live "
-                "smoke tests; cost scales with N."
+                "Source order is curated -> HN -> Crunchbase -> TavilyNews. "
+                "Useful for cheap live smoke tests; cost scales with N."
             ),
         ),
     ] = None,
@@ -181,8 +200,8 @@ def ingest_cmd(  # noqa: PLR0913 - every flag mirrors the spec; user types kwarg
             reclassify=reclassify,
             list_review=list_review,
             crunchbase_csv=crunchbase_csv,
-            enrich_wayback=enrich_wayback,
-            tavily_enrich=tavily_enrich,
+            enable_pitch_filler=enable_pitch_filler,
+            enable_title_pre_filter=enable_title_pre_filter,
             enable_tavily_news=enable_tavily_news,
             tavily_news_start_year=tavily_news_start_year,
             tavily_news_end_year=tavily_news_end_year,
@@ -246,17 +265,18 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     list_review: bool,
     limit: int | None,
     crunchbase_csv: Path | None,
-    enrich_wayback: bool,
-    tavily_enrich: bool,
+    enable_pitch_filler: bool,
+    enable_title_pre_filter: bool,
     enable_tavily_news: bool,
     tavily_news_start_year: int | None,
     tavily_news_end_year: int | None,
     tavily_news_max_emit: int | None,
-    tavily_news_search_depth: str | None,
+    tavily_news_search_depth: Literal["basic", "advanced"] | None,
     only_source: str | None,
     post_mortems_root: Path,
 ) -> None:
     config = load_config()
+    _maybe_setup_logging()
     _maybe_init_tracing(config)
 
     # Read-only short-circuits run before the full LLM/embedder build so they
@@ -286,20 +306,20 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             valid = ", ".join(sorted(_SOURCE_REGISTRY))
             msg = f"--only-source: unknown source {only_source!r}. Valid: {valid}."
             raise typer.BadParameter(msg)
-        spec = _SOURCE_REGISTRY[only_source]
+        source_class = _SOURCE_REGISTRY[only_source]
         # Each opt-in source's --enable-* flag needs an explicit branch here —
         # Python's keyword-only parameter binding can't be table-driven without
         # ``locals()`` tricks. Add one when introducing a new opt-in source.
-        if spec.source_class is TavilyNewsSource:
+        if source_class is TavilyNewsSource:
             enable_tavily_news = True
         # crunchbase_csv is gated by a path argument, not a boolean — require it explicitly.
-        if spec.source_class is CrunchbaseCsvSource and crunchbase_csv is None:
+        if source_class is CrunchbaseCsvSource and crunchbase_csv is None:
             msg = "--only-source crunchbase_csv requires --crunchbase-csv PATH."
             raise typer.BadParameter(msg)
 
-    if enable_tavily_news and not os.environ.get("TAVILY_API_KEY"):
+    if enable_tavily_news and not config.tavily_api_key.get_secret_value():
         msg = (
-            "--enable-tavily-news requires TAVILY_API_KEY: the Tavily news source "
+            "--enable-tavily-news requires tavily_api_key: the Tavily news source "
             "calls /search and pulls article bodies via include_raw_content. "
             "Set TAVILY_API_KEY in .env or unset --enable-tavily-news."
         )
@@ -321,6 +341,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
     if enable_tavily_news:
         sources.append(
             TavilyNewsSource(
+                api_key=config.tavily_api_key.get_secret_value(),
                 start_year=tavily_news_start_year,
                 end_year=tavily_news_end_year,
                 max_emit=tavily_news_max_emit,
@@ -329,7 +350,7 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         )
 
     if only_source is not None:
-        wanted_class = _SOURCE_REGISTRY[only_source].source_class
+        wanted_class = _SOURCE_REGISTRY[only_source]
         sources = [s for s in sources if isinstance(s, wanted_class)]
         if not sources:
             msg = (
@@ -338,17 +359,61 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
             )
             raise typer.BadParameter(msg)
 
-    enrichers: list[Enricher] = []
-    if enrich_wayback:
-        enrichers.append(WaybackEnricher(rps=5.0))
-    if tavily_enrich:
-        enrichers.append(TavilyEnricher())
+    # HN Algolia emits URL-only stubs (sources/hn_algolia.py:_hit_to_entry).
+    # The cheap fetch chain (Tavily-extract, Wayback) recovers ~50% of dead
+    # blogs but pads bodies with chrome and can't tell primary post-mortems
+    # from competitor commentary. The LLM pitch filler researches each URL
+    # via a single tavily_search and synthesizes a clean pitch instead.
+    if any(isinstance(s, HNAlgoliaSource) for s in sources):
+        if not config.tavily_api_key.get_secret_value():
+            msg = (
+                "hn_algolia source requires tavily_api_key: HN entries are URL-only "
+                "stubs whose pitches are synthesized by the LLM-driven pitch filler "
+                "using tavily_search. Set TAVILY_API_KEY in .env, or use "
+                "--only-source on a source whose entries already carry their body "
+                "(e.g. crunchbase_csv)."
+            )
+            raise typer.BadParameter(msg)
+        enable_pitch_filler = True
+        enable_title_pre_filter = True
 
-    # TTY-gated: attach Rich progress only when stderr is a real terminal.
-    # Piped invocations (CI, ``> file``) get a quiet run.
-    progress_ctx: contextlib.AbstractContextManager[RichIngestProgress | None] = (
-        RichIngestProgress() if sys.stderr.isatty() else contextlib.nullcontext()
-    )
+    enrichers: list[Enricher] = []
+    # Ordering is load-bearing: the title pre-filter must run before the pitch
+    # filler so rejected entries skip the pitch filler's Haiku call and its
+    # tavily_search tool invocation.
+    if enable_title_pre_filter:
+        from slopmortem.ingest import HaikuTitlePreFilter  # noqa: PLC0415
+
+        enrichers.append(
+            HaikuTitlePreFilter(
+                llm=llm,
+                model=config.model_title_pre_filter,
+                budget=budget,
+                max_tokens=config.max_tokens_title_pre_filter,
+            )
+        )
+    # Cheap fetch-chain enrichers temporarily disabled:
+    #   - WaybackEnricher: needs a rate-limit hack (Wayback throttles HEAD/GET
+    #     spreads aggressively from a single IP).
+    #   - TavilyEnricher (/extract): not available on the Tavily free plan.
+    # Re-enable by reinstating the WaybackEnricher / TavilyEnricher imports
+    # plus their CLI flags (--enrich-wayback / --tavily-enrich) and the
+    # corresponding enrichers.append(...) calls here.
+    if enable_pitch_filler:
+        from slopmortem.ingest import HaikuPitchFiller  # noqa: PLC0415
+
+        enrichers.append(
+            HaikuPitchFiller(
+                llm=llm,
+                model=config.model_pitch_filler,
+                budget=budget,
+                tavily_api_key=config.tavily_api_key.get_secret_value(),
+                max_tokens=config.max_tokens_pitch_filler,
+                max_chars_per_result=config.pitch_filler_max_chars_per_result,
+            )
+        )
+
+    progress_ctx = progress_context(RichIngestProgress)
     # Print escaping exceptions before Rich tears down — Progress.__exit__
     # clears the screen, so a traceback interleaved with bar redraws disappears.
     err_console = Console(stderr=True)
@@ -387,16 +452,11 @@ async def _run_ingest(  # noqa: PLR0913, PLR0912, PLR0915, C901 - the ingest CLI
         typer.echo(f"slopmortem ingest result: {result} cost=${budget.spent_usd:.4f}")
 
 
-@dataclass(frozen=True)
-class _SourceSpec:
-    source_class: type[Source]
-
-
-_SOURCE_REGISTRY: dict[str, _SourceSpec] = {
-    "curated": _SourceSpec(source_class=CuratedSource),
-    "hn_algolia": _SourceSpec(source_class=HNAlgoliaSource),
-    "crunchbase_csv": _SourceSpec(source_class=CrunchbaseCsvSource),
-    "tavily_news": _SourceSpec(source_class=TavilyNewsSource),
+_SOURCE_REGISTRY: dict[str, type[Source]] = {
+    "curated": CuratedSource,
+    "hn_algolia": HNAlgoliaSource,
+    "crunchbase_csv": CrunchbaseCsvSource,
+    "tavily_news": TavilyNewsSource,
 }
 
 
@@ -409,11 +469,7 @@ def _default_hn_queries_yaml() -> Path:
 
 
 async def _build_journal(config: Config, post_mortems_root: Path) -> MergeJournal:
-    """Build the merge journal, calling `MergeJournal.init`.
-
-    ``init()`` is idempotent so calling it every CLI invocation is cheap and
-    fresh dev databases work without an explicit setup step.
-    """
+    """Build the merge journal and call ``MergeJournal.init`` (idempotent)."""
     from slopmortem.corpus import MergeJournal  # noqa: PLC0415
 
     journal_path = Path(
@@ -427,10 +483,10 @@ async def _build_journal(config: Config, post_mortems_root: Path) -> MergeJourna
 def _build_slop_classifier(
     *, dry_run: bool, llm: LLMClient, model: str, max_tokens: int | None = None
 ) -> SlopClassifier:
-    """Pick a slop classifier based on *dry_run*.
+    """Pick a slop classifier based on ``dry_run``.
 
-    Dry-run uses `FakeSlopClassifier` — no API key, no LLM cost.
-    Live runs use `HaikuSlopClassifier` (one Haiku call per entry).
+    ``FakeSlopClassifier`` (no API key) for dry-run; ``HaikuSlopClassifier``
+    (one Haiku call per entry) for live runs.
     """
     if dry_run:
         from slopmortem.ingest import FakeSlopClassifier  # noqa: PLC0415
@@ -442,9 +498,9 @@ def _build_slop_classifier(
 
 
 async def _build_ingest_corpus(config: Config, post_mortems_root: Path) -> IngestCorpus:
-    """Build the ingest-side `QdrantCorpus`, ensuring the collection exists.
+    """Build the ingest-side ``QdrantCorpus`` and ensure the collection exists.
 
-    Without ``ensure_collection`` (idempotent), ``upsert_chunk`` fails with
+    Without ``ensure_collection``, ``upsert_chunk`` fails with
     ``Collection 'slopmortem' doesn't exist`` on a fresh dev box's first write.
     """
     from qdrant_client import AsyncQdrantClient  # noqa: PLC0415 - heavy dep, lazy import
@@ -476,10 +532,10 @@ async def _build_ingest_deps(
 ) -> tuple[LLMClient, EmbeddingClient, IngestCorpus, Budget, MergeJournal, SlopClassifier]:
     """Build the ingest-side dependency tuple.
 
-    Mirrors `slopmortem.deps.build_deps` but caps the budget at
-    ``max_cost_usd_per_ingest`` and additionally builds a journal plus the
-    slop classifier. ``dry_run=True`` swaps in `FakeSlopClassifier` so
-    the run needs no real API key.
+    Mirrors ``slopmortem.deps.build_deps`` but caps the budget at
+    ``max_cost_usd_per_ingest`` and also builds a journal plus slop
+    classifier. ``dry_run=True`` swaps in ``FakeSlopClassifier`` so the run
+    needs no real API key.
     """
     budget = Budget(cap_usd=config.max_cost_usd_per_ingest)
 
@@ -508,7 +564,7 @@ async def _build_ingest_deps(
 
 class RichIngestProgress(RichPhaseProgress[IngestPhase]):
     def __init__(self) -> None:
-        super().__init__(INGEST_PHASE_LABELS)
+        super().__init__(INGEST_PHASE_LABELS, console=_STDERR_CONSOLE)
 
 
 def _render_ingest_result(console: Console, result: IngestResult, budget: Budget) -> None:

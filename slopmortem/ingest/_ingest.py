@@ -9,8 +9,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import anyio
 from lmnr import Laminar, observe
 
+from slopmortem.concurrency import gather_resilient
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.ingest._fan_out import (
     _facet_summarize_fanout,
     _FanoutResult,
@@ -31,6 +34,7 @@ from slopmortem.ingest._ports import (
     NullProgress,
 )
 from slopmortem.ingest._slop_gate import (
+    _effective_slop_threshold,
     _quarantine,
     classify_one,
 )
@@ -40,6 +44,7 @@ from slopmortem.tracing import SpanEvent, git_sha, mint_run_id
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
+    from typing import Literal
 
     from slopmortem.budget import Budget
     from slopmortem.config import Config
@@ -54,9 +59,15 @@ if TYPE_CHECKING:
     from slopmortem.llm import EmbeddingClient, LLMClient
     from slopmortem.models import RawEntry
 
-__all__ = ["ingest"]
+__all__ = ["_classify_phase", "_write_phase", "ingest"]
 
 logger = logging.getLogger(__name__)
+
+# Lower bound on borderline-event emission. Scores under 0.4 trip too readily
+# on clean docs (TechCrunch obits, Wayback marketing copy, founder blogs are
+# all routinely <0.3) and would drown the trace in non-actionable noise. The
+# tunable region for ``recall_slop_threshold`` sits between 0.4 and 0.85.
+_BORDERLINE_LOWER = 0.4
 
 
 def _emit_collected_events(result: IngestResult) -> None:
@@ -69,8 +80,8 @@ def _emit_collected_events(result: IngestResult) -> None:
 def _record_error(result: IngestResult, entry_label: str, exc: BaseException) -> None:
     """Record per-entry failures on the parent ingest span.
 
-    Without this, swallowed per-entry exceptions only surface in stderr; the
-    parent ingest span returns OK and INGEST_ENTRY_FAILED carries no payload.
+    Without this, swallowed per-entry exceptions only show up in stderr; the
+    parent ingest span returns OK and ``INGEST_ENTRY_FAILED`` carries no payload.
     """
     if not Laminar.is_initialized():
         return
@@ -96,9 +107,9 @@ def _record_entry_failure(  # noqa: PLR0913 - one seam, every dep
     exc: BaseException,
     message: str,
 ) -> None:
-    """Caller still owns ``progress.advance_phase`` and ``continue``.
+    """Record an entry-level failure.
 
-    The write phase has two failure arms in one loop body.
+    Caller still owns ``progress.advance_phase`` and ``continue``.
     """
     label = f"{entry.source}:{entry.source_id}"
     logger.warning("ingest: %s", message)
@@ -108,7 +119,7 @@ def _record_entry_failure(  # noqa: PLR0913 - one seam, every dep
     result.span_events.append(SpanEvent.INGEST_ENTRY_FAILED.value)
 
 
-async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
+async def _classify_phase(  # noqa: PLR0913, C901 - one phase, every dep + branch at this seam
     entries: Sequence[RawEntry],
     *,
     enrichers: Sequence[Enricher],
@@ -117,63 +128,156 @@ async def _classify_phase(  # noqa: PLR0913 - one phase, every dep at this seam
     config: Config,
     post_mortems_root: Path,
     dry_run: bool,
+    force: bool,
     progress: IngestProgress,
     result: IngestResult,
+    skip_slop: bool = False,
 ) -> list[tuple[RawEntry, str]]:
     """Enrich → extract body → slop-gate; return survivors as ``(entry, body)``.
 
-    Per-entry failures log and continue; only the run-level orchestrator can
-    short-circuit. Mutates ``result`` counters and ``result.span_events``.
+    Per-entry failures log and continue (only the run-level orchestrator can
+    short-circuit). Mutates ``result`` counters and ``result.span_events``;
+    ``gather_resilient`` preserves input order so survivors line up with
+    ``entries``.
     """
     progress.start_phase(IngestPhase.CLASSIFY, total=len(entries))
-    keepers: list[tuple[RawEntry, str]] = []
-    for entry in entries:
-        result.seen += 1
-        try:
-            enriched = await _enrich_pipeline(entry, enrichers)
-        except Exception as exc:  # noqa: BLE001 - per-entry isolation.
-            _record_entry_failure(
-                result=result,
-                progress=progress,
-                phase=IngestPhase.CLASSIFY,
-                entry=entry,
-                exc=exc,
-                message=f"enricher failed for {entry.source_id}: {exc}",
-            )
-            progress.advance_phase(IngestPhase.CLASSIFY)
-            continue
+    limiter = anyio.CapacityLimiter(config.ingest_concurrency)
 
-        body = _entry_summary_text(enriched, max_tokens=config.max_doc_tokens)
-        if not body:
-            result.skipped += 1
-            progress.advance_phase(IngestPhase.CLASSIFY)
-            continue
+    async def _one(entry: RawEntry) -> tuple[RawEntry, str] | None:
+        async with limiter:
+            if not force and await journal.is_terminal(entry.source, entry.source_id):
+                logger.info(
+                    "ingest: skipped %s:%s — already processed (use --force to re-run)",
+                    entry.source,
+                    entry.source_id,
+                )
+                result.skipped += 1
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
+            result.seen += 1
+            try:
+                enriched = await _enrich_pipeline(entry, enrichers)
+            except Exception as exc:  # noqa: BLE001 - per-entry isolation.
+                _record_entry_failure(
+                    result=result,
+                    progress=progress,
+                    phase=IngestPhase.CLASSIFY,
+                    entry=entry,
+                    exc=exc,
+                    message=f"enricher failed for {entry.source_id}: {exc!r}",
+                )
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
 
-        slop_score = await classify_one(
-            entry=enriched,
-            body=body,
-            slop_classifier=slop_classifier,
-            on_error=lambda exc: progress.error(
-                IngestPhase.CLASSIFY, f"slop classifier failed: {exc}"
-            ),
-        )
+            if enriched.title_pre_filter_rejected:
+                logger.info(
+                    "ingest: title pre-filter rejected %s:%s title=%r",
+                    entry.source,
+                    entry.source_id,
+                    entry.title,
+                )
+                result.skipped += 1
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
 
-        if slop_score > config.slop_threshold:
-            if not dry_run:
-                await _quarantine(
-                    journal=journal,
+            body = _entry_summary_text(enriched, max_tokens=config.max_doc_tokens)
+            if not body:
+                logger.info(
+                    "ingest: skipped %s:%s — empty body url=%s",
+                    entry.source,
+                    entry.source_id,
+                    entry.url,
+                )
+                result.skipped += 1
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
+
+            if skip_slop:
+                # L5 deathness is the stricter gate for recall entries; slop
+                # was tuned on a different body shape (raw crawler output, no
+                # combined Wayback + news citation), so running it here risks
+                # false-quarantining L5-verified rows.
+                slop_score = 0.0
+            else:
+                slop_score = await classify_one(
                     entry=enriched,
                     body=body,
-                    slop_score=slop_score,
-                    post_mortems_root=post_mortems_root,
+                    slop_classifier=slop_classifier,
+                    on_error=lambda exc: progress.error(
+                        IngestPhase.CLASSIFY, f"slop classifier failed: {exc}"
+                    ),
                 )
-            result.quarantined += 1
-            result.span_events.append(SpanEvent.SLOP_QUARANTINED.value)
-            progress.advance_phase(IngestPhase.CLASSIFY)
-            continue
 
-        keepers.append((enriched, body))
-        progress.advance_phase(IngestPhase.CLASSIFY)
+            effective_threshold = _effective_slop_threshold(enriched, config)
+            # Borderline band only fires for llm_recall — that's the source the
+            # override knob targets, and the score-vs-threshold gap is the data
+            # we need to retune it.
+            if (
+                enriched.source == SOURCE_LLM_RECALL
+                and _BORDERLINE_LOWER <= slop_score < effective_threshold
+                and Laminar.is_initialized()
+            ):
+                Laminar.event(
+                    name=SpanEvent.RECALL_SLOP_BORDERLINE.value,
+                    attributes={
+                        "slop_score": f"{slop_score:.3f}",
+                        "effective_threshold": f"{effective_threshold:.3f}",
+                    },
+                )
+
+            if slop_score > effective_threshold:
+                if not dry_run:
+                    await _quarantine(
+                        journal=journal,
+                        entry=enriched,
+                        body=body,
+                        slop_score=slop_score,
+                        post_mortems_root=post_mortems_root,
+                    )
+                logger.info(
+                    "ingest: quarantined %s:%s slop=%.2f body=%d chars url=%s",
+                    entry.source,
+                    entry.source_id,
+                    slop_score,
+                    len(body),
+                    entry.url,
+                )
+                result.quarantined += 1
+                result.span_events.append(SpanEvent.SLOP_QUARANTINED.value)
+                progress.advance_phase(IngestPhase.CLASSIFY)
+                return None
+
+            preview = body[:160].replace("\n", " ")
+            logger.info(
+                "ingest: kept %s:%s slop=%.2f body=%d chars url=%s preview=%r",
+                entry.source,
+                entry.source_id,
+                slop_score,
+                len(body),
+                entry.url,
+                preview,
+            )
+            progress.advance_phase(IngestPhase.CLASSIFY)
+            return enriched, body
+
+    classified = await gather_resilient(*(_one(e) for e in entries))
+    keepers: list[tuple[RawEntry, str]] = []
+    for entry, item in zip(entries, classified, strict=True):
+        if isinstance(item, Exception):
+            # ``_one`` already routes Exceptions through ``_record_entry_failure``
+            # for known per-entry shapes. Anything reaching here is unexpected
+            # (e.g. ``_quarantine`` disk/journal write blew up) — log it but
+            # don't abort the run, and don't double-count ``errors``.
+            logger.warning(
+                "ingest classify: unhandled exception for %s:%s: %r",
+                entry.source,
+                entry.source_id,
+                item,
+            )
+            continue
+        if item is not None:
+            keepers.append(item)
+
     progress.end_phase(IngestPhase.CLASSIFY)
     return keepers
 
@@ -192,11 +296,13 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
     sparse_encoder: SparseEncoder,
     progress: IngestProgress,
     result: IngestResult,
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> None:
     """Per-entry: resolve → journal → disk → qdrant → mark_complete.
 
-    Per-entry failures isolate; ``BaseException`` (cancel / system-exit) re-raises
-    after surfacing which entry triggered it.
+    Per-entry failures isolate; ``BaseException`` (cancel/system-exit)
+    re-raises after surfacing which entry triggered it.
     """
     progress.start_phase(IngestPhase.WRITE, total=len(keepers))
     for (entry, body), fan in zip(keepers, fanout, strict=True):
@@ -209,7 +315,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 phase=IngestPhase.FAN_OUT,
                 entry=entry,
                 exc=fan,
-                message=f"fan-out failed for {entry.source}:{entry.source_id}: {fan}",
+                message=f"fan-out failed for {entry.source}:{entry.source_id}: {fan!r}",
             )
             progress.advance_phase(IngestPhase.WRITE)
             continue
@@ -228,6 +334,8 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 force=force,
                 span_events=result.span_events,
                 sparse_encoder=sparse_encoder,
+                verification_tier=verification_tier,
+                deathness_verdict=deathness_verdict,
             )
         except Exception as exc:  # noqa: BLE001 - per-entry isolation; run continues.
             _record_entry_failure(
@@ -236,7 +344,7 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
                 phase=IngestPhase.WRITE,
                 entry=entry,
                 exc=exc,
-                message=f"write phase failed for {entry.source}:{entry.source_id}: {exc}",
+                message=f"write phase failed for {entry.source}:{entry.source_id}: {exc!r}",
             )
             progress.advance_phase(IngestPhase.WRITE)
             continue
@@ -257,6 +365,21 @@ async def _write_phase(  # noqa: PLR0913 - one phase, every dep at this seam
             case ProcessOutcome.SKIPPED_EMPTY:
                 result.skipped_empty += 1
             case ProcessOutcome.FAILED:
+                # ``_process_entry`` already logged the underlying cause at
+                # warning level (e.g. delete_chunks transport error). Surface
+                # the entry on progress + trace at parity with the exception
+                # path; the synthetic exc is a placeholder so the helper's
+                # contract stays narrow.
+                _record_entry_failure(
+                    result=result,
+                    progress=progress,
+                    phase=IngestPhase.WRITE,
+                    entry=entry,
+                    exc=RuntimeError("process_entry returned FAILED; see prior warning"),
+                    message=(
+                        f"write phase failed for {entry.source}:{entry.source_id} (FAILED outcome)"
+                    ),
+                )
                 result.failed += 1
         progress.advance_phase(IngestPhase.WRITE)
     progress.end_phase(IngestPhase.WRITE)
@@ -343,6 +466,7 @@ async def ingest(  # noqa: PLR0913 - orchestration takes every dependency.
         config=config,
         post_mortems_root=post_mortems_root,
         dry_run=dry_run,
+        force=force,
         progress=progress,
         result=result,
     )

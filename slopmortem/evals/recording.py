@@ -68,6 +68,7 @@ class RecordingLLMClient:
         response_format: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         extra_body: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny]
         max_tokens: int | None = None,
+        single_tool_call: bool = False,
     ) -> CompletionResult:
         if self._max_cost_usd is not None and self._spent_usd >= self._max_cost_usd:
             raise RecordingBudgetExceededError(
@@ -83,6 +84,7 @@ class RecordingLLMClient:
             response_format=response_format,
             extra_body=extra_body,
             max_tokens=max_tokens,
+            single_tool_call=single_tool_call,
         )
         eff_model = model or self._model
         template_sha = ""

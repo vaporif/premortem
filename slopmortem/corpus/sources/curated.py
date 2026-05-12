@@ -68,7 +68,7 @@ class CuratedSource:
             try:
                 resp = await safe_get(url)
             except (SSRFBlockedError, httpx.HTTPError) as exc:
-                logger.warning("curated: fetch failed for %s: %s", url, exc)
+                logger.warning("curated: fetch failed for %s: %r", url, exc)
                 continue
             if resp.status_code >= HTTP_BAD_REQUEST:
                 logger.warning("curated: HTTP %s for %s", resp.status_code, url)

@@ -1,41 +1,67 @@
 """Pipeline orchestration. All side-effecting deps injected; CLI wires them up.
 
-``BudgetExceededError`` truncates the run and returns a partial
-`Report` with ``budget_exceeded=True``. Per-candidate synthesis
-failures don't abort — ``synthesize_all`` returns them as exception entries
-which we drop before populating ``Report.candidates``.
+``BudgetExceededError`` truncates the run and returns a partial ``Report``
+with ``budget_exceeded=True``. Per-candidate synthesis failures don't abort;
+``synthesize_all`` returns them as exception entries which we drop before
+populating ``Report.candidates``.
 """
 
 from __future__ import annotations
 
+import logging
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
 from dateutil.relativedelta import relativedelta
 from lmnr import Laminar, observe
 
 from slopmortem.budget import BudgetExceededError
+from slopmortem.corpus.sources import WaybackEnricher
+from slopmortem.ingest import IngestResult, NullProgress
+from slopmortem.llm import recall_tools
 from slopmortem.models import PipelineMeta, Report, Synthesis, TopRisks
 from slopmortem.stages import (
+    compute_coverage_gap,
     consolidate_risks,
     drop_below_min_similarity,
     extract_facets,
+    llm_recall,
     llm_rerank,
+    persist_recall_entry,
     retrieve,
     select_top_n_by_similarity,
     synthesize_all,
+    verify_and_persist_all,
 )
+from slopmortem.stages.llm_recall import PriorCandidateHint
+from slopmortem.stages.recall_verify import DeathnessConfig
 from slopmortem.tracing import SpanEvent, git_sha, mint_run_id
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from slopmortem.budget import Budget
     from slopmortem.config import Config
-    from slopmortem.corpus import Corpus
+    from slopmortem.corpus import Corpus, MergeJournal
+    from slopmortem.corpus.sources import Enricher
+    from slopmortem.ingest import Corpus as IngestCorpus
+    from slopmortem.ingest import SlopClassifier
     from slopmortem.llm import EmbeddingClient, LLMClient
-    from slopmortem.models import InputContext
-    from slopmortem.stages import SparseEncoder
+    from slopmortem.models import (
+        Candidate,
+        Facets,
+        InputContext,
+        LlmRerankResult,
+        RawEntry,
+    )
+    from slopmortem.stages import SparseEncoder, VerificationTier
+    from slopmortem.stages.recall_verify import ExtractFn, TavilySearchFn
+
+
+logger = logging.getLogger(__name__)
 
 
 class QueryPhase(StrEnum):
@@ -44,15 +70,41 @@ class QueryPhase(StrEnum):
     FACET_EXTRACT = "facet_extract"
     RETRIEVE = "retrieve"
     RERANK = "rerank"
+    RECALL = "recall"
     SYNTHESIZE = "synthesize"
+
+
+@dataclass(frozen=True)
+class RecallDeps:
+    """Long-lived deps the recall persist tail needs.
+
+    The pipeline raises ``RuntimeError`` when recall fires without these, so
+    misconfig surfaces at the call site instead of no-oping mid-run.
+
+    ``tavily_search`` is the mandatory L0 search head; ``extract`` is the L3
+    fallback for GET-4xx hosts and SPA shells. Both ride
+    ``enable_tavily_recall_search``.
+
+    ``wayback=None`` lets production wiring construct ``WaybackEnricher()``
+    lazily; tests inject a fake to skip archive.org.
+    """
+
+    journal: MergeJournal
+    slop_classifier: SlopClassifier
+    post_mortems_root: Path
+    tavily_search: TavilySearchFn
+    extract: ExtractFn
+    # Typed as the broad ``Enricher`` Protocol so tests can inject a fake
+    # without subclassing ``WaybackEnricher``.
+    wayback: Enricher | None = None
 
 
 @runtime_checkable
 class QueryProgress(Protocol):
     """Phase-level progress hooks for ``slopmortem query``.
 
-    The default `NullQueryProgress` keeps the orchestrator decoupled
-    from any UI library; the CLI wires a Rich implementation.
+    ``NullQueryProgress`` keeps the orchestrator UI-library-free; the CLI
+    wires a Rich implementation.
     """
 
     def start_phase(self, phase: QueryPhase, total: int) -> None: ...
@@ -75,10 +127,9 @@ class NullQueryProgress:
 
 
 def cutoff_iso(years_filter: int | None) -> str | None:
-    """Compute the ISO date cutoff for *years_filter*.
+    """Compute the ISO date cutoff for ``years_filter``.
 
-    Floor to ``date()`` keeps the cutoff stable across the query's hour;
-    retrieve takes dates (``YYYY-MM-DD``), not timestamps.
+    Floor to ``date()``: retrieve takes ``YYYY-MM-DD``, not timestamps.
     """
     if years_filter is None:
         return None
@@ -95,11 +146,172 @@ def _current_trace_id(*, enable_tracing: bool) -> str | None:
     return str(tid) if tid is not None else None
 
 
+@dataclass(frozen=True)
+class _RecallOutcome:
+    retrieved: list[Candidate]
+    reranked: LlmRerankResult
+    persisted_count: int
+    used: bool
+
+
+async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows through from run_query
+    *,
+    input_ctx: InputContext,
+    facets: Facets,
+    retrieved: list[Candidate],
+    reranked: LlmRerankResult,
+    cutoff: str | None,
+    llm: LLMClient,
+    embedding_client: EmbeddingClient,
+    corpus: Corpus,
+    config: Config,
+    sparse_encoder: SparseEncoder,
+    recall_deps: RecallDeps,
+) -> _RecallOutcome:
+    """Recall fallback: ``llm_recall`` → verify → persist → re-retrieve / re-rerank.
+
+    Runs at most once per query. Caller owns the ``QueryProgress`` hooks.
+    """
+    # Join the reranker's scored ids against the retrieve payloads so the
+    # recall prompt's "already covered" hint block carries human-readable
+    # names rather than ``<slug>::sector`` ids. Top ``N_synthesize`` is the
+    # cap Opus actually competes against downstream — more hints just bloat
+    # prompt tokens without changing dedup judgment.
+    by_id: dict[str, Candidate] = {c.canonical_id: c for c in retrieved}
+    prior_hints = [
+        PriorCandidateHint(name=by_id[sc.candidate_id].payload.name, rationale=sc.rationale)
+        for sc in reranked.ranked[: config.N_synthesize]
+        if sc.candidate_id in by_id
+    ]
+    suggestions = await llm_recall(
+        pitch=input_ctx.description,
+        facets=facets,
+        current_top_n=prior_hints,
+        llm=llm,
+        model=config.model_recall,
+        max_tokens=config.max_tokens_recall,
+        cap=config.recall_max_suggestions_per_pitch,
+        tools=recall_tools(config),
+        recall_max_tavily_calls=config.recall_max_tavily_calls,
+    )
+    if Laminar.is_initialized():
+        Laminar.event(
+            name=str(SpanEvent.RECALL_SUGGESTIONS_RECEIVED),
+            attributes={"count": len(suggestions)},
+        )
+    if not suggestions:
+        return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
+    # Lazy default: only constructed on the recall path so non-recall queries
+    # don't pay the import-time cost. Tests inject a fake via ``RecallDeps.wayback``.
+    wb = recall_deps.wayback if recall_deps.wayback is not None else WaybackEnricher()
+    # Cast: ``corpus`` satisfies the read-side Corpus Protocol on the caller's
+    # signature, but ``persist_recall_entry`` expects the write-side ingest
+    # Protocol. Production ``QdrantCorpus`` implements both surfaces; tests
+    # use a hybrid fake.
+    ingest_corpus = cast("IngestCorpus", corpus)
+
+    async def _persist(
+        entry: RawEntry,
+        tier: VerificationTier,
+        verdict: Literal["dead", "struggling"],
+    ) -> None:
+        # Per-call progress/result: ``classify_phase`` mutates both for the
+        # one entry being persisted; nothing else reads them. Fresh pair per
+        # call avoids cross-talk if recall fires multiple suggestions in
+        # parallel.
+        await persist_recall_entry(
+            entry,
+            tier,
+            deathness_verdict=verdict,
+            journal=recall_deps.journal,
+            corpus=ingest_corpus,
+            embed_client=embedding_client,
+            llm=llm,
+            slop_classifier=recall_deps.slop_classifier,
+            sparse_encoder=sparse_encoder,
+            config=config,
+            post_mortems_root=recall_deps.post_mortems_root,
+            progress=NullProgress(),
+            result=IngestResult(),
+        )
+        if Laminar.is_initialized():
+            Laminar.event(
+                name=str(SpanEvent.RECALL_PERSISTED),
+                attributes={"tier": tier, "deathness_verdict": verdict},
+            )
+
+    verified = await verify_and_persist_all(
+        suggestions,
+        wayback=wb,
+        persist=_persist,
+        llm=llm,
+        tavily_search=recall_deps.tavily_search,
+        extract=recall_deps.extract,
+        tavily_recall_max_results=config.tavily_recall_max_results,
+        deathness=DeathnessConfig(
+            model=config.model_recall_deathness,
+            max_tokens=config.max_tokens_recall_deathness,
+            min_confidence=config.recall_deathness_min_confidence,
+            struggling_min_confidence=config.recall_struggling_min_confidence,
+        ),
+    )
+    persisted_count = len(verified)
+    if not verified:
+        return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
+    new_retrieved = await retrieve(
+        description=input_ctx.description,
+        facets=facets,
+        corpus=corpus,
+        embedding_client=embedding_client,
+        cutoff_iso=cutoff,
+        strict_deaths=config.strict_deaths,
+        k_retrieve=config.K_retrieve,
+        sparse_encoder=sparse_encoder,
+        strict_sector_filter=config.strict_sector_filter,
+        strict_sector_filter_excludes_other=config.strict_sector_filter_excludes_other,
+    )
+    new_reranked = await llm_rerank(
+        new_retrieved,
+        input_ctx.description,
+        facets,
+        llm,
+        config,
+        model=config.model_rerank,
+        max_tokens=config.max_tokens_rerank,
+    )
+    # Mirror the pre-recall GAP_SCORE shape so a join-on-trace query can pair
+    # before/after. ``gap_closed`` is the derived boolean the calibration
+    # dashboard reads to answer "was recall worth the budget on this query".
+    gap_after = compute_coverage_gap(
+        retrieved=new_retrieved,
+        ranked=new_reranked.ranked,
+        pitch_sector=facets.sector,
+        min_similarity_score=config.min_similarity_score,
+        n_synthesize=config.N_synthesize,
+    )
+    if Laminar.is_initialized():
+        Laminar.event(
+            name=str(SpanEvent.RECALL_GAP_SCORE_AFTER),
+            attributes={
+                "qualifying": str(gap_after.qualifying),
+                "required": str(gap_after.required),
+                "gap_closed": str(not gap_after.gap),
+                "pitch_sector": facets.sector,
+            },
+        )
+    return _RecallOutcome(
+        retrieved=new_retrieved,
+        reranked=new_reranked,
+        persisted_count=persisted_count,
+        used=True,
+    )
+
+
 @observe(
     name="query",
     ignore_inputs=["llm", "embedding_client", "corpus", "budget", "progress"],
 )
-async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call site
+async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phase + recall branch lands inline
     input_ctx: InputContext,
     *,
     llm: LLMClient,
@@ -109,11 +321,17 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
     budget: Budget,
     progress: QueryProgress | None = None,
     sparse_encoder: SparseEncoder | None = None,
+    recall_deps: RecallDeps | None = None,
 ) -> Report:
-    """Run the query pipeline end-to-end and assemble the `Report`.
+    """Run the query pipeline end-to-end and assemble the ``Report``.
 
-    Per-candidate synthesis exceptions are dropped silently; ``BudgetExceededError``
+    Per-candidate synthesis exceptions drop silently. ``BudgetExceededError``
     truncates the run and surfaces as ``pipeline_meta.budget_exceeded=True``.
+
+    Provide ``recall_deps`` so the coverage-gap predicate can fire. Without
+    them, predicate-driven recall logs and no-ops (test path);
+    ``force_llm_recall=True`` raises ``RuntimeError`` so operator opt-in
+    surfaces misconfig.
     """
     t0 = time.monotonic()
     successes: list[Synthesis] = []
@@ -121,6 +339,9 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
     budget_exceeded = False
     filtered_pre_synth = 0
     filtered_post_synth = 0
+    coverage_gap = False
+    recall_used = False
+    recall_persisted_count = 0
 
     if Laminar.is_initialized():
         Laminar.set_span_attributes(
@@ -132,6 +353,9 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
                 "config.K_retrieve": config.K_retrieve,
                 "config.N_synthesize": config.N_synthesize,
                 "config.min_similarity_score": config.min_similarity_score,
+                "config.min_similarity_score_after_recall": (
+                    config.min_similarity_score_after_recall
+                ),
                 "config.strict_deaths": config.strict_deaths,
                 "config.model_facet": config.model_facet,
                 "config.model_rerank": config.model_rerank,
@@ -162,6 +386,8 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
             strict_deaths=config.strict_deaths,
             k_retrieve=config.K_retrieve,
             sparse_encoder=sparse_encoder,
+            strict_sector_filter=config.strict_sector_filter,
+            strict_sector_filter_excludes_other=config.strict_sector_filter_excludes_other,
         )
         progress.advance_phase(QueryPhase.RETRIEVE)
         progress.end_phase(QueryPhase.RETRIEVE)
@@ -179,10 +405,85 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
         progress.advance_phase(QueryPhase.RERANK)
         progress.end_phase(QueryPhase.RERANK)
 
+        gap_result = compute_coverage_gap(
+            retrieved=retrieved,
+            ranked=reranked.ranked,
+            pitch_sector=facets.sector,
+            min_similarity_score=config.min_similarity_score,
+            n_synthesize=config.N_synthesize,
+        )
+        coverage_gap = gap_result.gap
+
+        # GAP_SCORE fires every query so eval can sweep predicate thresholds
+        # against historical traces. GATE_FIRED stays predicate-driven only.
+        # Attributes are stringified for OTLP.
+        if Laminar.is_initialized():
+            Laminar.event(
+                name=str(SpanEvent.RECALL_GAP_SCORE),
+                attributes={
+                    "qualifying": str(gap_result.qualifying),
+                    "required": str(gap_result.required),
+                    "pitch_sector": facets.sector,
+                },
+            )
+
+        # OR-combined: predicate-driven OR force-on. ``force_llm_recall`` lets
+        # operators recording cassettes or running eval calibration fire recall
+        # on every query regardless of the predicate.
+        should_fire = coverage_gap or config.force_llm_recall
+
+        if coverage_gap and Laminar.is_initialized():
+            Laminar.event(name=str(SpanEvent.RECALL_GATE_FIRED))
+
+        if should_fire and recall_deps is None:
+            # Predicate-only firings degrade gracefully when deps weren't
+            # threaded through (eval harnesses, focused unit tests). The
+            # production CLI always provides deps; ``force_llm_recall`` still
+            # raises so explicit operator opt-in surfaces misconfig.
+            if config.force_llm_recall:
+                msg = "force_llm_recall=True but RecallDeps not provided"
+                raise RuntimeError(msg)
+            logger.info("coverage_gap fired but RecallDeps not provided; skipping recall")
+            should_fire = False
+
+        if should_fire and recall_deps is not None:
+            if sparse_encoder is None:
+                msg = "recall requires sparse_encoder"
+                raise RuntimeError(msg)
+            progress.start_phase(QueryPhase.RECALL, total=1)
+            outcome = await _run_recall_branch(
+                input_ctx=input_ctx,
+                facets=facets,
+                retrieved=retrieved,
+                reranked=reranked,
+                cutoff=cutoff,
+                llm=llm,
+                embedding_client=embedding_client,
+                corpus=corpus,
+                config=config,
+                sparse_encoder=sparse_encoder,
+                recall_deps=recall_deps,
+            )
+            retrieved = outcome.retrieved
+            reranked = outcome.reranked
+            recall_persisted_count = outcome.persisted_count
+            recall_used = outcome.used
+            progress.advance_phase(QueryPhase.RECALL)
+            progress.end_phase(QueryPhase.RECALL)
+
+        # When recall persisted >=1 entry, the corpus is by definition thin for
+        # this pitch — the corpus-normal floor would re-filter out the very
+        # entries we just verified and persisted. Lower bar trades fidelity
+        # for a non-empty report; verifier already vetted the candidates.
+        synthesis_threshold = (
+            config.min_similarity_score_after_recall
+            if recall_persisted_count > 0
+            else config.min_similarity_score
+        )
         top_n, filtered_pre_synth = select_top_n_by_similarity(
             retrieved=retrieved,
             ranked=reranked.ranked,
-            min_similarity=config.min_similarity_score,
+            min_similarity=synthesis_threshold,
             n_synthesize=config.N_synthesize,
         )
 
@@ -212,8 +513,13 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
             on_candidate_done=_on_candidate_done,
         )
         successes = [s for s in synth_results if isinstance(s, Synthesis)]
+        # Mirror the pre-synth floor: when recall persisted, the synthesizer's
+        # re-scored similarity is judged against the same lowered bar the
+        # rerank-side filter used. Otherwise the recall branch pays for
+        # synthesis on candidates it already vetted only for the post-synth
+        # drop to re-apply the corpus-normal floor and discard them.
         successes, filtered_post_synth = drop_below_min_similarity(
-            successes, min_similarity=config.min_similarity_score
+            successes, min_similarity=synthesis_threshold
         )
         # Inside the try so a budget-exceeded run falls through to the default
         # empty TopRisks instead of consolidating a partial set.
@@ -252,5 +558,8 @@ async def run_query(  # noqa: PLR0913 - every dep is required wiring at the call
             budget_exceeded=budget_exceeded,
             filtered_pre_synth=filtered_pre_synth,
             filtered_post_synth=filtered_post_synth,
+            coverage_gap=coverage_gap,
+            recall_used=recall_used,
+            recall_persisted_count=recall_persisted_count,
         ),
     )

@@ -29,9 +29,11 @@ from slopmortem.corpus import (
     write_canonical_atomic,
     write_raw_atomic,
 )
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
 from slopmortem.ingest._fan_out import _embed_and_upsert
 from slopmortem.ingest._helpers import (
     _build_payload,
+    _entry_name,
     _reliability_for,
     _skip_key,
     _text_id_for,
@@ -41,6 +43,7 @@ from slopmortem.tracing import SpanEvent
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Literal
 
     from slopmortem.config import Config
     from slopmortem.corpus import MergeJournal
@@ -76,15 +79,17 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
     force: bool,
     span_events: list[str],
     sparse_encoder: SparseEncoder,
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None,
+    deathness_verdict: Literal["dead", "struggling"] | None = None,
 ) -> ProcessOutcome:
     """Resolve, write, and journal one entry.
 
-    SKIPPED_EMPTY: zero chunks → skip mark_complete rather than journalling
-    a row with no Qdrant points. FAILED: a write raised (today only
-    delete_chunks_for_canonical on a re-merge); abort before any upsert so we
-    don't shadow prior orphans with a fresh layer.
+    ``SKIPPED_EMPTY``: zero chunks → skip ``mark_complete`` rather than
+    journalling a row with no Qdrant points. ``FAILED``: a write raised
+    (today only ``delete_chunks_for_canonical`` on re-merge); abort before
+    any upsert so we don't shadow prior orphans with a fresh layer.
     """
-    name = entry.source_id  # ingest's name extraction is best-effort in v1
+    name = _entry_name(entry)
     sector = fan.facets.sector
     res = await resolve_entity(
         entry,
@@ -98,6 +103,18 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         tiebreaker_max_tokens=config.max_tokens_tiebreaker,
     )
     span_events.extend(res.span_events)
+    # resolver_flipped already emits RESOLVER_FLIP_DETECTED via res.span_events;
+    # alias_blocked is the only canonical-merge path without its own dedicated
+    # trace event, so the audit dashboard learns about recall-side dedup here.
+    if (
+        res.action == "alias_blocked"
+        and entry.source == SOURCE_LLM_RECALL
+        and Laminar.is_initialized()
+    ):
+        Laminar.event(
+            name=SpanEvent.RECALL_DEDUPED_EXISTING.value,
+            attributes={"action": res.action, "source_id": entry.source_id},
+        )
     if res.action in ("alias_blocked", "resolver_flipped"):
         return ProcessOutcome.SKIPPED
     canonical_id = res.canonical_id
@@ -173,16 +190,17 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
             await corpus.delete_chunks_for_canonical(canonical_id)
         except Exception as exc:  # noqa: BLE001 - qdrant-client raises many transport/auth/validation shapes; recovery is the same for all.
             # Abort the entry; reconcile picks up the drift on a later pass.
-            Laminar.event(
-                name=SpanEvent.INGEST_ENTRY_FAILED.value,
-                attributes={
-                    "canonical_id": canonical_id,
-                    "stage": "delete_chunks",
-                    "error": str(exc),
-                },
-            )
+            if Laminar.is_initialized():
+                Laminar.event(
+                    name=SpanEvent.INGEST_ENTRY_FAILED.value,
+                    attributes={
+                        "canonical_id": canonical_id,
+                        "stage": "delete_chunks",
+                        "error": str(exc),
+                    },
+                )
             logger.warning(
-                "ingest aborted entry: delete_chunks_for_canonical failed for %s: %s",
+                "ingest aborted entry: delete_chunks_for_canonical failed for %s: %r",
                 canonical_id,
                 exc,
             )
@@ -196,7 +214,10 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         provenance_id=f"{entry.source}:{entry.source_id}",
         text_id=text_id,
         name=name,
-        provenance=entry.source,
+        entry_source=entry.source,
+        synthesized=entry.synthesized,
+        verification_tier=verification_tier,
+        deathness_verdict=deathness_verdict,
     )
     chunks_written = await _embed_and_upsert(
         canonical_id=canonical_id,
@@ -211,10 +232,11 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         # A "complete" row with zero Qdrant points is silent corpus drift. Leave
         # the row pending and surface the empty chunk count; reconcile catches
         # this class of drift retroactively.
-        Laminar.event(
-            name=SpanEvent.INGEST_ENTRY_EMPTY_CHUNKS.value,
-            attributes={"canonical_id": canonical_id},
-        )
+        if Laminar.is_initialized():
+            Laminar.event(
+                name=SpanEvent.INGEST_ENTRY_EMPTY_CHUNKS.value,
+                attributes={"canonical_id": canonical_id},
+            )
         logger.warning(
             "ingest skipped mark_complete: zero chunks for canonical_id=%s",
             canonical_id,
@@ -230,5 +252,13 @@ async def _process_entry(  # noqa: PLR0913 - orchestration density is the contra
         skip_key=skip_key,
         merged_at=utcnow_iso(),
         content_hash=content_hash,
+    )
+    logger.info(
+        "ingest: saved %s:%s → canonical=%s chunks=%d body=%d chars",
+        entry.source,
+        entry.source_id,
+        canonical_id,
+        chunks_written,
+        len(merged),
     )
     return ProcessOutcome.PROCESSED

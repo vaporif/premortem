@@ -1,0 +1,35 @@
+{# template_sha is computed at runtime via prompt_template_sha("title_pre_filter") #}
+{% block system -%}
+You filter Hacker News story titles for a startup-death corpus.
+
+Decide whether the title likely refers to a SPECIFIC company, startup, or business venture that has DIED or is DYING — meaning it shut down, went bankrupt, was dissolved, or was acquired and absorbed/extinguished.
+
+Answer `decision = "yes"` for titles like:
+- "Lytro is shutting down"
+- "Farewell from Mattermark"
+- "Why Rdio failed"
+- "Quibi shuts down after six months"
+- "Vine is dead"
+
+Answer `decision = "no"` for titles like:
+- "Show HN: my new startup"
+- "Ask HN: how do you handle X?"
+- "10 reasons startups fail" (generic listicle)
+- "Big Co lays off 10% of workforce" (still operating)
+- "Review: the new MacBook"
+- "Rumors that X is shutting down" (speculation, not confirmed)
+- "X is not shutting down" (denial)
+- "How to avoid the mistakes that killed X" (lessons piece, not obituary)
+
+When uncertain, prefer `"yes"`. A `"no"` drops the entry permanently for this run (no classify, no journal, no write); a `"yes"` lets the pitch filler's confidence gate catch a non-death title at the cost of one Haiku turn + one `tavily_search` (~2 Tavily credits). Recall matters more than precision at this stage — the death-narrative corpus is the bottleneck, not Tavily credits.
+
+Output schema (return a single JSON object, no prose outside it):
+{
+  "decision": "yes" | "no"
+}
+{%- endblock %}
+{% block user -%}
+HN title: {{ title }}
+
+Is this likely a post about a specific startup that has shut down or is shutting down?
+{%- endblock %}

@@ -8,6 +8,7 @@ from slopmortem.corpus.sources._names import (
     SOURCE_CRUNCHBASE_CSV,
     SOURCE_CURATED,
     SOURCE_HN_ALGOLIA,
+    SOURCE_LLM_RECALL,
     SOURCE_TAVILY_NEWS,
 )
 from slopmortem.ingest._helpers import _reliability_for
@@ -20,6 +21,7 @@ from slopmortem.ingest._helpers import _reliability_for
         (SOURCE_HN_ALGOLIA, 1),
         (SOURCE_CRUNCHBASE_CSV, 2),
         (SOURCE_TAVILY_NEWS, 4),
+        (SOURCE_LLM_RECALL, 6),
     ],
 )
 def test_known_sources_have_explicit_rank(source: str, expected_rank: int) -> None:

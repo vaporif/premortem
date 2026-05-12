@@ -1,16 +1,22 @@
 """Shared helpers used by 2+ subcommand modules.
 
-Lives here so subcommand files can import without forming circular dependencies
-through ``cli/__init__.py``. The leading underscore signals package-private;
-the import-linter contract enforces it.
+Lives here so subcommand files can import without circular dependencies via
+``cli/__init__.py``. Leading underscore signals package-private; import-linter
+enforces it.
 """
 
 from __future__ import annotations
 
+import contextlib
+import logging
+import os
+import sys
 from typing import TYPE_CHECKING
 
 import typer
 from lmnr import Laminar
+from rich.console import Console
+from rich.logging import RichHandler
 from rich.panel import Panel
 
 from slopmortem.cli_progress import RichPhaseProgress
@@ -18,20 +24,62 @@ from slopmortem.pipeline import QueryPhase
 from slopmortem.tracing import init_tracing
 
 if TYPE_CHECKING:
-    from rich.console import Console
+    from collections.abc import Callable
 
     from slopmortem.config import Config
     from slopmortem.models import Report
+
+# Single Console shared by ``RichHandler`` and every ``RichPhaseProgress``.
+# Live's render-height tracking only stays consistent when log lines and bar
+# refreshes go through the same Console (it holds Live's lock). A stdlib
+# StreamHandler would bypass Live's redirect proxy and orphan a phase-table
+# copy per log line.
+_STDERR_CONSOLE = Console(stderr=True)
+
 
 # ``__all__`` flags these underscore-prefixed names as intentional package-private
 # exports so basedpyright stops reporting reportPrivateUsage at the import sites
 # in ``_*_cmd.py``.
 __all__ = [
     "_QUERY_PHASE_LABELS",
+    "_STDERR_CONSOLE",
     "RichQueryProgress",
     "_maybe_init_tracing",
+    "_maybe_setup_logging",
     "_render_query_footer",
+    "progress_context",
 ]
+
+
+def _maybe_setup_logging() -> None:
+    """Configure stdlib logging from ``SLOPMORTEM_LOG`` env var.
+
+    Off by default so library use of the CLI module doesn't hijack the root
+    logger. Set ``SLOPMORTEM_LOG=info`` (or ``debug``) for per-entry ingest
+    progress. Third-party loggers (httpx, lmnr) pin to WARNING.
+    """
+    level_name = os.environ.get("SLOPMORTEM_LOG", "").strip().lower()
+    if not level_name:
+        return
+    level = getattr(logging, level_name.upper(), None)
+    if not isinstance(level, int):
+        return
+    # RichHandler routes records through ``_STDERR_CONSOLE.print``, which is
+    # Live-aware: it pauses the live region, prints above it, and resumes.
+    # A plain ``StreamHandler`` would capture the original ``sys.stderr`` at
+    # construction time and bypass Live's redirect proxy, leaving one stranded
+    # copy of the phase table per emitted record.
+    handler = RichHandler(
+        console=_STDERR_CONSOLE,
+        show_path=False,
+        markup=False,
+        rich_tracebacks=False,
+    )
+    # ``force=True`` so we still install our handler if an earlier import
+    # (Laminar, test runner) already touched the root logger.
+    logging.basicConfig(level=level, format="%(name)s: %(message)s", handlers=[handler], force=True)
+    for noisy in ("httpx", "httpcore", "lmnr", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 def _maybe_init_tracing(config: Config) -> None:
@@ -57,13 +105,31 @@ _QUERY_PHASE_LABELS: dict[QueryPhase, str] = {
     QueryPhase.FACET_EXTRACT: "Extracting facets",
     QueryPhase.RETRIEVE: "Retrieving candidates",
     QueryPhase.RERANK: "Reranking candidates",
+    QueryPhase.RECALL: "Recalling from memory",
     QueryPhase.SYNTHESIZE: "Synthesizing post-mortems",
 }
 
 
 class RichQueryProgress(RichPhaseProgress[QueryPhase]):
     def __init__(self) -> None:
-        super().__init__(_QUERY_PHASE_LABELS)
+        super().__init__(_QUERY_PHASE_LABELS, console=_STDERR_CONSOLE)
+
+
+def progress_context[T](
+    factory: Callable[[], contextlib.AbstractContextManager[T]],
+) -> contextlib.AbstractContextManager[T | None]:
+    """Build the Rich phase bar context, or ``nullcontext`` when stderr isn't a tty.
+
+    Gates: ``SLOPMORTEM_NO_PROGRESS``, ``sys.stderr.isatty()``, Rich
+    ``is_terminal``. Non-tty users still see progress via ``SLOPMORTEM_LOG=info``.
+    """
+    if os.environ.get("SLOPMORTEM_NO_PROGRESS"):
+        return contextlib.nullcontext()
+    if not sys.stderr.isatty():
+        return contextlib.nullcontext()
+    if not Console(stderr=True).is_terminal:
+        return contextlib.nullcontext()
+    return factory()
 
 
 def _render_query_footer(console: Console, report: Report) -> None:

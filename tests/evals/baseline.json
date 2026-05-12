@@ -4,17 +4,6 @@
       "assertions": {},
       "candidates_count": 0
     },
-    "helixthread": {
-      "assertions": {
-        "knewton::edtech": {
-          "all_sources_in_allowed_domains": true,
-          "claims_grounded_in_body": true,
-          "lifespan_months_positive": true,
-          "where_diverged_nonempty": true
-        }
-      },
-      "candidates_count": 1
-    },
     "kakikaki": {
       "assertions": {},
       "candidates_count": 0
@@ -77,17 +66,6 @@
         }
       },
       "candidates_count": 3
-    },
-    "vitalcue": {
-      "assertions": {
-        "ubiome::biotech": {
-          "all_sources_in_allowed_domains": true,
-          "claims_grounded_in_body": true,
-          "lifespan_months_positive": true,
-          "where_diverged_nonempty": true
-        }
-      },
-      "candidates_count": 1
     },
     "yume-tutor": {
       "assertions": {},

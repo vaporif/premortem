@@ -6,6 +6,7 @@
 # field names.
 sector:
   - fintech
+  - crypto_web3
   - healthtech
   - edtech
   - climate_energy
@@ -28,6 +29,7 @@ sector:
   - hr_recruiting
   - legal_compliance
   - marketing_adtech
+  - telecom
   - other
 
 business_model:

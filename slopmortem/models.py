@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, model_validator
 
 # Closed-enum facet fields whose values MUST be in taxonomy.yml. Free-form
 # fields like sub_sector, product_type, price_point, founding_year, and
@@ -91,10 +91,10 @@ class SimilarityScores(BaseModel):
 class Facets(BaseModel):
     """Facets extracted from an input pitch. Closed-key half pins the taxonomy schema.
 
-    Closed enums are typed as ``Literal[*taxonomy_values]`` so Pydantic emits a
-    JSON-schema ``enum`` constraint that Anthropic's grammar-constrained
-    sampler enforces. Out-of-enum values can't reach this class; the LLM
-    can't generate them in the first place.
+    Closed enums use ``Literal[*taxonomy_values]`` so Pydantic emits a
+    JSON-schema ``enum`` constraint Anthropic's grammar-constrained sampler
+    enforces — out-of-enum values can't reach this class because the LLM
+    can't generate them.
     """
 
     sector: SectorLit
@@ -112,11 +112,11 @@ class Facets(BaseModel):
 class LLMSynthesis(BaseModel):
     """Fields the LLM emits for one candidate.
 
-    failure_date, lifespan_months, and sources are intentionally missing. The
-    dates are derived from CandidatePayload in stages.synthesize; sources are
-    passed through from CandidatePayload because the LLM never sees provenance
-    URLs (the body is plain text after extract_clean), so asking for them
-    produced empty or hallucinated lists that the host filter dropped.
+    ``failure_date``, ``lifespan_months``, and ``sources`` are absent on
+    purpose. Dates derive from ``CandidatePayload`` in ``stages.synthesize``;
+    sources pass through from ``CandidatePayload`` because the LLM never sees
+    provenance URLs (the body is plain text after ``extract_clean``) and
+    asking for them produced empty or hallucinated lists.
     """
 
     candidate_id: str
@@ -144,9 +144,18 @@ class Synthesis(BaseModel):
     lessons_for_input: list[str]
     sources: list[str]
     injection_detected: bool = False
+    # Mirrors ``CandidatePayload.source`` so the renderer can flag llm_recall
+    # candidates without re-reading the qdrant payload. None on syntheses
+    # written before the field existed.
+    source: str | None = None
+    # Mirrors ``CandidatePayload.deathness_verdict`` so the renderer can pick
+    # forward-looking framing for ``"struggling"`` admits. None on syntheses
+    # written before the verdict existed (legacy crunchbase/web rows are
+    # already-curated post-mortems and render with the default dead framing).
+    deathness_verdict: Literal["dead", "struggling"] | None = None
 
     @classmethod
-    def from_llm(
+    def from_llm(  # noqa: PLR0913 - one kwarg per typed-payload field threaded past the LLM
         cls,
         llm_synth: LLMSynthesis,
         *,
@@ -154,6 +163,8 @@ class Synthesis(BaseModel):
         failure_date: date | None,
         sources: list[str],
         injection_detected: bool = False,
+        source: str | None = None,
+        deathness_verdict: Literal["dead", "struggling"] | None = None,
     ) -> Synthesis:
         lifespan = _months_between(founding_date, failure_date)
         return cls(
@@ -169,6 +180,8 @@ class Synthesis(BaseModel):
             lessons_for_input=llm_synth.lessons_for_input,
             sources=sources,
             injection_detected=injection_detected,
+            source=source,
+            deathness_verdict=deathness_verdict,
         )
 
 
@@ -183,13 +196,11 @@ def _months_between(founding: date | None, failure: date | None) -> int | None:
 class CandidatePayload(BaseModel):
     """Persisted candidate doc: body, facets, provenance, text id.
 
-    ``sources`` is URL-only (empty when the upstream entry had no URL, e.g. CSV
-    imports). ``provenance_id`` is the synthetic ``"<source>:<source_id>"``
-    audit string that always identifies where the doc came from.
-
-    Splitting these stops the synthetic id from leaking into the synth host
-    allowlist: ``urlparse("curated:Celsius Network").hostname is None`` used
-    to drop every cited URL.
+    ``sources`` is URL-only (empty when the upstream entry had no URL, e.g.
+    CSV imports). ``provenance_id`` is the synthetic ``"<source>:<source_id>"``
+    audit string. Splitting them stops the synthetic id from leaking into the
+    synth host allowlist (``urlparse("curated:Celsius Network").hostname`` is
+    None and used to drop every cited URL).
     """
 
     name: str
@@ -200,11 +211,26 @@ class CandidatePayload(BaseModel):
     failure_date: date | None
     founding_date_unknown: bool
     failure_date_unknown: bool
-    provenance: Literal["curated_real", "scraped"]
+    provenance: Literal["curated_real", "scraped", "synthesized"]
     slop_score: float
     sources: list[str]
     provenance_id: str = ""
     text_id: str
+    # None for non-recall sources; ``recall_persist`` sets it for source=llm_recall.
+    # Carries the verifier's L4 outcome ("wayback_anchored" beats "evidence_only"
+    # because a corroborated snapshot is harder to fabricate than a single citation).
+    verification_tier: Literal["wayback_anchored", "evidence_only"] | None = None
+    # None for non-recall sources; the L5 verifier sets it on admit. ``"dead"``
+    # is a terminal verdict (shutdown, bankruptcy, fire-sale acquisition);
+    # ``"struggling"`` is ongoing distress (layoffs, restructuring) without
+    # ceased operations. Synthesis weights the two differently — terminal
+    # citations are stronger evidence than distress signals.
+    deathness_verdict: Literal["dead", "struggling"] | None = None
+    # Raw ``RawEntry.source`` ("crunchbase_csv", "llm_recall", …). Kept alongside
+    # ``provenance`` (curated/scraped/synthesized 3-way) because synthesize and
+    # render branch on the finer split — only ``llm_recall`` gets the recall tag.
+    # None for qdrant rows written before the field existed.
+    source: str | None = None
 
 
 class Candidate(BaseModel):
@@ -238,6 +264,62 @@ class LlmRerankResult(BaseModel):
     ranked: list[ScoredCandidate]
 
 
+_HTTP_URL_ADAPTER: TypeAdapter[HttpUrl] = TypeAdapter(HttpUrl)
+
+
+_FAILURE_YEAR_MIN = 1990
+_FAILURE_YEAR_MAX = 2030
+
+
+class RecallSuggestion(BaseModel):
+    """One LLM-recalled comparable: company name plus optional URL hints.
+
+    ``homepage_url`` and ``evidence_url`` skip field-level ``HttpUrl`` format
+    because strict ``response_format`` (OpenAI + Anthropic) rejects
+    ``format``/``minLength``/``maxLength`` on strings and
+    ``minimum``/``maximum`` on integers. ``_validate_constraints`` enforces
+    the equivalent wire contract post-parse.
+
+    ``evidence_url`` is the citation URL Opus saw in its own
+    ``tavily_search`` results (title + snippet mentioned the company AND a
+    failure event). When present, the verifier skips its L0 round-trip and
+    threads the URL into L2-L5.
+    """
+
+    name: str
+    category: str
+    status: Literal["dead", "absorbed", "struggling", "bruised"]
+    homepage_url: str | None = None
+    evidence_url: str | None = None
+    failure_year: int
+    one_liner: str
+
+    @model_validator(mode="after")
+    def _validate_constraints(self) -> RecallSuggestion:
+        # Same shape ``HttpUrl`` would have enforced on the field directly.
+        if self.homepage_url is not None:
+            _HTTP_URL_ADAPTER.validate_python(self.homepage_url)
+        if self.evidence_url is not None:
+            _HTTP_URL_ADAPTER.validate_python(self.evidence_url)
+        if not _FAILURE_YEAR_MIN <= self.failure_year <= _FAILURE_YEAR_MAX:
+            msg = (
+                f"failure_year {self.failure_year} outside "
+                f"[{_FAILURE_YEAR_MIN}, {_FAILURE_YEAR_MAX}]"
+            )
+            raise ValueError(msg)
+        return self
+
+
+class RecallSuggestionList(BaseModel):
+    """Wrapper for the recall stage's array output.
+
+    Mirrors ``LlmRerankResult``: OpenRouter strict ``json_schema`` rejects
+    array roots, so the list lives under ``suggestions``.
+    """
+
+    suggestions: list[RecallSuggestion]
+
+
 class MergeState(StrEnum):
     """Lifecycle of an entity-resolution merge between two candidates."""
 
@@ -261,19 +343,27 @@ class PipelineMeta(BaseModel):
     budget_exceeded: bool
     filtered_pre_synth: int = 0
     filtered_post_synth: int = 0
+    # ``coverage_gap`` is the predicate result (survivors < N_synthesize after
+    # rerank+min_similarity) and is computed on every query. ``recall_used``
+    # flips only after a verified entry landed and the post-recall rerank ran
+    # (not on attempt). ``recall_persisted_count`` counts suggestions that passed
+    # L1-L4 verification AND the slop classifier.
+    coverage_gap: bool = False
+    recall_used: bool = False
+    recall_persisted_count: int = 0
 
 
 class ConsolidatedRisk(BaseModel):
     """One pitch-applicable risk consolidated across comparables.
 
     Attributes:
-        summary: Imperative one-liner for the founder. Canonical wording the
+        summary: Imperative one-liner for the founder; canonical wording the
             LLM picks when merging paraphrases.
-        applies_because: Why this risk hits THIS pitch. Must reference a
-            concrete element (asset class, scale, customer type, product
-            feature). Empty string is invalid.
-        raised_by: candidate_ids that emitted any lesson contributing to this
-            risk. Always non-empty for kept risks.
+        applies_because: Why this risk hits THIS pitch. Must cite a concrete
+            element (asset class, scale, customer type, product feature).
+            Empty string invalid.
+        raised_by: candidate_ids contributing any lesson to this risk.
+            Non-empty for kept risks.
         severity: "high" | "medium" | "low". At most 4 highs per report.
     """
 
@@ -330,9 +420,19 @@ class RawEntry(BaseModel):
     source: str
     source_id: str
     url: str | None
+    title: str | None = None
     raw_html: str | None = None
     markdown_text: str | None = None
     fetched_at: datetime
+    # True when ``markdown_text`` was synthesized by the LLM pitch filler
+    # (no primary HTML body backing it). Threads through to
+    # ``CandidatePayload.provenance="synthesized"`` at payload assembly.
+    synthesized: bool = False
+    # Set by HaikuTitlePreFilter when the HN title fails the cheap "is this a
+    # death narrative?" gate. Downstream enrichers (pitch filler) and the
+    # ingest classify loop short-circuit on this flag so rejected entries
+    # never trigger a Tavily call or a slop classifier call.
+    title_pre_filter_rejected: bool = False
 
 
 class AliasEdge(BaseModel):

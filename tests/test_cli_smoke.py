@@ -72,11 +72,11 @@ def _fixture_report(*, name: str = "Foo") -> Report:
     )
 
 
-def _build_fake_deps(_config: Config) -> tuple[object, object, object, Budget]:
+def _build_fake_deps(_config: Config) -> tuple[object, object, object, Budget, object]:
     """Stand-in for `slopmortem.deps.build_deps`; returns inert objects."""
     # Bare ``object()`` instances are fine here. The smoke test patches
     # ``run_query``, so these are never called.
-    return object(), object(), object(), Budget(cap_usd=0.0)
+    return object(), object(), object(), Budget(cap_usd=0.0), object()
 
 
 def _noop_set_corpus(_corpus: object) -> None:

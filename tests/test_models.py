@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from slopmortem.models import (
     Candidate,
     CandidatePayload,
@@ -7,6 +9,7 @@ from slopmortem.models import (
     InputContext,
     MergeState,
     PerspectiveScore,
+    RawEntry,
     ScoredCandidate,
     SimilarityScores,
 )
@@ -111,3 +114,24 @@ def test_similarity_scores_mean_averages_four_perspectives() -> None:
         stage_scale=PerspectiveScore(score=2.0, rationale="x"),
     )
     assert scores.mean() == 5.0
+
+
+def test_raw_entry_title_pre_filter_rejected_defaults_false() -> None:
+    e = RawEntry(
+        source="hn_algolia",
+        source_id="x",
+        url="https://example.com",
+        fetched_at=datetime.now(UTC),
+    )
+    assert e.title_pre_filter_rejected is False
+
+
+def test_raw_entry_title_pre_filter_rejected_can_be_set() -> None:
+    e = RawEntry(
+        source="hn_algolia",
+        source_id="x",
+        url="https://example.com",
+        fetched_at=datetime.now(UTC),
+        title_pre_filter_rejected=True,
+    )
+    assert e.title_pre_filter_rejected is True

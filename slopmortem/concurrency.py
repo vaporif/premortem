@@ -1,11 +1,9 @@
 """Concurrency helpers that don't fit anyio's task-group cancellation model.
 
-anyio's `anyio.abc.TaskGroup` cancels every sibling on the first
-exception. That's the right default for most of the codebase, but the fan-out
-sites in `slopmortem.ingest` and `slopmortem.stages.synthesize` need
-the opposite — one failed candidate must not cancel its siblings.
-`gather_resilient` wraps the asyncio primitive that gives that
-behaviour, so the rest of the code only has to import this helper.
+``anyio.abc.TaskGroup`` cancels every sibling on the first exception — the
+right default for most of the codebase, but the fan-out sites in
+``slopmortem.ingest`` and ``slopmortem.stages.synthesize`` need the opposite.
+``gather_resilient`` wraps the asyncio primitive that gives that behaviour.
 """
 
 from __future__ import annotations

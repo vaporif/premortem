@@ -17,11 +17,9 @@ from pathlib import Path
 # it out of the assertion set.
 _SEED_SECTORS: dict[str, str] = {
     "ledgermint": "fintech",
-    "vitalcue": "healthtech",
     "gridspring": "climate_energy",
     "kappa-cli": "devtools",
     "yume-tutor": "edtech",
-    "helixthread": "biotech",
     "smolpark": "social_communication",
     "shardbright": "gaming",
     # kakikaki = b2c marketplace; could plausibly map to media_content,

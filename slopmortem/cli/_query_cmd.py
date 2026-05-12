@@ -7,7 +7,6 @@ stdout (with ``--stdout``) or to ``.slopmortem/runs/<utc-ts>-<slug>.md``.
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import re
 import sys
@@ -24,13 +23,15 @@ from slopmortem.cli import app
 from slopmortem.cli._common import (
     RichQueryProgress,
     _maybe_init_tracing,
+    _maybe_setup_logging,
     _render_query_footer,
+    progress_context,
 )
 from slopmortem.config import load_config
 from slopmortem.corpus import set_query_corpus
-from slopmortem.deps import build_deps
+from slopmortem.deps import build_deps, build_tavily_recall_extract, build_tavily_recall_search
 from slopmortem.models import InputContext
-from slopmortem.pipeline import cutoff_iso, run_query
+from slopmortem.pipeline import RecallDeps, cutoff_iso, run_query
 from slopmortem.render import render
 from slopmortem.stages import extract_facets, retrieve
 
@@ -62,7 +63,7 @@ def _query_run_path(ctx: InputContext) -> Path:
 
 
 @app.command("query")
-def query_cmd(
+def query_cmd(  # noqa: PLR0913 - every flag mirrors a knob; user types kwargs.
     description: Annotated[
         str,
         typer.Argument(help="The pitch text to analyze."),
@@ -98,12 +99,23 @@ def query_cmd(
             ),
         ),
     ] = False,
+    force_llm_recall: Annotated[
+        bool,
+        typer.Option(
+            "--force-llm-recall/--no-force-llm-recall",
+            help=(
+                "Fire LLM recall on every query regardless of the coverage gate. "
+                "Default behaviour already fires recall when the gate trips; this "
+                "flag bypasses the gate. Use for cassette recording, eval "
+                "calibration, or thin/new corpora."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """When no candidates clear the similarity floor, exits 1 and writes no file.
 
     Tracing is gated on ``Config.enable_tracing`` and ``LMNR_PROJECT_API_KEY``;
-    if the key is missing but tracing is enabled, the run continues untraced
-    with a one-line warning on stderr.
+    missing key + tracing enabled continues untraced with a stderr warning.
     """
     anyio.run(
         functools.partial(
@@ -113,31 +125,37 @@ def query_cmd(
             years=years,
             debug_retrieve=debug_retrieve,
             to_stdout=to_stdout,
+            force_llm_recall=force_llm_recall,
         )
     )
 
 
 @observe(name="cli.query")
-async def _query(
+async def _query(  # noqa: PLR0913 - mirrors ``query_cmd``'s flag surface.
     *,
     description: str,
     name: str | None,
     years: int | None,
     debug_retrieve: bool = False,
     to_stdout: bool = False,
+    force_llm_recall: bool = False,
 ) -> None:
     config = load_config()
+    # ``model_copy`` skips validators; ``force_llm_recall`` has no cross-field
+    # constraints so this is safe. If that changes, switch to
+    # ``Config.model_validate``.
+    config = config.model_copy(update={"force_llm_recall": force_llm_recall})
+    _maybe_setup_logging()
     _maybe_init_tracing(config)
-    llm, embedder, corpus, budget = build_deps(config)
+    llm, embedder, corpus, budget, sparse_encoder = build_deps(config)
     set_query_corpus(corpus)
     ctx = InputContext(name=name or "(unnamed)", description=description, years_filter=years)
     if debug_retrieve:
         await _debug_retrieve(ctx, llm=llm, embedder=embedder, corpus=corpus, config=config)
         return
+    recall_deps = await _build_recall_deps(config, llm=llm)
 
-    progress_ctx: contextlib.AbstractContextManager[RichQueryProgress | None] = (
-        RichQueryProgress() if sys.stderr.isatty() else contextlib.nullcontext()
-    )
+    progress_ctx = progress_context(RichQueryProgress)
     err_console = Console(stderr=True)
     try:
         with progress_ctx as bar:
@@ -149,6 +167,8 @@ async def _query(
                 config=config,
                 budget=budget,
                 progress=bar,
+                sparse_encoder=sparse_encoder,
+                recall_deps=recall_deps,
             )
     except KeyboardInterrupt:
         err_console.rule("[bold yellow]query cancelled (Ctrl-C)", style="yellow")
@@ -175,6 +195,46 @@ async def _query(
     err_console.print(f"[bold green]Report saved to[/bold green] {out_path.resolve()}")
     if not sys.stdout.isatty():
         typer.echo(str(out_path))
+
+
+async def _build_recall_deps(
+    config: Config,
+    *,
+    llm: LLMClient,
+) -> RecallDeps | None:
+    """Build ``RecallDeps`` eagerly; return ``None`` when recall is off.
+
+    Built up front because the coverage-gap predicate can fire on any query.
+    ``MergeJournal.init()`` dominates cold start at <50ms. Tavily-off
+    disables the whole branch (L0 search and L3 extract share the flag).
+    """
+    tavily_search = build_tavily_recall_search(config)
+    extract = build_tavily_recall_extract(config)
+    if tavily_search is None or extract is None:
+        return None
+    # Local imports keep the cold-start cost off the import path; mirrors
+    # the ``_ingest_cmd.py`` pattern of deferring heavyweight deps.
+    from slopmortem.corpus import MergeJournal  # noqa: PLC0415
+    from slopmortem.ingest import HaikuSlopClassifier  # noqa: PLC0415
+
+    post_mortems_root = Path(config.post_mortems_root)
+    journal_path = Path(
+        config.merge_journal_path or str(post_mortems_root.parent / "journal.sqlite")
+    )
+    journal = MergeJournal(journal_path)
+    await journal.init()
+    classifier = HaikuSlopClassifier(
+        llm=llm,
+        model=config.model_summarize,
+        max_tokens=config.max_tokens_slop_judge,
+    )
+    return RecallDeps(
+        journal=journal,
+        slop_classifier=classifier,
+        post_mortems_root=post_mortems_root,
+        tavily_search=tavily_search,
+        extract=extract,
+    )
 
 
 _DEBUG_SUMMARY_MAX = 200

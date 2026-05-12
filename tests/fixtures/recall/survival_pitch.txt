@@ -1,0 +1,13 @@
+We're building a Kickstarter-funded consumer wearable: a notification-first
+e-paper smartwatch that pairs with iOS and Android phones, runs downloadable
+watchfaces and apps, and gets a week of battery life on a single charge.
+Our hardware partners are in Shenzhen and our backers are tech enthusiasts who
+already pre-ordered the first batch on Kickstarter at a $129 price point.
+We undercut Apple Watch on price and outlast it on battery; the bet is that
+glanceable notifications and step tracking are 90% of what most buyers
+actually want from a watch, and a $400 phone-on-your-wrist is overkill for
+that use case. Revenue model is direct-to-consumer hardware sales plus a
+small premium tier for cloud-synced watchface marketplaces. Team is six
+engineers from a previous wearables Kickstarter, plus an industrial designer
+who shipped at Misfit. We've raised $2M from angels and are closing a $10M
+seed; we want a slopmortem on what kills consumer-wearable Kickstarter plays.

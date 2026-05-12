@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL
+
 if TYPE_CHECKING:
     from slopmortem.models import (
         PerspectiveScore,
@@ -57,40 +59,64 @@ def _render_bullets(items: list[str]) -> str:
 
 
 def _render_candidate(syn: Synthesis) -> str:
-    failure_date_str = syn.failure_date.isoformat() if syn.failure_date else "unknown"
-    lifespan_str = f"{syn.lifespan_months} months" if syn.lifespan_months is not None else "unknown"
-    parts: list[str] = [
-        f"## {syn.name}",
-        "",
-        _strip_markdown_links(syn.one_liner),
-        "",
-        f"Failure date: {failure_date_str}",
-        f"Lifespan: {lifespan_str}",
-        "",
-        "Similarity:",
-        "",
-        _render_similarity_table(syn.similarity),
-        "",
-        "Why similar:",
-        "",
-        _strip_markdown_links(syn.why_similar),
-        "",
-        "Where diverged:",
-        "",
-        _strip_markdown_links(syn.where_diverged),
-        "",
-        "Failure causes:",
-        "",
-        _render_bullets(syn.failure_causes),
-        "",
-        "Lessons:",
-        "",
-        _render_bullets(syn.lessons_for_input),
-        "",
-        "Sources:",
-        "",
-        "\n".join(syn.sources),
-    ]
+    is_struggling = syn.deathness_verdict == "struggling"
+    date_str = syn.failure_date.isoformat() if syn.failure_date else "unknown"
+    # Struggling vendors are still operating, so the default "Failure date" /
+    # "Lifespan" framing reads wrong (no failure has happened, lifespan is
+    # open-ended). Swap the heading + date label and skip lifespan instead of
+    # rendering "unknown" for a still-running company.
+    if is_struggling:
+        heading = f"## {syn.name} — currently struggling"
+        date_label = "Distress observed:"
+    else:
+        heading = f"## {syn.name}"
+        date_label = "Failure date:"
+    parts: list[str] = [heading]
+    # llm_recall comparables are LLM-named and web-verified — weaker grounding
+    # than a crawler-sourced obit. Tag them so the reader discounts accordingly.
+    if syn.source == SOURCE_LLM_RECALL:
+        parts.append("*Source: LLM recall (verified against live web)*")
+    parts.extend(
+        [
+            "",
+            _strip_markdown_links(syn.one_liner),
+            "",
+            f"{date_label} {date_str}",
+        ]
+    )
+    if not is_struggling:
+        lifespan_str = (
+            f"{syn.lifespan_months} months" if syn.lifespan_months is not None else "unknown"
+        )
+        parts.append(f"Lifespan: {lifespan_str}")
+    parts.extend(
+        [
+            "",
+            "Similarity:",
+            "",
+            _render_similarity_table(syn.similarity),
+            "",
+            "Why similar:",
+            "",
+            _strip_markdown_links(syn.why_similar),
+            "",
+            "Where diverged:",
+            "",
+            _strip_markdown_links(syn.where_diverged),
+            "",
+            "Failure causes:",
+            "",
+            _render_bullets(syn.failure_causes),
+            "",
+            "Lessons:",
+            "",
+            _render_bullets(syn.lessons_for_input),
+            "",
+            "Sources:",
+            "",
+            "\n".join(syn.sources),
+        ]
+    )
     return "\n".join(parts)
 
 
@@ -111,26 +137,37 @@ def _render_top_risks(top_risks: TopRisks, candidates: list[Synthesis]) -> str:
 
 def _render_footer(meta: PipelineMeta) -> str:
     models_block = "\n".join(f"- {role}: {model}" for role, model in sorted(meta.models.items()))
-    return "\n".join(
+    lines: list[str] = [
+        "---",
+        "",
+        "Pipeline meta:",
+        "",
+        f"- cost_usd_total: {meta.cost_usd_total:.4f}",
+        f"- latency_ms_total: {meta.latency_ms_total}",
+        f"- trace_id: {meta.trace_id or 'none'}",
+        f"- budget_remaining_usd: {meta.budget_remaining_usd:.4f}",
+        f"- budget_exceeded: {meta.budget_exceeded}",
+        f"- K_retrieve: {meta.K_retrieve}",
+        f"- N_synthesize: {meta.N_synthesize}",
+        f"- min_similarity_score: {meta.min_similarity_score:.1f}",
+    ]
+    # Recall fallback signals: only render when non-default so existing
+    # report shapes don't grow noisy lines on every query.
+    if meta.coverage_gap:
+        lines.append(f"- coverage_gap: {meta.coverage_gap}")
+    if meta.recall_used:
+        lines.append(f"- recall_used: {meta.recall_used}")
+    if meta.recall_persisted_count:
+        lines.append(f"- recall_persisted_count: {meta.recall_persisted_count}")
+    lines.extend(
         [
-            "---",
-            "",
-            "Pipeline meta:",
-            "",
-            f"- cost_usd_total: {meta.cost_usd_total:.4f}",
-            f"- latency_ms_total: {meta.latency_ms_total}",
-            f"- trace_id: {meta.trace_id or 'none'}",
-            f"- budget_remaining_usd: {meta.budget_remaining_usd:.4f}",
-            f"- budget_exceeded: {meta.budget_exceeded}",
-            f"- K_retrieve: {meta.K_retrieve}",
-            f"- N_synthesize: {meta.N_synthesize}",
-            f"- min_similarity_score: {meta.min_similarity_score:.1f}",
             "",
             "Models:",
             "",
             models_block,
         ]
     )
+    return "\n".join(lines)
 
 
 def _render_no_comparables_banner(meta: PipelineMeta) -> str:
@@ -150,11 +187,11 @@ def _render_no_comparables_banner(meta: PipelineMeta) -> str:
 
 
 def render(report: Report) -> str:
-    """Render *report* to plain markdown, stripping clickable links.
+    """Render ``report`` to plain markdown, stripping clickable links.
 
-    Inline links, reference-style links, and image markdown are stripped from
-    every prose field. Sources go out as plain URLs, one per line, so no
-    clickable autolink reaches a markdown viewer.
+    Inline links, reference-style links, and image markdown drop from every
+    prose field. Sources go out as plain URLs, one per line, so no clickable
+    autolink reaches a markdown viewer.
     """
     sections: list[str] = [
         f"# Slopmortem report for {report.input.name}",

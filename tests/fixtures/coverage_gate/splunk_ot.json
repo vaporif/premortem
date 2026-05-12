@@ -1,0 +1,183 @@
+{
+  "pitch_sector": "security",
+  "retrieved": [
+    {
+      "canonical_id": "industrial_defender",
+      "score": 0.81,
+      "payload": {
+        "name": "Industrial Defender",
+        "summary": "ICS/OT security monitoring for power, water, and oil and gas operators.",
+        "body": "Industrial Defender sold an OT-native SIEM and asset inventory product to critical infrastructure operators before being acquired and rebranded.",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2006-01-01",
+        "failure_date": "2014-06-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://example.com/industrial-defender"],
+        "provenance_id": "curated:Industrial Defender",
+        "text_id": "1111111111111111"
+      }
+    },
+    {
+      "canonical_id": "wurldtech",
+      "score": 0.79,
+      "payload": {
+        "name": "Wurldtech",
+        "summary": "OT cyber-defense platform for industrial control systems.",
+        "body": "Wurldtech built Achilles, a security testing and runtime protection product for ICS, before being acquired by GE.",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "canada",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2006-01-01",
+        "failure_date": "2014-05-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://example.com/wurldtech"],
+        "provenance_id": "curated:Wurldtech",
+        "text_id": "2222222222222222"
+      }
+    },
+    {
+      "canonical_id": "nexdefense",
+      "score": 0.77,
+      "payload": {
+        "name": "NexDefense",
+        "summary": "Network anomaly detection for industrial control system networks.",
+        "body": "NexDefense built Sophia, a passive ICS network monitoring product, before winding down operations.",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2012-01-01",
+        "failure_date": "2018-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://example.com/nexdefense"],
+        "provenance_id": "curated:NexDefense",
+        "text_id": "3333333333333333"
+      }
+    },
+    {
+      "canonical_id": "secmation",
+      "score": 0.74,
+      "payload": {
+        "name": "Secmation",
+        "summary": "Embedded cyber-defense for industrial endpoints.",
+        "body": "Secmation built hardware-rooted security for OT endpoints; struggled to find a sustainable channel and folded.",
+        "facets": {
+          "sector": "security",
+          "business_model": "hardware_with_service",
+          "customer_type": "enterprise",
+          "geography": "us",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2014-01-01",
+        "failure_date": "2020-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://example.com/secmation"],
+        "provenance_id": "curated:Secmation",
+        "text_id": "4444444444444444"
+      }
+    },
+    {
+      "canonical_id": "redacted_ics",
+      "score": 0.71,
+      "payload": {
+        "name": "Redacted ICS Monitoring",
+        "summary": "Hosted SIEM for industrial control system telemetry.",
+        "body": "Hosted SIEM tuned for OT protocols; lost head-to-head deals against the SIEM incumbents and shut down.",
+        "facets": {
+          "sector": "security",
+          "business_model": "b2b_saas",
+          "customer_type": "enterprise",
+          "geography": "eu",
+          "monetization": "subscription_recurring"
+        },
+        "founding_date": "2015-01-01",
+        "failure_date": "2021-01-01",
+        "founding_date_unknown": false,
+        "failure_date_unknown": false,
+        "provenance": "curated_real",
+        "slop_score": 0.0,
+        "sources": ["https://example.com/redacted-ics"],
+        "provenance_id": "curated:Redacted ICS Monitoring",
+        "text_id": "5555555555555555"
+      }
+    }
+  ],
+  "ranked": [
+    {
+      "candidate_id": "industrial_defender",
+      "perspective_scores": {
+        "business_model": {"score": 6.0, "rationale": "B2B SaaS OT security monitoring with the same recurring model"},
+        "market": {"score": 7.0, "rationale": "same critical-infrastructure buyer set"},
+        "gtm": {"score": 5.0, "rationale": "channel-led enterprise security GTM"},
+        "stage_scale": {"score": 4.0, "rationale": "comparable enterprise-deal cadence at peak"}
+      },
+      "rationale": "Closest direct comparable: same buyer, same protocol coverage strategy."
+    },
+    {
+      "candidate_id": "wurldtech",
+      "perspective_scores": {
+        "business_model": {"score": 5.0, "rationale": "OT runtime protection plus services layer"},
+        "market": {"score": 6.0, "rationale": "same industrial vertical"},
+        "gtm": {"score": 5.0, "rationale": "OEM and channel partnerships dominated"},
+        "stage_scale": {"score": 4.0, "rationale": "mid-market OT scale before GE acquisition"}
+      },
+      "rationale": "Adjacent OT play, similar GTM logic."
+    },
+    {
+      "candidate_id": "nexdefense",
+      "perspective_scores": {
+        "business_model": {"score": 5.0, "rationale": "passive network monitoring SaaS"},
+        "market": {"score": 6.0, "rationale": "same ICS network buyers"},
+        "gtm": {"score": 4.0, "rationale": "system-integrator-led pull"},
+        "stage_scale": {"score": 4.0, "rationale": "early-mid-stage at wind-down"}
+      },
+      "rationale": "Passive-monitoring twin with similar GTM constraints."
+    },
+    {
+      "candidate_id": "secmation",
+      "perspective_scores": {
+        "business_model": {"score": 4.0, "rationale": "hardware-anchored OT security with services layer"},
+        "market": {"score": 5.0, "rationale": "industrial endpoints overlap"},
+        "gtm": {"score": 4.0, "rationale": "channel-led with hardware logistics tax"},
+        "stage_scale": {"score": 4.0, "rationale": "small-mid-stage before failure"}
+      },
+      "rationale": "Hardware-rooted OT defender; same buyers and similar failure mode."
+    },
+    {
+      "candidate_id": "redacted_ics",
+      "perspective_scores": {
+        "business_model": {"score": 4.0, "rationale": "hosted SIEM on a recurring contract"},
+        "market": {"score": 5.0, "rationale": "OT-flavored SIEM market overlap"},
+        "gtm": {"score": 4.0, "rationale": "direct-sale enterprise motion"},
+        "stage_scale": {"score": 4.0, "rationale": "comparable mid-stage scale"}
+      },
+      "rationale": "Hosted SIEM tuned for OT, lost on incumbent breadth."
+    }
+  ],
+  "expected_gate": false
+}
