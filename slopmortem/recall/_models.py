@@ -1,8 +1,6 @@
 """Record types for the recall subsystem.
 
-``VerifiedEntry`` is re-exported from ``_verify`` so the package surface
-has a single import site for records the public ``recall()`` returns.
-``RecallDeps`` / ``RecallConfig`` exist here so the recall package never
+``RecallDeps`` / ``RecallConfig`` live here so the recall package never
 imports ``slopmortem.config`` — the pipeline builds these from the global
 ``Config`` at the call site.
 """
@@ -11,10 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-
-from slopmortem.recall._verify import (
-    VerifiedEntry as VerifiedEntry,  # noqa: PLC0414 - explicit re-export so the package surface has a single import site
-)
 
 if TYPE_CHECKING:
     from slopmortem.corpus.sources import Enricher

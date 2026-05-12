@@ -20,7 +20,8 @@ from slopmortem.recall._models import RecallDeps as RecallDeps
 from slopmortem.recall._verify import DeathnessConfig as DeathnessConfig
 from slopmortem.recall._verify import VerificationTier as VerificationTier
 from slopmortem.recall._verify import VerifiedEntry as VerifiedEntry
-from slopmortem.recall._verify import verify_all
+from slopmortem.recall._verify import recall_source_id as recall_source_id
+from slopmortem.recall._verify import verify_all as _verify_all
 from slopmortem.recall.fake import FakeRecaller as FakeRecaller
 from slopmortem.tracing import SpanEvent
 
@@ -37,6 +38,7 @@ __all__ = [
     "VerificationTier",
     "VerifiedEntry",
     "recall",
+    "recall_source_id",
 ]
 
 
@@ -60,9 +62,10 @@ async def recall(
     drop fired, or transport failures isolated all candidates. The function
     never raises for per-suggestion failures.
     """
-    from slopmortem.stages.facet_extract import (  # noqa: PLC0415 - lazy: keeps slopmortem.recall outside `stages-leaf` contract source_modules (see .importlinter)
-        extract_facets,
-    )
+    # Lazy: importing slopmortem.stages.facet_extract eagerly would pull the
+    # whole stages package into recall's import graph for the rare standalone
+    # facets=None path. Pipeline always passes pre-extracted facets.
+    from slopmortem.stages.facet_extract import extract_facets  # noqa: PLC0415
 
     if facets is None:
         facets = await extract_facets(
@@ -92,7 +95,7 @@ async def recall(
         return []
 
     wayback = deps.wayback if deps.wayback is not None else WaybackEnricher()
-    return await verify_all(
+    return await _verify_all(
         suggestions,
         wayback=wayback,
         llm=deps.llm,

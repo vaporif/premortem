@@ -65,7 +65,7 @@ from slopmortem.llm import (
     render_prompt,
 )
 from slopmortem.models import Candidate, CandidatePayload, Facets, RawEntry
-from slopmortem.recall._verify import _recall_source_id
+from slopmortem.recall import recall_source_id
 from slopmortem.stages import extract_facets, persist_recall_entry, retrieve
 
 if TYPE_CHECKING:
@@ -151,7 +151,7 @@ def _suggestion_from_fixture(vendor: dict[str, Any]) -> RecallSuggestion:
 def _entry_for(suggestion: RecallSuggestion, body: str) -> RawEntry:
     return RawEntry(
         source=SOURCE_LLM_RECALL,
-        source_id=_recall_source_id(suggestion),
+        source_id=recall_source_id(suggestion),
         url=str(suggestion.homepage_url),
         markdown_text=body,
         raw_html=None,

@@ -190,7 +190,7 @@ class DeathnessConfig:
     struggling_min_confidence: float
 
 
-def _recall_source_id(suggestion: RecallSuggestion) -> str:
+def recall_source_id(suggestion: RecallSuggestion) -> str:
     """Stable id keyed on (name, homepage_url) when present, (name,) otherwise.
 
     Same vendor → same source_id. Without a homepage, falling back to
@@ -871,7 +871,7 @@ async def verify_suggestion(  # noqa: PLR0913 - verifier signature carries L0-L5
     # arrive empty for L4 to do its enrichment pass.
     seed = RawEntry(
         source=SOURCE_LLM_RECALL,
-        source_id=_recall_source_id(suggestion),
+        source_id=recall_source_id(suggestion),
         url=homepage,
         # The suggestion's name is trusted (LLM-emitted and L1-validated);
         # threading it here keeps the resolver from keying tier-2 on the

@@ -26,7 +26,7 @@ from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
 from slopmortem.recall._verify import (
     DeathnessConfig,
-    _recall_source_id,
+    recall_source_id,
     verify_suggestion,
 )
 from slopmortem.stages.recall_persist import persist_recall_entry
@@ -319,7 +319,7 @@ async def test_struggling_verdict_lands_in_qdrant_payload(tmp_path: Path) -> Non
     body = (sentence + " ") * 30
     entry = RawEntry(
         source=SOURCE_LLM_RECALL,
-        source_id=_recall_source_id(sug),
+        source_id=recall_source_id(sug),
         url=str(sug.homepage_url),
         markdown_text=body,
         raw_html=None,

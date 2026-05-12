@@ -32,8 +32,7 @@ from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, ren
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import Candidate, CandidatePayload, Facets, InputContext, RawEntry
 from slopmortem.pipeline import PersistDeps, run_query
-from slopmortem.recall import RecallDeps
-from slopmortem.recall._verify import _recall_source_id
+from slopmortem.recall import RecallDeps, recall_source_id
 from slopmortem.stages import synthesize_prompt_kwargs
 from slopmortem.stages.recall_persist import persist_recall_entry
 from tests.recall.test_search_head import FakeTavilyExtract, FakeTavilySearch
@@ -125,7 +124,7 @@ def _suggestion() -> RecallSuggestion:
 def _entry_for(suggestion: RecallSuggestion) -> RawEntry:
     return RawEntry(
         source=SOURCE_LLM_RECALL,
-        source_id=_recall_source_id(suggestion),
+        source_id=recall_source_id(suggestion),
         url=str(suggestion.homepage_url),
         markdown_text=_BODY,
         raw_html=None,
