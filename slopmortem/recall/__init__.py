@@ -14,7 +14,7 @@ from lmnr import Laminar
 
 from slopmortem.corpus.sources import WaybackEnricher
 from slopmortem.recall._brainstorm import PriorCandidateHint as PriorCandidateHint
-from slopmortem.recall._brainstorm import llm_recall
+from slopmortem.recall._brainstorm import llm_recall as _llm_recall
 from slopmortem.recall._models import RecallConfig as RecallConfig
 from slopmortem.recall._models import RecallDeps as RecallDeps
 from slopmortem.recall._verify import DeathnessConfig as DeathnessConfig
@@ -74,7 +74,7 @@ async def recall(
             max_tokens=config.max_tokens_facet,
         )
 
-    suggestions = await llm_recall(
+    suggestions = await _llm_recall(
         pitch=pitch,
         facets=facets,
         current_top_n=prior_hints if prior_hints is not None else [],
