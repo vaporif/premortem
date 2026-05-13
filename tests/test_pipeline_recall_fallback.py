@@ -6,8 +6,8 @@ predicate evaluation, the ``force_llm_recall`` bypass, the single-pass
 guarantee, and ``PipelineMeta`` flag surfacing.
 
 All upstream dependencies are faked. The verifier's HTTP probes are patched
-at ``slopmortem.stages.recall_verify.safe_head`` / ``safe_get`` — same
-shape as ``tests/stages/test_recall_verify.py``.
+at ``slopmortem.recall._verify.safe_head`` / ``safe_get`` — same
+shape as ``tests/recall/test_verify.py``.
 """
 
 from __future__ import annotations
@@ -33,14 +33,16 @@ from slopmortem.models import (
     Facets,
     InputContext,
 )
-from slopmortem.pipeline import RecallDeps, run_query
+from slopmortem.pipeline import PersistDeps, run_query
+from slopmortem.recall import FakeRecaller, RecallDeps, VerifiedEntry
 from slopmortem.stages import synthesize_prompt_kwargs
-from tests.stages.test_recall_search_head import FakeTavilyExtract, FakeTavilySearch
+from tests.recall.test_search_head import FakeTavilyExtract, FakeTavilySearch
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
+    from slopmortem.llm import LLMClient
     from slopmortem.models import RawEntry
 
 
@@ -464,8 +466,8 @@ def _patch_recall_http(monkeypatch: pytest.MonkeyPatch) -> None:
             raise AssertionError(msg)
         return get_map[url]
 
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_head", fake_head)
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_get", fake_get)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_head", fake_head)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_get", fake_get)
 
 
 class _NoOpWayback:
@@ -643,16 +645,22 @@ def _build_canned(  # noqa: PLR0913 - test fixture: every parameter shapes a can
     return canned
 
 
-async def _make_recall_deps(tmp_path: Path) -> RecallDeps:
-    journal = MergeJournal(tmp_path / "j.sqlite")
-    await journal.init()
+async def _make_recall_deps(llm: LLMClient) -> RecallDeps:
     return RecallDeps(
-        journal=journal,
-        slop_classifier=FakeSlopClassifier(default_score=0.0),
-        post_mortems_root=tmp_path / "post_mortems",
+        llm=llm,
         tavily_search=FakeTavilySearch(default=_tavily_hits()),
         extract=FakeTavilyExtract(),
         wayback=_NoOpWayback(),
+    )
+
+
+async def _make_persist_deps(tmp_path: Path) -> PersistDeps:
+    journal = MergeJournal(tmp_path / "j.sqlite")
+    await journal.init()
+    return PersistDeps(
+        journal=journal,
+        slop_classifier=FakeSlopClassifier(default_score=0.0),
+        post_mortems_root=tmp_path / "post_mortems",
     )
 
 
@@ -686,7 +694,8 @@ async def test_pipeline_recall_fires_on_zero_candidates(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     report = await run_query(
         ctx,
@@ -697,6 +706,7 @@ async def test_pipeline_recall_fires_on_zero_candidates(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     assert report.pipeline_meta.coverage_gap is True
@@ -775,7 +785,8 @@ async def test_pipeline_recall_trigger_fires_when_qualifying_low(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     report = await run_query(
         ctx,
@@ -786,6 +797,7 @@ async def test_pipeline_recall_trigger_fires_when_qualifying_low(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     assert report.pipeline_meta.coverage_gap is True
@@ -824,7 +836,8 @@ async def test_pipeline_force_llm_recall_bypasses_quiet_predicate(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     report = await run_query(
         ctx,
@@ -835,6 +848,7 @@ async def test_pipeline_force_llm_recall_bypasses_quiet_predicate(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     assert report.pipeline_meta.coverage_gap is False
@@ -870,7 +884,8 @@ async def test_pipeline_force_llm_recall_with_quiet_trigger(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     report = await run_query(
         ctx,
@@ -881,6 +896,7 @@ async def test_pipeline_force_llm_recall_with_quiet_trigger(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     assert report.pipeline_meta.coverage_gap is False
@@ -920,7 +936,8 @@ async def test_pipeline_recall_max_one_pass(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     report = await run_query(
         ctx,
@@ -931,6 +948,7 @@ async def test_pipeline_recall_max_one_pass(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     assert len(llm.recall_calls) == 1
@@ -977,6 +995,45 @@ async def test_pipeline_recall_raises_when_recall_deps_missing(
         )
 
 
+async def test_pipeline_force_llm_recall_raises_when_persist_deps_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``force_llm_recall=True`` with ``persist_deps=None`` raises so misconfig surfaces.
+
+    Mirrors the existing ``recall_deps=None`` guard. The two records split
+    apart in the recall extraction; both must be present for recall to fire.
+    """
+    cfg = _build_config(k_retrieve=6, n_synthesize=3, force_llm_recall=True)
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    base = [_candidate(f"cand-{i}") for i in range(cfg.K_retrieve)]
+    corpus = _HybridCorpus(base_candidates=base)
+    canned = _build_canned(
+        retrieved=base,
+        top_n=base[: cfg.N_synthesize],
+        ctx=ctx,
+        cfg=cfg,
+    )
+    inner = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    llm = _RecallRoutingLLM(inner=inner, recall_responses=[])
+    embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    budget = Budget(cap_usd=2.0)
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
+    deps = await _make_recall_deps(llm)
+
+    with pytest.raises(RuntimeError, match="force_llm_recall=True but PersistDeps not provided"):
+        await run_query(
+            ctx,
+            llm=llm,
+            embedding_client=embed,
+            corpus=corpus,
+            config=cfg,
+            budget=budget,
+            sparse_encoder=_stub_sparse,
+            recall_deps=deps,
+            persist_deps=None,
+        )
+
+
 async def test_pipeline_recall_raises_when_sparse_encoder_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1000,7 +1057,8 @@ async def test_pipeline_recall_raises_when_sparse_encoder_missing(
     embed = FakeEmbeddingClient(model=_EMBED_MODEL)
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     with pytest.raises(RuntimeError, match="recall requires sparse_encoder"):
         await run_query(
@@ -1012,6 +1070,7 @@ async def test_pipeline_recall_raises_when_sparse_encoder_missing(
             budget=budget,
             sparse_encoder=None,
             recall_deps=deps,
+            persist_deps=persist_deps,
         )
 
 
@@ -1049,7 +1108,8 @@ async def test_pipeline_recall_lowers_synth_floor_when_persisted(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     report = await run_query(
         ctx,
@@ -1060,6 +1120,7 @@ async def test_pipeline_recall_lowers_synth_floor_when_persisted(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     # Recall fired and persisted alpha; the 3.5 rerank score clears the
@@ -1109,7 +1170,8 @@ async def test_pipeline_recall_lowers_post_synth_floor_when_persisted(
     budget = Budget(cap_usd=2.0)
     monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
     _patch_recall_http(monkeypatch)
-    deps = await _make_recall_deps(tmp_path)
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
 
     report = await run_query(
         ctx,
@@ -1120,6 +1182,7 @@ async def test_pipeline_recall_lowers_post_synth_floor_when_persisted(
         budget=budget,
         sparse_encoder=_stub_sparse,
         recall_deps=deps,
+        persist_deps=persist_deps,
     )
 
     assert report.pipeline_meta.recall_used is True
@@ -1218,3 +1281,92 @@ async def test_gap_score_event_emitted_on_every_query(
     # Quiet predicate: gate event must not fire and recall stays untouched.
     assert not any(e["name"] == "recall.gate_fired" for e in events)
     assert report.pipeline_meta.coverage_gap is False
+
+
+def _stub_verified_entry_for_pipeline(name: str) -> VerifiedEntry:
+    """Minimal VerifiedEntry for pipeline persist-isolation tests."""
+    from datetime import UTC, datetime  # noqa: PLC0415 - test-local
+
+    from slopmortem.models import RawEntry  # noqa: PLC0415 - test-local
+
+    return VerifiedEntry(
+        entry=RawEntry(
+            source="llm_recall",
+            source_id=f"recall::{name}",
+            url=f"https://{name}.example.com",
+            title=name.title(),
+            raw_html=None,
+            markdown_text=f"{name} shut down operations.",
+            fetched_at=datetime.now(UTC),
+        ),
+        tier="evidence_only",
+        verdict="dead",
+    )
+
+
+async def test_pipeline_persist_failure_isolates_per_suggestion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """One ``persist_recall_entry`` raising must not abort sibling persists.
+
+    Per-suggestion isolation is enforced by ``_persist_one`` in
+    ``pipeline._run_recall_branch``.
+    """
+    cfg = _build_config(k_retrieve=6, n_synthesize=3)
+    ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")
+    persisted = _candidate("alpha-stub")
+    corpus = _HybridCorpus(base_candidates=[], augment_with=persisted)
+    canned = _build_canned(
+        retrieved=[],
+        top_n=[],
+        ctx=ctx,
+        cfg=cfg,
+        second_pass=[persisted],
+        second_pass_top_n=[persisted],
+    )
+    inner = FakeLLMClient(canned=canned, default_model=_SYNTH_MODEL)
+    llm = _RecallRoutingLLM(inner=inner, recall_responses=[])
+    embed = FakeEmbeddingClient(model=_EMBED_MODEL)
+    budget = Budget(cap_usd=2.0)
+    monkeypatch.setattr("slopmortem.corpus._embed_sparse.encode", _stub_sparse)
+
+    call_count = {"n": 0}
+
+    async def flaky_persist(*_args: object, **_kwargs: object) -> None:
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            msg = "simulated persist failure"
+            raise RuntimeError(msg)
+
+    monkeypatch.setattr("slopmortem.pipeline.persist_recall_entry", flaky_persist)
+
+    fake_recaller = FakeRecaller(
+        verified=[
+            _stub_verified_entry_for_pipeline("a"),
+            _stub_verified_entry_for_pipeline("b"),
+        ],
+    )
+    monkeypatch.setattr("slopmortem.pipeline.recall", fake_recaller)
+
+    deps = await _make_recall_deps(llm)
+    persist_deps = await _make_persist_deps(tmp_path)
+
+    report = await run_query(
+        ctx,
+        llm=llm,
+        embedding_client=embed,
+        corpus=corpus,
+        config=cfg,
+        budget=budget,
+        sparse_encoder=_stub_sparse,
+        recall_deps=deps,
+        persist_deps=persist_deps,
+    )
+
+    assert report.pipeline_meta.recall_persisted_count == 1
+    assert report.pipeline_meta.recall_used is True
+    # FakeRecaller saw exactly one call with the right pitch.
+    assert len(fake_recaller.calls) == 1
+    assert fake_recaller.calls[0].pitch == ctx.description
+    # Two persist attempts: one raised, one succeeded.
+    assert call_count["n"] == 2

@@ -17,11 +17,13 @@ from slopmortem.ingest import FakeSlopClassifier, IngestResult, InMemoryCorpus, 
 from slopmortem.ingest._helpers import _build_payload
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.models import Facets, RawEntry, RecallSuggestion
+from slopmortem.recall import recall_source_id
 from slopmortem.stages.recall_persist import persist_recall_entry
-from slopmortem.stages.recall_verify import VerificationTier, _recall_source_id
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from slopmortem.recall import VerificationTier
 
 
 _HAIKU = "anthropic/claude-haiku-4.5"
@@ -78,7 +80,7 @@ def _entry_for(suggestion: RecallSuggestion) -> RawEntry:
     """Mirror the verifier's RawEntry shape: ``source=llm_recall``, deterministic id."""
     return RawEntry(
         source=SOURCE_LLM_RECALL,
-        source_id=_recall_source_id(suggestion),
+        source_id=recall_source_id(suggestion),
         url=str(suggestion.homepage_url),
         markdown_text=_BODY,
         raw_html=None,
@@ -161,8 +163,8 @@ def test_persist_deterministic_source_id() -> None:
     a = _suggestion(name="Hexagate", homepage="https://hexagate.example/")
     b = _suggestion(name="Hexagate", homepage="https://hexagate.example/")
     c = _suggestion(name="Hexagate", homepage="https://hexagate-different.example/")
-    assert _recall_source_id(a) == _recall_source_id(b)
-    assert _recall_source_id(a) != _recall_source_id(c)
+    assert recall_source_id(a) == recall_source_id(b)
+    assert recall_source_id(a) != recall_source_id(c)
 
 
 @pytest.mark.parametrize("tier", ["wayback_anchored", "evidence_only"])

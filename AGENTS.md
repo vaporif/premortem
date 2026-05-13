@@ -60,7 +60,7 @@ Precedence (highest wins): env vars → `.env` → `slopmortem.local.toml` → `
 - **Slop classifier** quarantines docs above `slop_threshold` to `post_mortems/quarantine/` — they get *no* Qdrant point and *no* journal row. `--reclassify` is the only way back.
 - **Lazy ONNX loading** — fastembed model loads on first call. Tests pass a no-op stub so `just test` doesn't trigger the ~550 MB download. Don't eager-load at import time.
 - **Prompt cache warm pattern** (`slopmortem/ingest.py`): first entry runs alone, then the rest fan out. Emits `CACHE_READ_RATIO_LOW` if the ratio drops under 0.80 across the first 5 responses. Preserve this when refactoring ingest.
-- **Injection marker** (`slopmortem/stages/synthesize.py`): when the synthesis LLM emits `where_diverged == "prompt_injection_attempted"` (compared against `_INJECTION_MARKER` at `synthesize.py:129`), the stage flips `injection_detected=True` and `consolidate_risks` short-circuits to an empty risk list. Don't normalize the marker string away in prompts or post-processing.
+- **Injection marker** (`slopmortem/stages/synthesize.py`): when the synthesis LLM emits `where_diverged == "prompt_injection_attempted"` (compared against `_INJECTION_MARKER` defined at `synthesize.py:72`, compared at `synthesize.py:122`), the stage flips `injection_detected=True` and `consolidate_risks` short-circuits to an empty risk list. Don't normalize the marker string away in prompts or post-processing.
 
 ## Forbidden / discouraged
 

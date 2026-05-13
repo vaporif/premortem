@@ -1,10 +1,10 @@
-"""Tests for ``stages.recall_verify``: L1-L5 gates plus fan-out isolation."""
+"""Tests for ``recall._verify``: L1-L5 gates plus fan-out isolation."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -13,21 +13,18 @@ from slopmortem.corpus.tavily import TavilyHit
 from slopmortem.http import SSRFBlockedError
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
-from slopmortem.stages import recall_verify as _rv
-from slopmortem.stages.recall_verify import (
+from slopmortem.recall import _verify as _rv
+from slopmortem.recall._verify import (
     _DEATH_KEYWORDS,
     DeathnessConfig,
-    VerificationTier,
     _build_status_shaped_query,
-    verify_and_persist_all,
+    verify_all,
     verify_suggestion,
 )
 from slopmortem.tracing import SpanEvent
-from tests.stages.test_recall_search_head import FakeTavilyExtract, FakeTavilySearch
+from tests.recall.test_search_head import FakeTavilyExtract, FakeTavilySearch
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
     import pytest
 
 
@@ -204,8 +201,8 @@ def _patch_http(
             raise item
         return item
 
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_head", fake_head)
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_get", fake_get)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_head", fake_head)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_get", fake_get)
 
 
 async def test_l2_rejects_404_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -590,31 +587,17 @@ async def test_verify_all_via_gather_resilient_isolates_failures(
     tavily = FakeTavilySearch(default=[])
     tavily.response_map = {_build_status_shaped_query(s): [_hit_for(s)] for s in sugs}
     wb = _FakeWayback(enriched_text=None)
-    persisted: list[tuple[RawEntry, VerificationTier, Literal["dead", "struggling"]]] = []
-
-    async def persist(
-        entry: RawEntry,
-        tier: VerificationTier,
-        verdict: Literal["dead", "struggling"],
-    ) -> None:
-        persisted.append((entry, tier, verdict))
-
-    typed_persist: Callable[
-        [RawEntry, VerificationTier, Literal["dead", "struggling"]], Awaitable[None]
-    ] = persist
-    out = await verify_and_persist_all(
+    out = await verify_all(
         sugs,
         wayback=wb,
-        persist=typed_persist,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         tavily_search=tavily,
         tavily_recall_max_results=5,
         extract=_NEVER_EXTRACT,
         deathness=_DEATHNESS,
     )
-    assert {e.source_id for e in out} == {p[0].source_id for p in persisted}
     assert len(out) == 2
-    names_in_bodies = {(entry.markdown_text or "").lower() for entry, _, _ in persisted}
+    names_in_bodies = {(v.entry.markdown_text or "").lower() for v in out}
     assert any("alphaco" in body for body in names_in_bodies)
     assert any("gammaco" in body for body in names_in_bodies)
 
@@ -625,10 +608,10 @@ async def test_death_keywords_cover_terminal_and_distress() -> None:
         assert kw in _DEATH_KEYWORDS
 
 
-async def test_verify_skips_persist_for_dropped_suggestions(
+async def test_verify_drops_rejected_suggestions_from_returned_list(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``verify_and_persist_all`` only invokes ``persist`` on accepted entries."""
+    """``verify_all`` returns only accepted entries; L0/L2/L4/L5-drops are absent."""
     sug = _suggestion("DroppedCo")
     discovered = _discovered(sug.name)
     _patch_http(
@@ -637,19 +620,9 @@ async def test_verify_skips_persist_for_dropped_suggestions(
         get_responses={discovered: _FakeResp(status=404)},
     )
     wb = _FakeWayback()
-    persisted: list[RawEntry] = []
-
-    async def persist(
-        entry: RawEntry,
-        _tier: VerificationTier,
-        _verdict: Literal["dead", "struggling"],
-    ) -> None:
-        persisted.append(entry)
-
-    out = await verify_and_persist_all(
+    out = await verify_all(
         [sug],
         wayback=wb,
-        persist=persist,
         llm=_FakeLLM(default=_DEATHNESS_PASS),
         tavily_search=_tavily_for([sug]),
         tavily_recall_max_results=5,
@@ -657,7 +630,6 @@ async def test_verify_skips_persist_for_dropped_suggestions(
         deathness=_DEATHNESS,
     )
     assert out == []
-    assert persisted == []
 
 
 async def test_seed_entry_carries_recall_provenance(monkeypatch: pytest.MonkeyPatch) -> None:

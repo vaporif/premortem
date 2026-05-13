@@ -24,13 +24,13 @@ from slopmortem.ingest import FakeSlopClassifier, IngestResult, InMemoryCorpus, 
 from slopmortem.llm import FakeEmbeddingClient, FakeLLMClient, FakeResponse, render_prompt
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
-from slopmortem.stages.recall_persist import persist_recall_entry
-from slopmortem.stages.recall_verify import (
+from slopmortem.recall._verify import (
     DeathnessConfig,
-    _recall_source_id,
+    recall_source_id,
     verify_suggestion,
 )
-from tests.stages.test_recall_search_head import FakeTavilyExtract
+from slopmortem.stages.recall_persist import persist_recall_entry
+from tests.recall.test_search_head import FakeTavilyExtract
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -141,8 +141,8 @@ def _patch_http(
             raise AssertionError(msg)
         return get_responses[url]
 
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_head", fake_head)
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_get", fake_get)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_head", fake_head)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_get", fake_get)
 
 
 def _suggestion(name: str = "Acme") -> RecallSuggestion:
@@ -319,7 +319,7 @@ async def test_struggling_verdict_lands_in_qdrant_payload(tmp_path: Path) -> Non
     body = (sentence + " ") * 30
     entry = RawEntry(
         source=SOURCE_LLM_RECALL,
-        source_id=_recall_source_id(sug),
+        source_id=recall_source_id(sug),
         url=str(sug.homepage_url),
         markdown_text=body,
         raw_html=None,

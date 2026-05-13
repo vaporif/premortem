@@ -1,4 +1,4 @@
-"""Tests for the L3 Tavily ``/extract`` fallback in ``stages.recall_verify``.
+"""Tests for the L3 Tavily ``/extract`` fallback in ``recall._verify``.
 
 The fallback fires when direct GET on a citation URL either 4xx's (Medium
 returns 403 to our user-agent, etc.) or returns a body too short to admit
@@ -16,13 +16,13 @@ import httpx
 
 from slopmortem.llm.client import CompletionResult
 from slopmortem.models import RawEntry, RecallSuggestion
-from slopmortem.stages import recall_verify as _rv
-from slopmortem.stages.recall_verify import (
+from slopmortem.recall import _verify as _rv
+from slopmortem.recall._verify import (
     DeathnessConfig,
     verify_suggestion,
 )
 from slopmortem.tracing import SpanEvent
-from tests.stages.test_recall_search_head import FakeTavilyExtract
+from tests.recall.test_search_head import FakeTavilyExtract
 
 if TYPE_CHECKING:
     import pytest
@@ -133,8 +133,8 @@ def _patch_http(
             raise item
         return item
 
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_head", fake_head)
-    monkeypatch.setattr("slopmortem.stages.recall_verify.safe_get", fake_get)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_head", fake_head)
+    monkeypatch.setattr("slopmortem.recall._verify.safe_get", fake_get)
 
 
 def _capture_events(monkeypatch: pytest.MonkeyPatch) -> list[tuple[SpanEvent, dict[str, str]]]:

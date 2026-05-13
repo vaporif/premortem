@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from slopmortem.corpus.sources._names import SOURCE_LLM_RECALL as SOURCE_LLM_RECALL
 from slopmortem.corpus.sources.base import Enricher as Enricher
 from slopmortem.corpus.sources.base import Source as Source
 from slopmortem.corpus.sources.crunchbase_csv import CrunchbaseCsvSource as CrunchbaseCsvSource
@@ -12,6 +13,7 @@ from slopmortem.corpus.sources.tavily_news import TavilyNewsSource as TavilyNews
 from slopmortem.corpus.sources.wayback import WaybackEnricher as WaybackEnricher
 
 __all__ = [
+    "SOURCE_LLM_RECALL",
     "CrunchbaseCsvSource",
     "CuratedSource",
     "Enricher",

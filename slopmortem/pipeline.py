@@ -13,31 +13,36 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
+import anyio
 from dateutil.relativedelta import relativedelta
 from lmnr import Laminar, observe
 
 from slopmortem.budget import BudgetExceededError
-from slopmortem.corpus.sources import WaybackEnricher
+from slopmortem.concurrency import gather_resilient
 from slopmortem.ingest import IngestResult, NullProgress
 from slopmortem.llm import recall_tools
 from slopmortem.models import PipelineMeta, Report, Synthesis, TopRisks
+from slopmortem.recall import (
+    DeathnessConfig,
+    PriorCandidateHint,
+    RecallConfig,
+    RecallDeps,
+    VerifiedEntry,
+    recall,
+)
 from slopmortem.stages import (
     compute_coverage_gap,
     consolidate_risks,
     drop_below_min_similarity,
     extract_facets,
-    llm_recall,
     llm_rerank,
     persist_recall_entry,
     retrieve,
     select_top_n_by_similarity,
     synthesize_all,
-    verify_and_persist_all,
 )
-from slopmortem.stages.llm_recall import PriorCandidateHint
-from slopmortem.stages.recall_verify import DeathnessConfig
 from slopmortem.tracing import SpanEvent, git_sha, mint_run_id
 
 if TYPE_CHECKING:
@@ -46,7 +51,6 @@ if TYPE_CHECKING:
     from slopmortem.budget import Budget
     from slopmortem.config import Config
     from slopmortem.corpus import Corpus, MergeJournal
-    from slopmortem.corpus.sources import Enricher
     from slopmortem.ingest import Corpus as IngestCorpus
     from slopmortem.ingest import SlopClassifier
     from slopmortem.llm import EmbeddingClient, LLMClient
@@ -55,10 +59,8 @@ if TYPE_CHECKING:
         Facets,
         InputContext,
         LlmRerankResult,
-        RawEntry,
     )
-    from slopmortem.stages import SparseEncoder, VerificationTier
-    from slopmortem.stages.recall_verify import ExtractFn, TavilySearchFn
+    from slopmortem.stages import SparseEncoder
 
 
 logger = logging.getLogger(__name__)
@@ -75,28 +77,18 @@ class QueryPhase(StrEnum):
 
 
 @dataclass(frozen=True)
-class RecallDeps:
+class PersistDeps:
     """Long-lived deps the recall persist tail needs.
 
-    The pipeline raises ``RuntimeError`` when recall fires without these, so
-    misconfig surfaces at the call site instead of no-oping mid-run.
-
-    ``tavily_search`` is the mandatory L0 search head; ``extract`` is the L3
-    fallback for GET-4xx hosts and SPA shells. Both ride
-    ``enable_tavily_recall_search``.
-
-    ``wayback=None`` lets production wiring construct ``WaybackEnricher()``
-    lazily; tests inject a fake to skip archive.org.
+    Split from ``RecallDeps`` so the recall subsystem doesn't see the
+    journal, slop classifier, or post_mortems_root. The pipeline raises
+    ``RuntimeError`` when recall fires without both ``RecallDeps`` and
+    ``PersistDeps``.
     """
 
     journal: MergeJournal
     slop_classifier: SlopClassifier
     post_mortems_root: Path
-    tavily_search: TavilySearchFn
-    extract: ExtractFn
-    # Typed as the broad ``Enricher`` Protocol so tests can inject a fake
-    # without subclassing ``WaybackEnricher``.
-    wayback: Enricher | None = None
 
 
 @runtime_checkable
@@ -136,6 +128,31 @@ def cutoff_iso(years_filter: int | None) -> str | None:
     return (datetime.now(UTC) - relativedelta(years=years_filter)).date().isoformat()
 
 
+def _recall_config_from(config: Config) -> RecallConfig:
+    """Project the global ``Config`` onto the recall subsystem's narrow surface.
+
+    ``recall_tools(config)`` collapses ``enable_tavily_recall_search`` and
+    ``recall_max_tavily_calls`` into the canonical ``tools=[]`` "disabled"
+    state at this seam; the recall package never imports global ``Config``.
+    """
+    return RecallConfig(
+        model_facet=config.model_facet,
+        max_tokens_facet=config.max_tokens_facet,
+        model_recall=config.model_recall,
+        max_tokens_recall=config.max_tokens_recall,
+        suggestion_cap=config.recall_max_suggestions_per_pitch,
+        tools=recall_tools(config),
+        max_tavily_calls=config.recall_max_tavily_calls,
+        tavily_max_results=config.tavily_recall_max_results,
+        deathness=DeathnessConfig(
+            model=config.model_recall_deathness,
+            max_tokens=config.max_tokens_recall_deathness,
+            min_confidence=config.recall_deathness_min_confidence,
+            struggling_min_confidence=config.recall_struggling_min_confidence,
+        ),
+    )
+
+
 def _current_trace_id(*, enable_tracing: bool) -> str | None:
     # Gated on enable_tracing because @observe can still mint an OTel trace id
     # via TracerWrapper after Laminar.shutdown(), leaking a trace_id into runs
@@ -167,97 +184,69 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
     config: Config,
     sparse_encoder: SparseEncoder,
     recall_deps: RecallDeps,
+    persist_deps: PersistDeps,
 ) -> _RecallOutcome:
-    """Recall fallback: ``llm_recall`` → verify → persist → re-retrieve / re-rerank.
+    """Recall fallback: ``recall(...)`` → persist (concurrent, isolated) → re-retrieve / re-rerank.
 
     Runs at most once per query. Caller owns the ``QueryProgress`` hooks.
     """
-    # Join the reranker's scored ids against the retrieve payloads so the
-    # recall prompt's "already covered" hint block carries human-readable
-    # names rather than ``<slug>::sector`` ids. Top ``N_synthesize`` is the
-    # cap Opus actually competes against downstream — more hints just bloat
-    # prompt tokens without changing dedup judgment.
     by_id: dict[str, Candidate] = {c.canonical_id: c for c in retrieved}
     prior_hints = [
         PriorCandidateHint(name=by_id[sc.candidate_id].payload.name, rationale=sc.rationale)
         for sc in reranked.ranked[: config.N_synthesize]
         if sc.candidate_id in by_id
     ]
-    suggestions = await llm_recall(
-        pitch=input_ctx.description,
+    verified = await recall(
+        input_ctx.description,
         facets=facets,
-        current_top_n=prior_hints,
-        llm=llm,
-        model=config.model_recall,
-        max_tokens=config.max_tokens_recall,
-        cap=config.recall_max_suggestions_per_pitch,
-        tools=recall_tools(config),
-        recall_max_tavily_calls=config.recall_max_tavily_calls,
+        prior_hints=prior_hints,
+        deps=recall_deps,
+        config=_recall_config_from(config),
     )
-    if Laminar.is_initialized():
-        Laminar.event(
-            name=str(SpanEvent.RECALL_SUGGESTIONS_RECEIVED),
-            attributes={"count": len(suggestions)},
-        )
-    if not suggestions:
-        return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
-    # Lazy default: only constructed on the recall path so non-recall queries
-    # don't pay the import-time cost. Tests inject a fake via ``RecallDeps.wayback``.
-    wb = recall_deps.wayback if recall_deps.wayback is not None else WaybackEnricher()
-    # Cast: ``corpus`` satisfies the read-side Corpus Protocol on the caller's
-    # signature, but ``persist_recall_entry`` expects the write-side ingest
-    # Protocol. Production ``QdrantCorpus`` implements both surfaces; tests
-    # use a hybrid fake.
-    ingest_corpus = cast("IngestCorpus", corpus)
-
-    async def _persist(
-        entry: RawEntry,
-        tier: VerificationTier,
-        verdict: Literal["dead", "struggling"],
-    ) -> None:
-        # Per-call progress/result: ``classify_phase`` mutates both for the
-        # one entry being persisted; nothing else reads them. Fresh pair per
-        # call avoids cross-talk if recall fires multiple suggestions in
-        # parallel.
-        await persist_recall_entry(
-            entry,
-            tier,
-            deathness_verdict=verdict,
-            journal=recall_deps.journal,
-            corpus=ingest_corpus,
-            embed_client=embedding_client,
-            llm=llm,
-            slop_classifier=recall_deps.slop_classifier,
-            sparse_encoder=sparse_encoder,
-            config=config,
-            post_mortems_root=recall_deps.post_mortems_root,
-            progress=NullProgress(),
-            result=IngestResult(),
-        )
-        if Laminar.is_initialized():
-            Laminar.event(
-                name=str(SpanEvent.RECALL_PERSISTED),
-                attributes={"tier": tier, "deathness_verdict": verdict},
-            )
-
-    verified = await verify_and_persist_all(
-        suggestions,
-        wayback=wb,
-        persist=_persist,
-        llm=llm,
-        tavily_search=recall_deps.tavily_search,
-        extract=recall_deps.extract,
-        tavily_recall_max_results=config.tavily_recall_max_results,
-        deathness=DeathnessConfig(
-            model=config.model_recall_deathness,
-            max_tokens=config.max_tokens_recall_deathness,
-            min_confidence=config.recall_deathness_min_confidence,
-            struggling_min_confidence=config.recall_struggling_min_confidence,
-        ),
-    )
-    persisted_count = len(verified)
     if not verified:
         return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
+
+    ingest_corpus = cast("IngestCorpus", corpus)
+    # Pre-extraction the OLD verify_and_persist_all released the verify limiter
+    # before awaiting persist, so up to `recall_max_suggestions_per_pitch` (8)
+    # Qdrant upserts + journal writes + slop-classify LLM hops fanned out
+    # unbounded. CapacityLimiter(3) caps that fan-out on the query critical path;
+    # matches the verify-side ceiling so the persist tail can't blow past it.
+    persist_limiter = anyio.CapacityLimiter(3)
+
+    async def _persist_one(v: VerifiedEntry) -> bool:
+        async with persist_limiter:
+            try:
+                await persist_recall_entry(
+                    v.entry,
+                    v.tier,
+                    deathness_verdict=v.verdict,
+                    journal=persist_deps.journal,
+                    corpus=ingest_corpus,
+                    embed_client=embedding_client,
+                    llm=llm,
+                    slop_classifier=persist_deps.slop_classifier,
+                    sparse_encoder=sparse_encoder,
+                    config=config,
+                    post_mortems_root=persist_deps.post_mortems_root,
+                    progress=NullProgress(),
+                    result=IngestResult(),
+                )
+            except Exception as exc:  # noqa: BLE001 - per-suggestion isolation; mirrors today's gather_resilient drop
+                logger.warning("persist_recall_entry failed for %r: %r", v.entry.title, exc)
+                return False
+            if Laminar.is_initialized():
+                Laminar.event(
+                    name=str(SpanEvent.RECALL_PERSISTED),
+                    attributes={"tier": v.tier, "deathness_verdict": v.verdict},
+                )
+            return True
+
+    persist_results = await gather_resilient(*(_persist_one(v) for v in verified))
+    persisted_count = sum(1 for r in persist_results if r is True)
+    if persisted_count == 0:
+        return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
+
     new_retrieved = await retrieve(
         description=input_ctx.description,
         facets=facets,
@@ -279,9 +268,6 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         model=config.model_rerank,
         max_tokens=config.max_tokens_rerank,
     )
-    # Mirror the pre-recall GAP_SCORE shape so a join-on-trace query can pair
-    # before/after. ``gap_closed`` is the derived boolean the calibration
-    # dashboard reads to answer "was recall worth the budget on this query".
     gap_after = compute_coverage_gap(
         retrieved=new_retrieved,
         ranked=new_reranked.ranked,
@@ -322,6 +308,7 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
     progress: QueryProgress | None = None,
     sparse_encoder: SparseEncoder | None = None,
     recall_deps: RecallDeps | None = None,
+    persist_deps: PersistDeps | None = None,
 ) -> Report:
     """Run the query pipeline end-to-end and assemble the ``Report``.
 
@@ -435,18 +422,15 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
         if coverage_gap and Laminar.is_initialized():
             Laminar.event(name=str(SpanEvent.RECALL_GATE_FIRED))
 
-        if should_fire and recall_deps is None:
-            # Predicate-only firings degrade gracefully when deps weren't
-            # threaded through (eval harnesses, focused unit tests). The
-            # production CLI always provides deps; ``force_llm_recall`` still
-            # raises so explicit operator opt-in surfaces misconfig.
+        if should_fire and (recall_deps is None or persist_deps is None):
+            missing = "RecallDeps" if recall_deps is None else "PersistDeps"
             if config.force_llm_recall:
-                msg = "force_llm_recall=True but RecallDeps not provided"
+                msg = f"force_llm_recall=True but {missing} not provided"
                 raise RuntimeError(msg)
-            logger.info("coverage_gap fired but RecallDeps not provided; skipping recall")
+            logger.info("coverage_gap fired but %s not provided; skipping recall", missing)
             should_fire = False
 
-        if should_fire and recall_deps is not None:
+        if should_fire and recall_deps is not None and persist_deps is not None:
             if sparse_encoder is None:
                 msg = "recall requires sparse_encoder"
                 raise RuntimeError(msg)
@@ -463,6 +447,7 @@ async def run_query(  # noqa: PLR0913, C901, PLR0915 - orchestration: every phas
                 config=config,
                 sparse_encoder=sparse_encoder,
                 recall_deps=recall_deps,
+                persist_deps=persist_deps,
             )
             retrieved = outcome.retrieved
             reranked = outcome.reranked

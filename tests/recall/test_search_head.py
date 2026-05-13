@@ -1,4 +1,4 @@
-"""Tests for ``stages.recall_verify._search_for_evidence`` (L0 Tavily head)."""
+"""Tests for ``recall._verify._search_for_evidence`` (L0 Tavily head)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ import httpx
 
 from slopmortem.corpus.tavily import TavilyHit
 from slopmortem.models import RecallSuggestion
-from slopmortem.stages import recall_verify as _rv
-from slopmortem.stages.recall_verify import (
+from slopmortem.recall import _verify as _rv
+from slopmortem.recall._verify import (
     _build_status_shaped_query as _status_shaped_query,
 )
-from slopmortem.stages.recall_verify import (
+from slopmortem.recall._verify import (
     _search_for_evidence,
 )
 from slopmortem.tracing import SpanEvent

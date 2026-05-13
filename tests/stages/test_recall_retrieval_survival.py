@@ -29,7 +29,7 @@ upserted chunks, with parent-collapse and the production
 second test wants the same surface.
 
 The combined-body construction below mirrors the shape Task 3 will lift into
-``slopmortem/stages/recall_verify._combine_recall_body``. After Task 3
+``slopmortem/recall/_verify._combine_recall_body``. After Task 3
 lands, swap the inline block for a direct call to that helper so this test
 tracks the production combiner.
 """
@@ -65,8 +65,8 @@ from slopmortem.llm import (
     render_prompt,
 )
 from slopmortem.models import Candidate, CandidatePayload, Facets, RawEntry
+from slopmortem.recall import recall_source_id
 from slopmortem.stages import extract_facets, persist_recall_entry, retrieve
-from slopmortem.stages.recall_verify import _recall_source_id
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -151,7 +151,7 @@ def _suggestion_from_fixture(vendor: dict[str, Any]) -> RecallSuggestion:
 def _entry_for(suggestion: RecallSuggestion, body: str) -> RawEntry:
     return RawEntry(
         source=SOURCE_LLM_RECALL,
-        source_id=_recall_source_id(suggestion),
+        source_id=recall_source_id(suggestion),
         url=str(suggestion.homepage_url),
         markdown_text=body,
         raw_html=None,

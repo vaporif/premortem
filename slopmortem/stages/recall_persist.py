@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     )
     from slopmortem.llm import EmbeddingClient, LLMClient
     from slopmortem.models import RawEntry
-    from slopmortem.stages.recall_verify import VerificationTier
+    from slopmortem.recall import VerificationTier
 
 __all__ = ["persist_recall_entry"]
 

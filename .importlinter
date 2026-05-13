@@ -20,6 +20,7 @@ source_modules =
     slopmortem.evals
     slopmortem.tracing
     slopmortem.llm
+    slopmortem.recall
 forbidden_modules =
     slopmortem.corpus._chunk
     slopmortem.corpus._disk
@@ -48,6 +49,7 @@ source_modules =
     slopmortem.evals
     slopmortem.corpus
     slopmortem.tracing
+    slopmortem.recall
 forbidden_modules =
     slopmortem.llm.cassettes
     slopmortem.llm.client
@@ -80,6 +82,7 @@ source_modules =
     slopmortem.ingest
     slopmortem.pipeline
     slopmortem.evals
+    slopmortem.recall
 forbidden_modules =
     slopmortem.corpus.sources.base
     slopmortem.corpus.sources.crunchbase_csv
@@ -100,6 +103,7 @@ source_modules =
     slopmortem.evals
     slopmortem.corpus
     slopmortem.llm
+    slopmortem.recall
 forbidden_modules =
     slopmortem.tracing.events
 
@@ -143,3 +147,21 @@ forbidden_modules =
     slopmortem.cli._ingest_cmd
     slopmortem.cli._query_cmd
     slopmortem.cli._replay_cmd
+
+[importlinter:contract:recall-private]
+name = recall._* is private — outside imports go through __init__
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    slopmortem.cli
+    slopmortem.ingest
+    slopmortem.pipeline
+    slopmortem.stages
+    slopmortem.evals
+    slopmortem.corpus
+    slopmortem.llm
+    slopmortem.tracing
+forbidden_modules =
+    slopmortem.recall._brainstorm
+    slopmortem.recall._models
+    slopmortem.recall._verify

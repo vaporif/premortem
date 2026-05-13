@@ -15,7 +15,7 @@ from openai import AsyncOpenAI
 from slopmortem.budget import Budget
 from slopmortem.llm import CompletionResult, LLMClient, OpenRouterClient
 from slopmortem.models import Facets
-from slopmortem.stages.llm_recall import PriorCandidateHint, llm_recall
+from slopmortem.recall._brainstorm import PriorCandidateHint, llm_recall
 
 CASSETTE_FILE = (
     Path(__file__).parent.parent / "fixtures" / "cassettes" / "recall" / "llm_recall_hacken.yaml"

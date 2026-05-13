@@ -12,8 +12,8 @@ import sys
 
 from slopmortem.config import load_config
 from slopmortem.deps import build_deps
+from slopmortem.recall._brainstorm import llm_recall
 from slopmortem.stages.facet_extract import extract_facets
-from slopmortem.stages.llm_recall import llm_recall
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 for noisy in ("httpx", "httpcore", "lmnr", "urllib3"):
@@ -39,6 +39,7 @@ async def main(pitch: str) -> None:
         model=config.model_recall,
         max_tokens=config.max_tokens_recall,
         cap=config.recall_max_suggestions_per_pitch,
+        tools=[],
     )
     print(f"\n=== Opus returned {len(suggestions)} suggestion(s) ===\n")
     for i, s in enumerate(suggestions, 1):
