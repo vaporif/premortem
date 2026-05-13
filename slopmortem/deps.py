@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from slopmortem.corpus import Corpus
     from slopmortem.corpus.tavily import TavilyHit
     from slopmortem.llm import EmbeddingClient, LLMClient
-    from slopmortem.recall._verify import ExtractFn, TavilySearchFn
+    from slopmortem.recall import ExtractFn, TavilySearchFn
     from slopmortem.stages import SparseEncoder
 
 

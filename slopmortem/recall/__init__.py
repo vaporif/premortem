@@ -18,6 +18,8 @@ from slopmortem.recall._brainstorm import llm_recall as _llm_recall
 from slopmortem.recall._models import RecallConfig as RecallConfig
 from slopmortem.recall._models import RecallDeps as RecallDeps
 from slopmortem.recall._verify import DeathnessConfig as DeathnessConfig
+from slopmortem.recall._verify import ExtractFn as ExtractFn
+from slopmortem.recall._verify import TavilySearchFn as TavilySearchFn
 from slopmortem.recall._verify import VerificationTier as VerificationTier
 from slopmortem.recall._verify import VerifiedEntry as VerifiedEntry
 from slopmortem.recall._verify import recall_source_id as recall_source_id
@@ -31,10 +33,12 @@ if TYPE_CHECKING:
 
 __all__ = [
     "DeathnessConfig",
+    "ExtractFn",
     "FakeRecaller",
     "PriorCandidateHint",
     "RecallConfig",
     "RecallDeps",
+    "TavilySearchFn",
     "VerificationTier",
     "VerifiedEntry",
     "recall",

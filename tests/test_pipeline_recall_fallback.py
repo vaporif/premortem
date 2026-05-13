@@ -1309,9 +1309,8 @@ async def test_pipeline_persist_failure_isolates_per_suggestion(
 ) -> None:
     """One ``persist_recall_entry`` raising must not abort sibling persists.
 
-    Mirrors the per-suggestion isolation that ``verify_and_persist_all``
-    used to provide internally. After the recall extraction, the same
-    invariant is enforced by ``_persist_one`` in ``pipeline._run_recall_branch``.
+    Per-suggestion isolation is enforced by ``_persist_one`` in
+    ``pipeline._run_recall_branch``.
     """
     cfg = _build_config(k_retrieve=6, n_synthesize=3)
     ctx = InputContext(name="newco", description="A B2B fintech for SMB invoicing")

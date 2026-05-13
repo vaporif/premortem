@@ -207,10 +207,11 @@ async def _run_recall_branch(  # noqa: PLR0913 - leaf helper; every dep flows th
         return _RecallOutcome(retrieved=retrieved, reranked=reranked, persisted_count=0, used=False)
 
     ingest_corpus = cast("IngestCorpus", corpus)
-    # CapacityLimiter(3) mirrors today's verify-time concurrency ceiling.
-    # `recall_max_suggestions_per_pitch` defaults to 8; without the limiter,
-    # up to 8 Qdrant upserts + journal writes + slop-classify LLM hops fan
-    # out concurrently on the query critical path.
+    # Pre-extraction the OLD verify_and_persist_all released the verify limiter
+    # before awaiting persist, so up to `recall_max_suggestions_per_pitch` (8)
+    # Qdrant upserts + journal writes + slop-classify LLM hops fanned out
+    # unbounded. CapacityLimiter(3) caps that fan-out on the query critical path;
+    # matches the verify-side ceiling so the persist tail can't blow past it.
     persist_limiter = anyio.CapacityLimiter(3)
 
     async def _persist_one(v: VerifiedEntry) -> bool:
